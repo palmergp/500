@@ -2,9 +2,11 @@
 //!
 //!   fh-lab play [--seed N] [--watch]
 //!   fh-lab sim  [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]
+//!   fh-lab bench [--deals N]   (double-dummy solver speed)
 //!
 //! STYLE is a persona: steady, rookie, rock, gambler (or random).
 
+mod bench;
 mod sim;
 mod terminal;
 
@@ -17,6 +19,7 @@ fn main() {
         None => ("help", HashMap::new()),
     };
     match command {
+        "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),
         "play" => terminal::run(flag(&flags, "seed", now_seed()), flags.contains_key("watch")),
         "sim" => sim::run(sim::Options {
             games: flag(&flags, "games", 1000),

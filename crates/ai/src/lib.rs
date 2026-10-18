@@ -5,6 +5,7 @@ pub mod cardplay;
 pub mod evaluate;
 pub mod personas;
 pub mod rule_bot;
+pub mod solver;
 
 use fh_core::{Action, Game, Observation, Phase, Rng, Team};
 
