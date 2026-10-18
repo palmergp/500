@@ -1,6 +1,6 @@
 [workspace]
 resolver = "2"
-members = ["crates/core", "crates/ai", "crates/lab"]
+members = ["crates/core", "crates/ai", "crates/lab", "crates/wasm"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,3 +9,6 @@ license = "MIT"
 
 [profile.release]
 debug = 1
+
+[profile.release.package.fh-wasm]
+debug = 0

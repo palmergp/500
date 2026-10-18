@@ -3,10 +3,12 @@
 
 pub mod cardplay;
 pub mod evaluate;
+pub mod personas;
 pub mod rule_bot;
 
 use fh_core::{Action, Game, Observation, Phase, Rng, Team};
 
+pub use personas::{make_bot, persona, Persona, PERSONAS};
 pub use rule_bot::{RuleBot, Style};
 
 pub trait Bot {

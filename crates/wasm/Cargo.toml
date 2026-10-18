@@ -1,0 +1,17 @@
+[package]
+name = "fh-wasm"
+description = "Browser bindings for the 500 engine"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+fh-core = { path = "../core" }
+fh-ai = { path = "../ai" }
+wasm-bindgen = "0.2.129"
+serde-wasm-bindgen = "0.6.5"
+serde_json = "1.0.154"
+serde = { version = "1.0.229", features = ["derive"] }

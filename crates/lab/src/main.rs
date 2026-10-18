@@ -3,7 +3,7 @@
 //!   fh-lab play [--seed N] [--watch]
 //!   fh-lab sim  [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]
 //!
-//! STYLE is one of: steady, cautious, bold, random.
+//! STYLE is a persona: steady, rookie, rock, gambler (or random).
 
 mod sim;
 mod terminal;
@@ -27,7 +27,7 @@ fn main() {
         }),
         _ => {
             println!("usage:\n  fh-lab play [--seed N] [--watch]\n  fh-lab sim [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]");
-            println!("STYLE: steady | cautious | bold | random");
+            println!("STYLE: steady | rookie | rock | gambler | random");
         }
     }
 }
@@ -62,14 +62,8 @@ fn now_seed() -> u64 {
     std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map_or(0, |d| d.as_nanos() as u64)
 }
 
-/// A bot of the named style for `seat`.
-pub fn make_bot(style: &str, seed: u64) -> Box<dyn fh_ai::Bot> {
-    use fh_ai::{RandomBot, RuleBot, Style};
-    match style {
-        "steady" => Box::new(RuleBot::new("Steady", Style::STEADY)),
-        "cautious" => Box::new(RuleBot::new("Cautious", Style::CAUTIOUS)),
-        "bold" => Box::new(RuleBot::new("Bold", Style::BOLD)),
-        "random" => Box::new(RandomBot::new(seed)),
-        other => panic!("unknown bot style {other:?} (steady, cautious, bold, random)"),
-    }
+/// A bot for the named persona.
+pub fn make_bot(persona: &str, seed: u64) -> Box<dyn fh_ai::Bot> {
+    fh_ai::make_bot(persona, seed)
+        .unwrap_or_else(|| panic!("unknown bot {persona:?} (steady, rookie, rock, gambler, random)"))
 }

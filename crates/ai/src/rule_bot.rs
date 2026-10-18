@@ -9,7 +9,7 @@ use crate::Bot;
 use fh_core::cards::{ACE, KING};
 use fh_core::rules::is_trump;
 use fh_core::trick::trick_strength;
-use fh_core::{effective_suit, Action, Call, Card, CardSet, Contract, Observation, Phase, Play, Strain, Suit};
+use fh_core::{effective_suit, Action, Call, Card, CardSet, Contract, Observation, Phase, Play, Rng, Strain, Suit};
 
 /// Bidding temperament.
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -20,22 +20,44 @@ pub struct Style {
     pub partner_credit: f32,
     /// Tricks expected from the kitty.
     pub kitty_credit: f32,
+    /// Random error (± tricks) in each bidding estimate: bidding "by gut".
+    pub bid_noise: f32,
+    /// Chance of playing a random legal card instead of the planned one.
+    pub blunder_rate: f32,
+    /// Whether the bot remembers cards from earlier tricks (otherwise it sees only its hand
+    /// and the current trick).
+    pub remembers_cards: bool,
 }
 
 impl Style {
-    pub const STEADY: Style = Style { aggression: 0.0, partner_credit: 1.5, kitty_credit: 0.5 };
-    pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4 };
-    pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7 };
+    pub const STEADY: Style = Style {
+        aggression: 0.0,
+        partner_credit: 1.5,
+        kitty_credit: 0.5,
+        bid_noise: 0.0,
+        blunder_rate: 0.0,
+        remembers_cards: true,
+    };
+    pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4, ..Style::STEADY };
+    pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7, ..Style::STEADY };
+    pub const ROOKIE: Style = Style {
+        aggression: 0.3,
+        bid_noise: 1.0,
+        blunder_rate: 0.12,
+        remembers_cards: false,
+        ..Style::STEADY
+    };
 }
 
 pub struct RuleBot {
     name: String,
     style: Style,
+    rng: Rng,
 }
 
 impl RuleBot {
-    pub fn new(name: &str, style: Style) -> RuleBot {
-        RuleBot { name: name.to_string(), style }
+    pub fn new(name: &str, style: Style, seed: u64) -> RuleBot {
+        RuleBot { name: name.to_string(), style, rng: Rng::new(seed) }
     }
 
     /// Expected tricks for our side in `strain`, adjusted for what the auction has shown.
@@ -61,9 +83,13 @@ impl RuleBot {
         hand_tricks(obs.hand, strain) + support + self.style.kitty_credit + self.style.aggression
     }
 
-    fn call(&self, obs: &Observation, legal: &[Action]) -> Action {
+    fn call(&mut self, obs: &Observation, legal: &[Action]) -> Action {
         let is_legal = |call: Call| legal.contains(&Action::Call(call));
-        let mut strains: Vec<(Strain, f32)> = Strain::ALL.into_iter().map(|s| (s, self.estimate(obs, s))).collect();
+        let noise = self.style.bid_noise;
+        let mut strains: Vec<(Strain, f32)> = Strain::ALL
+            .into_iter()
+            .map(|s| (s, self.estimate(obs, s) + noise * (2.0 * self.rng.unit() as f32 - 1.0)))
+            .collect();
         strains.sort_by(|a, b| b.1.total_cmp(&a.1));
 
         let partner_high = obs.auction.high_bid().map(|(seat, _)| seat) == Some(obs.seat.partner());
@@ -123,11 +149,18 @@ impl RuleBot {
         Action::Discard(card)
     }
 
-    fn play(&self, obs: &Observation, legal: &[Action]) -> Action {
+    fn play(&mut self, obs: &Observation, legal: &[Action]) -> Action {
+        if self.style.blunder_rate > 0.0 && self.rng.unit() < self.style.blunder_rate as f64 {
+            return legal[self.rng.below(legal.len())];
+        }
         let trick = obs.current_trick.as_ref().expect("playing phase has a trick");
         let options: Vec<Play> = legal.iter().filter_map(|a| if let Action::Play(p) = a { Some(*p) } else { None }).collect();
         let cards: Vec<Card> = options.iter().map(|p| p.card).collect();
-        let seen = obs.played().union(obs.hand).union(obs.discards.unwrap_or_default());
+        let seen = if self.style.remembers_cards {
+            obs.played().union(obs.hand).union(obs.discards.unwrap_or_default())
+        } else {
+            obs.hand.union(trick.cards().iter().copied().collect())
+        };
 
         let card = if trick.is_empty() {
             self.lead(obs, &cards, seen)
@@ -223,7 +256,7 @@ mod tests {
     use fh_core::{Game, Rules, Team};
 
     fn rule_bots() -> [Box<dyn Bot>; 4] {
-        std::array::from_fn(|_| Box::new(RuleBot::new("Steady", Style::STEADY)) as Box<dyn Bot>)
+        std::array::from_fn(|_| Box::new(RuleBot::new("Steady", Style::STEADY, 0)) as Box<dyn Bot>)
     }
 
     #[test]
@@ -243,7 +276,7 @@ mod tests {
         for seed in 0..games {
             let mut bots: [Box<dyn Bot>; 4] = std::array::from_fn(|i| {
                 if i % 2 == 0 {
-                    Box::new(RuleBot::new("Steady", Style::STEADY)) as Box<dyn Bot>
+                    Box::new(RuleBot::new("Steady", Style::STEADY, 0)) as Box<dyn Bot>
                 } else {
                     Box::new(RandomBot::new(seed * 4 + i as u64)) as Box<dyn Bot>
                 }
@@ -266,7 +299,7 @@ mod tests {
         let hands = [hand, take(10), take(10), take(10)];
         let kitty = take(3);
         let game = Game::from_deal(rules, 1, fh_core::Seat::EAST, hands, kitty);
-        let mut bot = RuleBot::new("Steady", Style::STEADY);
+        let mut bot = RuleBot::new("Steady", Style::STEADY, 0);
         let action = bot.choose(&game.observe(fh_core::Seat::SOUTH), &game.legal_actions());
         assert!(matches!(action, Action::Call(Call::Six(_))), "{action}");
     }

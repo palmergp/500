@@ -5,3 +5,6 @@ dist/
 __pycache__/
 *.pyc
 .ipynb_checkpoints/
+web/src/engine/pkg/
+web/test-results/
+web/playwright-report/
