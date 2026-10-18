@@ -8,7 +8,7 @@ pub struct Persona {
     pub blurb: &'static str,
 }
 
-pub const PERSONAS: [Persona; 6] = [
+pub const PERSONAS: [Persona; 7] = [
     Persona {
         id: "steady",
         name: "Steady",
@@ -39,6 +39,11 @@ pub const PERSONAS: [Persona; 6] = [
         name: "The Shark",
         blurb: "Expert play with one eye on the scoreboard: pushes hard when the game is on the line.",
     },
+    Persona {
+        id: "oracle",
+        name: "The Oracle",
+        blurb: "Bids from a neural network trained on tens of thousands of solved deals; plays like The Counter.",
+    },
 ];
 
 pub fn persona(id: &str) -> Option<&'static Persona> {
@@ -62,6 +67,7 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
         "random" => return Some(Box::new(RandomBot::new(seed))),
         "counter" => return Some(Box::new(SearchBot::new("The Counter", SearchConfig::COUNTER, seed))),
         "shark" => return Some(Box::new(SearchBot::new("The Shark", SearchConfig::SHARK, seed))),
+        "oracle" => return Some(Box::new(SearchBot::new("The Oracle", SearchConfig::ORACLE, seed))),
         "counter-fast" => return Some(Box::new(SearchBot::new("Counter (fast)", SearchConfig::FAST, seed))),
         // Lab variants that isolate one part of the search bot.
         "search-play" => {

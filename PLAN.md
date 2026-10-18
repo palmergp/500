@@ -1,6 +1,6 @@
 # 500 — Game & Trainer: Project Plan
 
-*Status: Phases 0–4 done (rules engine, bots, simulator, web game, expert AI and lab, coach) · 2026-10-18*
+*Status: Phases 0–5 done (rules engine, bots, simulator, web game, expert AI and lab, coach, neural bidding) · 2026-10-18*
 
 ## 1. Goals
 
@@ -170,11 +170,22 @@ Every persona makes and reads mentions and 6-calls; the expert bots also use the
 - **Output:** findings are written up in `docs/lab/` and become lessons.
 
 **Neural pipeline.** It is sized for a CPU-only laptop and starts small.
-1. **Distillation:** the PIMC expert labels millions of decisions overnight, and small networks (about 1–5M parameters) learn to imitate it. This gives fast, decent policies cheaply.
-2. **Self-play reinforcement learning** (Deep Monte Carlo, the method behind the DouZero card-game AI, or PPO), starting from the distilled networks and run against the Rust engine from Python. It is evaluated by duplicate matches against the PIMC expert.
-3. **Hybrid:** the neural net guides the search and supplies inference. This is likely the strongest player overall.
-4. **Export** to ONNX and run in a browser Web Worker.
-5. **Lesson mining:** find where the network disagrees with conventional wisdom, confirm the difference in the lab, and teach it.
+
+*As built in Phase 5:* the lab showed bidding is the expert's weak spot, so the network starts there.
+
+1. **Data:** `fh-lab dataset` records each bidder's view and labels it with the solver's result for every strain. The inputs are defined once, in `crates/ai/src/features.rs`.
+2. **Training:** `train/train_bid.py` (PyTorch, CPU) learns a trick distribution per strain.
+3. **Running the model:** a small multilayer network runs in plain Rust (`crates/ai/src/nn.rs`) with the weights embedded. It behaves the same natively and in the browser, so ONNX isn't needed.
+4. **The Oracle:** neural bidding plus The Counter's search play, tested in duplicate.
+5. **Self-play refinement:** once the Oracle bids differently, partner's calls mean different things. So the data is regenerated with the Oracle bidding and the model retrained.
+6. **Rules of thumb:** `train/rules_of_thumb.py` turns the same data into counting rules (`docs/rules-of-thumb.md`).
+
+*Later steps:*
+
+- **Distillation:** the PIMC expert labels millions of decisions, and small networks (about 1–5M parameters) learn to imitate it. This gives fast, decent policies cheaply.
+- **Self-play reinforcement learning:** Deep Monte Carlo (the method behind the DouZero card-game AI) or PPO, starting from the distilled networks and evaluated by duplicate matches against the PIMC expert.
+- **Hybrid play:** the neural network guides the search and supplies inference. This is likely the strongest player overall.
+- **Lesson mining:** find where the network disagrees with conventional wisdom, confirm the difference in the lab, and teach it.
 
 **Expectations**
 - The research found that neural nets work well as *components* trained on our own lab data. Full self-play systems at research scale (ReBeL, Student of Games) need data-center compute.
@@ -192,7 +203,7 @@ Each phase ends with something usable.
 | **2. Playable web game (MVP)** ✅ | React table over the WASM engine (`crates/wasm`, `web/`); Rookie, Rock, Gambler and Steady; save and resume; score pad; hand review; bower badges. The rule bots are instant, so moving the AI to Web Workers waits for Phase 3 | Playwright plays complete hands at desktop and phone sizes (`npm run e2e`) |
 | **3. Expert AI + lab** ✅ | Double-dummy solver, PIMC card play with inference, lab-tuned bidding, heuristic kitty discards (searched discards tested: no gain); Counter and Shark; `fh-lab duel`, `calibrate` and `bench`; engine in a Web Worker; findings in `docs/lab/README.md` | Expert beats the rule bots in duplicate (Counter +29 points per hand over Steady, 95% CI +16 to +42); every expert move ≤ 1.1 s in the browser on this laptop |
 | **4. Coach** ✅ | Hint button with reasons; live grades (best → blunder by expected points, capped when the sampled deals cannot separate two plays) with Undo; review tabs for your decisions, trick-by-trick hindsight (all cards visible) and luck vs skill (replay with The Counter in your seat); trump counter and card tracker; coach in its own worker | Every decision in a hand can be graded and explained (`crates/ai/src/coach.rs`, `web/e2e/coach.spec.ts`) |
-| **5. Neural AI** | Distillation → self-play → ONNX; the Oracle; lesson mining | Oracle scores ≥ PIMC expert in duplicate (or the hybrid improves it) |
+| **5. Neural AI** ✅ (first stage) | Neural bidding evaluator (`fh-lab dataset` → `train/train_bid.py` → `crates/ai/src/nn.rs`), one self-play refinement round, The Oracle (now the default partner), coach bids graded by the evaluator, `docs/rules-of-thumb.md` from solver data and expert habits. Play-policy distillation and self-play RL are left for a later stage | The Oracle beats The Counter: +12.4 points per hand on 400 duplicate deals, +8 to +12 across three matches |
 | **6. Curriculum** | Lessons, drills, puzzles, progress dashboard, lab insights | The full beginner-to-expert path is playable |
 | **7. Polish & extras** | Animations and sound, accessibility, offline install, 3/5/6-player variants; online play optional | — |
 

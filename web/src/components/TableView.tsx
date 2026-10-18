@@ -4,6 +4,17 @@ import { Card, CardBack } from "./Card";
 
 const POSITION: Record<SeatIndex, string> = { 0: "south", 1: "west", 2: "north", 3: "east" };
 
+const AVATAR: Record<string, string> = {
+  human: "🧑",
+  steady: "🧭",
+  rookie: "🐣",
+  rock: "🪨",
+  gambler: "🎲",
+  counter: "🧮",
+  shark: "🦈",
+  oracle: "🔮",
+};
+
 function lastCall(calls: CallView[], seat: SeatIndex) {
   return calls.find((c) => c.seat === seat);
 }
@@ -17,6 +28,9 @@ function SeatPlate({ view, seat }: { view: View; seat: SeatIndex }) {
   return (
     <div className={`seat seat-${POSITION[seat]}${thinking ? " thinking" : ""}`} title={player.blurb}>
       <div className="seat-name">
+        <span className="avatar" aria-hidden="true">
+          {AVATAR[player.persona] ?? "🙂"}
+        </span>
         {player.name}
         {seat === 2 && <span className="tag">partner</span>}
         {view.dealer === seat && <span className="chip">dealer</span>}
@@ -35,9 +49,9 @@ function SeatPlate({ view, seat }: { view: View; seat: SeatIndex }) {
   );
 }
 
-function TrickArea({ trick }: { trick: TrickView }) {
+function TrickArea({ trick, sweepTo }: { trick: TrickView; sweepTo: SeatIndex | null }) {
   return (
-    <div className="trick-area" aria-label="Current trick">
+    <div className={`trick-area${sweepTo !== null ? ` sweep sweep-${POSITION[sweepTo]}` : ""}`} aria-label="Current trick">
       {trick.plays.map((p) => (
         <div key={p.seat} className={`trick-card at-${POSITION[p.seat]}${trick.winner === p.seat ? " winning" : ""}`}>
           <Card card={p.card} />
@@ -75,11 +89,13 @@ interface Props {
   trick: TrickView | null;
   /** Shown when the trump counter is on. */
   trumpsUnseen?: number | null;
+  /** Sweep the finished trick toward its winner. */
+  sweepTo?: SeatIndex | null;
   children: React.ReactNode;
 }
 
 /** The felt: three opponents' and partner's seats around the trick, your seat and hand below. */
-export function TableView({ view, trick, trumpsUnseen, children }: Props) {
+export function TableView({ view, trick, trumpsUnseen, sweepTo = null, children }: Props) {
   const showTrick = view.phase === "playing" || (trick && trick.plays.length > 0);
   return (
     <div className="table">
@@ -97,7 +113,7 @@ export function TableView({ view, trick, trumpsUnseen, children }: Props) {
             )}
           </div>
         )}
-        {showTrick && trick ? <TrickArea trick={trick} /> : view.phase === "bidding" ? <AuctionArea view={view} /> : null}
+        {showTrick && trick ? <TrickArea trick={trick} sweepTo={sweepTo} /> : view.phase === "bidding" ? <AuctionArea view={view} /> : null}
         {view.phase === "discarding" && !view.humanToAct && (
           <div className="waiting">{view.players[view.contract!.declarer].name} is taking the kitty…</div>
         )}

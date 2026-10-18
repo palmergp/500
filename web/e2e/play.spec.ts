@@ -2,7 +2,11 @@ import { expect, test } from "@playwright/test";
 import { startGame, takeTurn } from "./helpers";
 
 test("plays a hand through to the score", async ({ page }, info) => {
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   await startGame(page);
+  // Turn music on too, so the audio engine is exercised (sound effects are on by default).
+  await page.getByRole("button", { name: "Music" }).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   await page.screenshot({ path: `test-results/${info.project.name}-1-deal.png` });
 
@@ -28,6 +32,7 @@ test("plays a hand through to the score", async ({ page }, info) => {
   const review = page.getByRole("dialog", { name: "Hand review" });
   await expect(review.locator(".review-hand")).toHaveCount(6);
   await page.screenshot({ path: `test-results/${info.project.name}-4-review.png`, fullPage: true });
+  expect(errors).toEqual([]);
 });
 
 test("restores a game after reload", async ({ page }) => {

@@ -14,16 +14,22 @@ export interface Settings {
   trumpCounter: boolean;
   /** Show every card played this hand. */
   tracker: boolean;
+  /** Sound effects. */
+  sound: boolean;
+  /** Background music. */
+  music: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
   west: "rock",
-  north: "counter",
+  north: "oracle",
   east: "gambler",
   speed: "normal",
   grade: true,
   trumpCounter: true,
   tracker: false,
+  sound: true,
+  music: false,
 };
 
 const SETTINGS_KEY = "fh500.settings";

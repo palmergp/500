@@ -5,10 +5,14 @@ pub mod belief;
 pub mod cardplay;
 pub mod coach;
 pub mod evaluate;
+pub mod features;
+pub mod models;
+pub mod nn;
 pub mod personas;
 pub mod rule_bot;
 pub mod search_bot;
 pub mod solver;
+pub mod thumb;
 
 use fh_core::{Action, Game, Observation, Phase, Rng, Team};
 

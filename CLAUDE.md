@@ -16,6 +16,9 @@
   where lab findings are recorded.
 - Search bots budget work in solver nodes, not time (no clock in wasm; keeps runs reproducible).
 - `fh-lab coach --seed N --south rookie` prints the coach's grades and reasons for a hand: use it to check explanations.
+- Neural bidding: `fh-lab dataset` writes training data (inputs defined in `crates/ai/src/features.rs`), then
+  `train/.venv/Scripts/python train/train_bid.py` writes `crates/ai/models/bid.fhnn`, embedded at build time.
+  `train/rules_of_thumb.py` measures the counting rules in `docs/rules-of-thumb.md`.
 - The web app runs two engine workers: one plays, one coaches (rebuilding positions from the save), so grading never delays play.
 - In `web/`: `npm run dev` (builds the WASM engine, then serves the app), `npm run build`,
   `npm run e2e` (Playwright, after `npm run build`; screenshots land in `web/test-results/`).

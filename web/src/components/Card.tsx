@@ -19,9 +19,16 @@ interface CardProps {
   small?: boolean;
   /** The coach's suggestion. */
   hinted?: boolean;
+  /** Position in a fanned hand, for the arc and the deal-in animation. */
+  fan?: { index: number; count: number };
 }
 
-export function Card({ card, onClick, playable, selected, fromKitty, small, hinted }: CardProps) {
+export function Card({ card, onClick, playable, selected, fromKitty, small, hinted, fan }: CardProps) {
+  const offset = fan ? fan.index - (fan.count - 1) / 2 : 0;
+  const style = fan
+    ? ({ "--rot": `${offset * 1.6}deg`, "--drop": `${Math.abs(offset) * 1.4}px`, "--i": fan.index } as React.CSSProperties)
+    : undefined;
+  const face = card.suit !== null && (card.rank === "J" || card.rank === "Q" || card.rank === "K");
   const symbol = card.suit ? SUIT_SYMBOL[card.suit] : "★";
   const classes = [
     "card",
@@ -31,6 +38,8 @@ export function Card({ card, onClick, playable, selected, fromKitty, small, hint
     small ? "small" : "",
     card.trump ? "trump" : "",
     hinted ? "hinted" : "",
+    fan ? "fanned" : "",
+    face ? "face" : "",
   ];
   return (
     <button
@@ -40,12 +49,13 @@ export function Card({ card, onClick, playable, selected, fromKitty, small, hint
       disabled={!onClick}
       aria-label={describe(card)}
       aria-pressed={selected || undefined}
+      style={style}
     >
       <span className="corner">
         {card.suit && <span className="rank">{card.rank}</span>}
         <span className="suit">{symbol}</span>
       </span>
-      <span className="pip">{card.suit ? symbol : "JOKER"}</span>
+      <span className="pip">{card.suit ? (face ? <><b>{card.rank}</b>{symbol}</> : symbol) : "JOKER"}</span>
       {card.bower && (
         <span className="badge" title={`${card.bower === "right" ? "Right" : "Left"} bower: a trump`}>
           {card.bower === "right" ? "R" : "L"}

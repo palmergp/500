@@ -10,6 +10,8 @@
 mod bench;
 mod calibrate;
 mod coach;
+mod dataset;
+mod habits;
 mod duel;
 mod sim;
 mod terminal;
@@ -39,6 +41,19 @@ fn main() {
             flags.get("play").map_or("search-play", |s| s.as_str()),
         ),
         "coach" => coach::run(flag(&flags, "seed", 1), flags.get("south").map_or("steady", |s| s.as_str())),
+        "dataset" => dataset::run(
+            flag(&flags, "deals", 1000),
+            flag(&flags, "seed", 1_000_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("out").map_or("train/data/bid", |s| s.as_str()),
+            flags.get("bidder").map_or("rule", |s| s.as_str()),
+        ),
+        "habits" => habits::run(
+            flag(&flags, "deals", 500),
+            flag(&flags, "seed", 70_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("bot").map_or("counter", |s| s.as_str()),
+        ),
         "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),
         "play" => terminal::run(flag(&flags, "seed", now_seed()), flags.contains_key("watch")),
         "sim" => sim::run(sim::Options {

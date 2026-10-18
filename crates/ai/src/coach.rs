@@ -7,7 +7,8 @@
 
 use crate::belief::Belief;
 use crate::cardplay::{is_boss, trumps};
-use crate::evaluate::{has_bower, hand_tricks};
+use crate::evaluate::has_bower;
+use crate::thumb;
 use crate::rule_bot::{heuristic_discards, RuleBot, Style};
 use crate::search_bot::{PlayStat, PlayStats, SearchBot, SearchConfig};
 use crate::solver::{Position, Solver};
@@ -92,7 +93,9 @@ pub struct Coach {
 
 impl Coach {
     pub fn new(seed: u64) -> Coach {
-        let config = SearchConfig { play_samples: 32, min_play_samples: 20, node_budget: 8_000_000, bid_samples: 16, ..SearchConfig::COUNTER };
+        // Card play as The Counter (more samples); bidding as The Oracle, which beat rule bidding
+        // in the lab (docs/lab/README.md, finding 9).
+        let config = SearchConfig { play_samples: 32, min_play_samples: 20, node_budget: 8_000_000, bid_samples: 16, neural_bidding: true, ..SearchConfig::COUNTER };
         Coach {
             search: SearchBot::new("Coach", config, seed),
             rules_bot: RuleBot::new("Coach", Style { aggression: SearchConfig::COUNTER.rule_aggression, ..Style::STEADY }, seed),
@@ -120,10 +123,18 @@ impl Coach {
         let ev = |a: Action, analysis: &Analysis| analysis.options.iter().find(|o| o.action == a).map(|o| o.ev);
         let best_ev = ev(analysis.best, &analysis).unwrap_or(0.0);
         let loss = (best_ev - ev(chosen, &analysis).unwrap_or(best_ev)).max(0.0);
+        let signal = |a: Action| matches!(a, Action::Call(Call::Six(_) | Call::Mention(_)));
         if chosen != analysis.best && loss < 2.0 {
+            if signal(analysis.best) && !signal(chosen) && obs.phase == Phase::Bidding {
+                // Passing instead of signalling costs no points directly, but it leaves partner
+                // guessing: worth a tip, not a black mark.
+                return Grade { chosen, best: analysis.best, loss: 0.0, verdict: Verdict::Good, analysis };
+            }
             if let Some(play) = analysis.play.as_ref() {
                 let stat = |a: Action| play.stats.iter().find(|s| s.action == a).copied();
                 analysis.reasons = play_reasons(obs, chosen, None, stat(chosen), None, play.worlds);
+            } else if obs.phase == Phase::Bidding {
+                analysis.reasons = call_reasons(obs, chosen, None, &analysis.options, obs.auction.high_bid());
             }
             analysis.best = chosen;
             return Grade { chosen, best: chosen, loss: 0.0, verdict: Verdict::Best, analysis };
@@ -153,6 +164,9 @@ impl Coach {
     // ---- Bidding -----------------------------------------------------------------------------
 
     fn analyze_call(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
+        if let Some(model) = crate::models::bid_model() {
+            return self.analyze_call_neural(obs, legal, chosen, model);
+        }
         let recommended = self.rules_bot.choose(obs, legal);
         let belief = Belief::new(obs, true);
         let worlds = belief.sample_fitting(&mut self.search_rng(), obs.hand, self.search.config().bid_samples);
@@ -194,6 +208,33 @@ impl Coach {
         options.insert(0, first);
         let reasons = call_reasons(obs, recommended, chosen, &options, high);
         Analysis { best: recommended, options, reasons, worlds: worlds.len(), play: None }
+    }
+
+    /// Bidding analysis with the neural evaluator: the same numbers The Oracle bids by, for every
+    /// legal call. Calls that don't bid (pass, mentions, 6-calls) are worth the same in points:
+    /// letting the current high bid stand.
+    fn analyze_call_neural(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>, model: &crate::nn::Mlp) -> Analysis {
+        let recommended = self.search.choose(obs, legal);
+        let (bids, baseline) = self.search.neural_values(obs, legal, model);
+        let eval = |action: Action| -> OptionEval {
+            match action {
+                Action::Call(Call::Bid(c)) => {
+                    let (_, ev, makes) = bids.iter().copied().find(|b| b.0 == c).unwrap_or((c, baseline, 0.0));
+                    OptionEval { action, ev, makes: Some(makes) }
+                }
+                _ => OptionEval { action, ev: baseline, makes: None },
+            }
+        };
+        let mut options = vec![eval(recommended)];
+        if let Some(c) = chosen.filter(|&c| c != recommended) {
+            options.push(eval(c));
+        }
+        // Show the strongest alternative bids too.
+        let mut others: Vec<OptionEval> = bids.iter().map(|&(c, _, _)| eval(Action::Call(Call::Bid(c)))).filter(|o| !options.iter().any(|x| x.action == o.action)).collect();
+        others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
+        options.extend(others.into_iter().take(2));
+        let reasons = call_reasons(obs, recommended, chosen, &options, obs.auction.high_bid());
+        Analysis { best: recommended, options, reasons, worlds: 0, play: None }
     }
 
     fn search_rng(&mut self) -> fh_core::Rng {
@@ -362,13 +403,15 @@ fn call_label(action: Action) -> String {
 fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options: &[OptionEval], high: Option<(Seat, Contract)>) -> Vec<String> {
     let mut reasons = Vec::new();
     let hand = obs.hand;
-    let mut strains: Vec<(Strain, f32)> = Strain::ALL.iter().map(|&s| (s, hand_tricks(hand, s))).collect();
-    strains.sort_by(|a, b| b.1.total_cmp(&a.1));
-    let (top, alone) = strains[0];
-    reasons.push(format!(
-        "Your hand counts about {alone:.1} tricks in {top} by itself; with partner and the kitty, expect about {:.1}.",
-        alone + PARTNER_AND_KITTY
-    ));
+    // The rule-of-thumb count (docs/rules-of-thumb.md) for the strain that matters here.
+    let focus = match best {
+        Action::Call(Call::Bid(c)) => c.strain,
+        _ => Strain::ALL.into_iter().max_by(|&a, &b| thumb::count(obs, a).0.total_cmp(&thumb::count(obs, b).0)).unwrap(),
+    };
+    let (total, parts) = thumb::count(obs, focus);
+    let shown: Vec<String> = parts.iter().take(6).map(|(l, v)| format!("{l} {}", thumb::fraction(*v))).collect();
+    reasons.push(format!("Rule-of-thumb count for {focus}: about {} ({}).", thumb::fraction(total), shown.join(", ")));
+    reasons.push("A 7 bid pays from about 7¼, an 8 from about 8¼.".into());
     let partner = obs.seat.partner();
     for (seat, call) in obs.auction.calls() {
         if seat == partner {
@@ -386,7 +429,7 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
         Action::Call(Call::Bid(c)) => {
             if let Some(o) = ev(best) {
                 if let Some(m) = o.makes {
-                    reasons.push(format!("{c} makes in about {} of simulated deals.", pct(m)));
+                    reasons.push(format!("{c} makes in about {} of similar deals.", pct(m)));
                 }
             }
         }

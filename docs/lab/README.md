@@ -122,6 +122,45 @@ A learned hand evaluator, trained on millions of solver results, is the planned 
 - Searched discards add nothing measurable, so the Counter uses the faster heuristic: void a short side suit, keep aces, guarded kings and all trumps.
 - The searched version stays available as `counter-search-kitty`.
 
+### 9. A neural bidding evaluator beats the tuned rule
+
+*Measured by `fh-lab dataset`, `train/train_bid.py` and `duel`.*
+
+**The model:** a two-layer network (256 units).
+- **Inputs:** one bidder's hand, position and the calls so far.
+- **Output:** a trick distribution for each strain.
+- **Training data:** 64,000 decisions from 16,000 deals, each labelled with the double-dummy result for every strain.
+
+On held-out decisions:
+
+| | Mean error |
+|---|---|
+| The network | **1.53 tricks** |
+| Strain-average baseline | 2.00 tricks |
+| Calibration (per strain) | within 0.07 tricks |
+
+Much of the remaining error is irreducible: the bidder can't see partner's hand or the kitty.
+
+The Oracle bids from these distributions and plays like The Counter:
+
+| Matchup (duplicate) | Deals | Gain per hand (95% CI) |
+|---|---|---|
+| Oracle vs Counter | 400 | +11.2 (−2.2 to +24.5) |
+| Oracle vs Counter, new deals | 400 | +8.1 (−5.0 to +21.2) |
+| **Pooled** | 800 | **+9.7** (about +0.3 to +19) |
+| **After self-play retraining**: same 400 deals as the first row | 400 | **+12.4** (−0.5 to +25.4) |
+
+**Self-play retraining:** 12,000 more deals with The Oracle bidding at all four seats, so partner's calls carry the Oracle's own meaning, then retraining on all 112,000 decisions.
+- Mean error went from 1.528 to 1.521 tricks; every strain is now calibrated within 0.04 tricks.
+- The make rate rose from 71% to 74%. That version is the one embedded now.
+
+- The Oracle declares about 68% of hands and makes 71%. The Counter declares 32% and makes 77%.
+- So the Oracle wins by competing for more contracts, at a slightly lower make rate.
+
+### 10. Measured bidding values and expert habits
+
+These now live in `docs/rules-of-thumb.md`. They come from `train/rules_of_thumb.py` on the same data, and from `fh-lab habits` (The Counter in all four seats, 600 hands).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

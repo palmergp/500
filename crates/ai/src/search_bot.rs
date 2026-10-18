@@ -11,6 +11,8 @@
 use crate::belief::{Belief, World};
 use crate::cardplay::card_cost;
 use crate::evaluate::{has_bower, hand_tricks};
+use crate::features::{bid_features, strain_block};
+use crate::nn::{softmax, Mlp};
 use crate::rule_bot::{heuristic_discards, RuleBot, Style};
 use crate::solver::{Position, Solver};
 use crate::Bot;
@@ -76,6 +78,8 @@ pub struct SearchConfig {
     pub dd_bias: f64,
     /// Use search for bidding and for the kitty (otherwise a rule bot decides).
     pub search_bidding: bool,
+    /// Bid with the neural evaluator (takes precedence over `search_bidding`).
+    pub neural_bidding: bool,
     pub search_discards: bool,
     /// Aggression of the rule bot used when search bidding is off. +0.7 won the lab's sweep
     /// (docs/lab/README.md, finding 6).
@@ -99,6 +103,7 @@ impl SearchConfig {
         // Simulated bidding with a handful of worlds lost 27 points a hand to rule bidding in the
         // lab (finding 7), so the expert bids by calibrated rules until a learned evaluator exists.
         search_bidding: false,
+        neural_bidding: false,
         // Searched kitty choice gained +0.1 points a hand over the heuristic (finding 8): not
         // worth the time.
         search_discards: false,
@@ -106,6 +111,8 @@ impl SearchConfig {
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
+    /// Neural bidding (Phase 5) with The Counter's card play.
+    pub const ORACLE: SearchConfig = SearchConfig { neural_bidding: true, ..SearchConfig::COUNTER };
     /// A cheaper setting for bulk lab simulations.
     pub const FAST: SearchConfig =
         SearchConfig { play_samples: 8, min_play_samples: 3, node_budget: 800_000, bid_samples: 5, discard_samples: 3, ..SearchConfig::COUNTER };
@@ -352,6 +359,69 @@ impl SearchBot {
         total / results.iter().map(|&(_, w)| w).sum::<f64>().max(1e-9)
     }
 
+    /// Bidding with the neural evaluator: it predicts, from what this seat can see, how many tricks
+    /// our side takes as declarer in each strain, averaged over the deals it learned from. Each
+    /// legal bid is scored on that distribution (less the play gap, `dd_bias`) and compared with
+    /// passing.
+    /// The neural evaluator's view of every legal bid: (contract, expected points, make chance),
+    /// plus the expected points of not bidding (the current high bid standing, or a redeal).
+    pub fn neural_values(&self, obs: &Observation, legal: &[Action], model: &Mlp) -> (Vec<(Contract, f64, f64)>, f64) {
+        let logits = model.forward(&bid_features(obs));
+        let dist = |strain: Strain| -> Vec<(u8, f64)> {
+            let block = strain_block(strain);
+            softmax(&logits[block..block + 11]).into_iter().enumerate().map(|(t, p)| (t as u8, p)).collect()
+        };
+        let me = obs.seat;
+        let baseline = match obs.auction.high_bid() {
+            None => 0.0,
+            Some((seat, contract)) if seat == me.partner() => self.expected(obs, &dist(contract.strain), contract, me),
+            Some((_, contract)) => {
+                // An opponent's contract: they make it about three times in four (lab), taking
+                // about a third of a trick more than they bid.
+                let v = contract.value() as f64;
+                -(0.75 * v - 0.25 * v) + 10.0 * (10.0 - contract.level as f64 - 0.3)
+            }
+        };
+        let mut bids = Vec::new();
+        for strain in Strain::ALL {
+            let d = dist(strain);
+            for level in 7..=10 {
+                let contract = Contract::new(level, strain);
+                if !legal.contains(&Action::Call(Call::Bid(contract))) {
+                    continue;
+                }
+                let value = self.expected(obs, &d, contract, me);
+                let makes: f64 = d.iter().filter(|(t, _)| *t as f64 - self.config.dd_bias >= level as f64).map(|(_, p)| p).sum();
+                bids.push((contract, value, makes));
+            }
+        }
+        (bids, baseline)
+    }
+
+    fn neural_call(&mut self, obs: &Observation, legal: &[Action], model: &Mlp) -> Action {
+        let me = obs.seat;
+        let (bids, baseline) = self.neural_values(obs, legal, model);
+        let best = bids.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, v, m)| (v, c, m));
+        let must_bid = obs.auction.must_bid();
+        if let Some((value, contract, makes)) = best {
+            self.note = format!("neural: best {contract} makes {:.0}%, EV {value:+.0} vs baseline {baseline:+.0}", 100.0 * makes);
+            let partner_strain = obs.auction.high_bid().filter(|(s, _)| *s == me.partner()).map(|(_, c)| c.strain);
+            let margin = match partner_strain {
+                Some(s) if s != contract.strain => self.config.bid_margin + 40.0,
+                _ => self.config.bid_margin,
+            };
+            if must_bid || value > baseline + margin {
+                return Action::Call(Call::Bid(contract));
+            }
+        }
+        if must_bid {
+            return *legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(_)))).expect("a forced bid exists");
+        }
+        // No bid: signal honestly, as the rule bot does (offering it only the non-bids).
+        let calls: Vec<Action> = legal.iter().filter(|a| !matches!(a, Action::Call(Call::Bid(_)))).copied().collect();
+        self.fallback.choose(obs, &calls)
+    }
+
     fn call(&mut self, obs: &Observation, legal: &[Action]) -> Action {
         let is_legal = |call: Call| legal.contains(&Action::Call(call));
         let belief = Belief::new(obs, self.config.inference);
@@ -461,6 +531,10 @@ impl Bot for SearchBot {
             return legal[0];
         }
         match obs.phase {
+            Phase::Bidding if self.config.neural_bidding => match crate::models::bid_model() {
+                Some(model) => self.neural_call(obs, legal, model),
+                None => self.fallback.choose(obs, legal),
+            },
             Phase::Bidding if !self.config.search_bidding => self.fallback.choose(obs, legal),
             Phase::Discarding if !self.config.search_discards => self.fallback.choose(obs, legal),
             Phase::Bidding => self.call(obs, legal),
@@ -501,6 +575,18 @@ mod tests {
                     break;
                 }
             }
+        }
+    }
+
+    #[test]
+    fn neural_bidding_loads_and_bids_legally() {
+        assert!(crate::models::bid_model().is_some(), "embedded model must load");
+        for seed in 0..20 {
+            let game = Game::new(Rules::default(), seed);
+            let seat = game.to_act().unwrap();
+            let legal = game.legal_actions();
+            let action = SearchBot::new("t", SearchConfig::ORACLE, seed).choose(&game.observe(seat), &legal);
+            assert!(legal.contains(&action));
         }
     }
 

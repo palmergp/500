@@ -4,6 +4,8 @@ import { CoachClient, Engine, SUIT_SYMBOL } from "./engine";
 import { BiddingBox } from "./components/BiddingBox";
 import { Card } from "./components/Card";
 import { CardTracker, GradeBar, HintPanel } from "./components/Coach";
+import { Celebration } from "./components/Celebration";
+import { audio } from "./audio";
 import { CoachDialog } from "./components/CoachDialog";
 import { Dialog } from "./components/Dialog";
 import { HandReview } from "./components/HandReview";
@@ -55,6 +57,7 @@ export function App() {
   const [grades, setGrades] = useState<GradeView[]>(() => savedGrades.load<GradeView>());
   const [lastGrade, setLastGrade] = useState<GradeView | null>(null);
   const [showCoach, setShowCoach] = useState(false);
+  const [sweeping, setSweeping] = useState(false);
 
   const factor = SPEED_FACTOR[settings.speed];
 
@@ -64,6 +67,18 @@ export function App() {
     setView(next);
     saveRef.current = snapshot.save;
     savedGame.store(snapshot.save);
+    for (const e of snapshot.events) {
+      if (e.kind === "played") audio.play("card");
+      else if (e.kind === "dealt") audio.play("deal");
+      else if (e.kind === "called") audio.play(e.text.endsWith("Pass") ? "pass" : "bid");
+      else if (e.kind === "contractWon") audio.play("contract");
+      else if (e.kind === "trickWon") audio.play(e.seat !== null && e.seat % 2 === 0 ? "trickUs" : "trickThem");
+      else if (e.kind === "handScored") {
+        const hand = next.history.filter((h) => !h.passedOut).at(-1);
+        const ours = hand?.contract ? hand.contract.declarer % 2 === 0 : false;
+        audio.play(hand && ours === !!hand.made ? "made" : "set");
+      } else if (e.kind === "gameWon") audio.play(next.winner === 0 ? "win" : "lose");
+    }
     const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
     if (snapshot.events.some((e) => e.kind === "trickWon")) {
@@ -137,9 +152,29 @@ export function App() {
   // Show a finished trick for a moment before play continues.
   useEffect(() => {
     if (!held) return;
+    setSweeping(false);
+    const sweep = setTimeout(() => setSweeping(true), TRICK_HOLD * factor * 0.65);
     const timer = setTimeout(() => setHeld(null), TRICK_HOLD * factor);
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(sweep);
+      clearTimeout(timer);
+    };
   }, [held, factor]);
+
+  // Audio may only start after a user gesture.
+  useEffect(() => {
+    audio.sfxOn = settings.sound;
+    const unlock = () => {
+      audio.unlock();
+      audio.setMusic(settings.music);
+    };
+    window.addEventListener("pointerdown", unlock);
+    window.addEventListener("keydown", unlock);
+    return () => {
+      window.removeEventListener("pointerdown", unlock);
+      window.removeEventListener("keydown", unlock);
+    };
+  }, [settings.sound, settings.music]);
 
   const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach;
 
@@ -190,7 +225,10 @@ export function App() {
     setHintLoading(true);
     coach
       .hint(save)
-      .then((h) => setHint({ forAction, hint: h }))
+      .then((h) => {
+        setHint({ forAction, hint: h });
+        audio.play("hint");
+      })
       .catch(() => {})
       .finally(() => setHintLoading(false));
   };
@@ -285,6 +323,30 @@ export function App() {
           </div>
         )}
         <nav>
+          <button
+            type="button"
+            className="icon-toggle"
+            aria-pressed={settings.sound}
+            title={settings.sound ? "Sound on" : "Sound off"}
+            aria-label="Sound effects"
+            onClick={() => changeSettings({ ...settings, sound: !settings.sound })}
+          >
+            {settings.sound ? "🔊" : "🔇"}
+          </button>
+          <button
+            type="button"
+            className={`icon-toggle${settings.music ? "" : " off"}`}
+            aria-pressed={settings.music}
+            title={settings.music ? "Music on" : "Music off"}
+            aria-label="Music"
+            onClick={() => {
+              audio.unlock();
+              audio.setMusic(!settings.music);
+              changeSettings({ ...settings, music: !settings.music });
+            }}
+          >
+            🎵
+          </button>
           <button type="button" onClick={() => setShowCoach(true)}>
             Coach
           </button>
@@ -298,7 +360,7 @@ export function App() {
       </header>
 
       {view ? (
-        <TableView view={view} trick={trick} trumpsUnseen={settings.trumpCounter ? view.trumpsUnseen : null}>
+        <TableView view={view} trick={trick} sweepTo={held && sweeping ? held.winner : null} trumpsUnseen={settings.trumpCounter ? view.trumpsUnseen : null}>
           <div className="status-row">
             <div className="status" role="status">
               {prompt(view) || message}
@@ -334,10 +396,11 @@ export function App() {
               </button>
             </div>
           )}
-          <div className={`hand${view.hand.length > 10 ? " crowded" : ""}`} aria-label="Your hand">
-            {view.hand.map((card) => (
+          <div key={`deal-${view.history.length}`} className={`hand${view.hand.length > 10 ? " crowded" : ""}`} aria-label="Your hand">
+            {view.hand.map((card, i) => (
               <Card
                 key={card.id}
+                fan={{ index: i, count: view.hand.length }}
                 card={card}
                 playable={legalCards.has(card.id)}
                 selected={selected.includes(card.id)}
@@ -355,6 +418,7 @@ export function App() {
 
       {result && view && (
         <Dialog title={`Hand ${view.history.filter((h) => !h.passedOut).length}`}>
+          <Celebration hand={result} gameWinner={view.winner} />
           <HandResult hand={result} view={view} />
           <div className="actions">
             <button type="button" onClick={() => setReview(result)}>
