@@ -31,11 +31,20 @@ pub struct Belief {
     played_by: [CardSet; 4],
     calls: Vec<(Seat, Call)>,
     inference: bool,
+    trump: Option<Suit>,
+    /// Each seat's discard signal (signal suit, the suit it showed out of), if reading them.
+    signals: [Option<(Suit, Suit)>; 4],
 }
 
 impl Belief {
-    /// `inference`: weight worlds by how well they fit the auction (otherwise all weights are 1).
+    /// `inference`: weight worlds by how well they fit the auction and partner's discard signals
+    /// (otherwise all weights are 1).
     pub fn new(obs: &Observation, inference: bool) -> Belief {
+        Belief::new_with(obs, inference, inference)
+    }
+
+    /// As [`Belief::new`], choosing separately whether to read discard signals.
+    pub fn new_with(obs: &Observation, inference: bool, read_signals: bool) -> Belief {
         let me = obs.seat;
         let trump = obs.trump();
         let played = obs.played();
@@ -45,13 +54,18 @@ impl Belief {
 
         let mut played_by = [CardSet::EMPTY; 4];
         let mut void = [[false; 4]; 4];
+        let mut signals: [Option<(Suit, Suit)>; 4] = [None; 4];
         for trick in obs.tricks.iter().chain(obs.current_trick.iter()) {
             let led = trick.led_suit();
             for (seat, card) in trick.plays() {
                 played_by[seat.index()].insert(card);
                 if let Some(led) = led {
                     if seat != trick.leader() && effective_suit(card, trump) != Some(led) {
+                        let first = !void[seat.index()].iter().any(|&v| v);
                         void[seat.index()][led.index()] = true;
+                        if first && read_signals && seat != me && !fh_core::rules::is_trump(card, trump) && !card.is_joker() {
+                            signals[seat.index()] = effective_suit(card, trump).map(|s| (s, led));
+                        }
                     }
                 }
             }
@@ -117,6 +131,8 @@ impl Belief {
             played_by,
             calls: obs.auction.calls().collect(),
             inference,
+            trump,
+            signals,
         }
     }
 
@@ -248,6 +264,14 @@ impl Belief {
                 }
             };
             weight *= factor;
+        }
+        // A discard signal says "this is my strongest side suit".
+        for (seat, signal) in self.signals.iter().enumerate() {
+            if let Some((suit, void_in)) = signal {
+                let held = hands[seat].union(self.played_by[seat]);
+                let strongest = crate::signals::strongest_side_suit(held, self.trump, Some(*void_in));
+                weight *= if strongest == Some(*suit) { 1.0 } else { 0.35 };
+            }
         }
         weight
     }

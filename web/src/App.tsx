@@ -5,6 +5,9 @@ import { BiddingBox } from "./components/BiddingBox";
 import { Card } from "./components/Card";
 import { CardTracker, GradeBar, HintPanel } from "./components/Coach";
 import { Celebration } from "./components/Celebration";
+import { CountingQuiz, quizDue } from "./components/CountingQuiz";
+import { Learn } from "./components/Learn";
+import { recordGrades } from "./progress";
 import { audio } from "./audio";
 import { CoachDialog } from "./components/CoachDialog";
 import { Dialog } from "./components/Dialog";
@@ -16,6 +19,15 @@ import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type 
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
 const TRICK_HOLD = 1300;
+
+/** Identifies a game for the progress record: its seed. */
+function gameId(save: string): string {
+  try {
+    return String((JSON.parse(save) as { seed: number }).seed);
+  } catch {
+    return "unknown";
+  }
+}
 
 function randomSeed(): number {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -58,6 +70,8 @@ export function App() {
   const [lastGrade, setLastGrade] = useState<GradeView | null>(null);
   const [showCoach, setShowCoach] = useState(false);
   const [sweeping, setSweeping] = useState(false);
+  const [quizzed, setQuizzed] = useState<number | null>(null);
+  const [showLearn, setShowLearn] = useState(false);
 
   const factor = SPEED_FACTOR[settings.speed];
 
@@ -77,7 +91,10 @@ export function App() {
         const hand = next.history.filter((h) => !h.passedOut).at(-1);
         const ours = hand?.contract ? hand.contract.declarer % 2 === 0 : false;
         audio.play(hand && ours === !!hand.made ? "made" : "set");
-      } else if (e.kind === "gameWon") audio.play(next.winner === 0 ? "win" : "lose");
+      } else if (e.kind === "gameWon") {
+        audio.play(next.winner === 0 ? "win" : "lose");
+        recordGrades(gameId(snapshot.save), savedGrades.load(), true, next.winner === 0);
+      }
     }
     const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
@@ -176,7 +193,7 @@ export function App() {
     };
   }, [settings.sound, settings.music]);
 
-  const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach;
+  const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach || showLearn;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -201,6 +218,7 @@ export function App() {
           setGrades((all) => {
             const next = [...all.filter((x) => x.actionNumber !== g.actionNumber), g].sort((a, b) => a.actionNumber - b.actionNumber);
             savedGrades.store(next);
+            recordGrades(gameId(save), next);
             return next;
           });
           setLastGrade(g);
@@ -260,13 +278,14 @@ export function App() {
     saveSettings(next);
   };
 
+  const quizActive = !!view && settings.quiz && !paused && quizzed !== view.actionCount && quizDue(view);
   const currentHint = hint && view && hint.forAction === view.actionCount && view.humanToAct ? hint.hint : null;
   const hintedAction = currentHint ? view?.legal[currentHint.best] : undefined;
 
   const legalCards = useMemo(() => {
-    if (!view?.humanToAct || paused) return new Set<number>();
+    if (!view?.humanToAct || paused || (settings.quiz && view && quizzed !== view.actionCount && quizDue(view))) return new Set<number>();
     return new Set(view.legal.filter((a) => a.card !== null).map((a) => a.card!));
-  }, [view, paused]);
+  }, [view, paused, settings.quiz, quizzed]);
 
   const kittyIds = useMemo(() => new Set(view?.phase === "discarding" ? view.kitty?.map((c) => c.id) : []), [view]);
   const discardsLeft = view ? 3 - (view.discards?.length ?? 0) : 0;
@@ -347,6 +366,9 @@ export function App() {
           >
             🎵
           </button>
+          <button type="button" className="learn-button" onClick={() => setShowLearn(true)}>
+            Learn
+          </button>
           <button type="button" onClick={() => setShowCoach(true)}>
             Coach
           </button>
@@ -360,7 +382,13 @@ export function App() {
       </header>
 
       {view ? (
-        <TableView view={view} trick={trick} sweepTo={held && sweeping ? held.winner : null} trumpsUnseen={settings.trumpCounter ? view.trumpsUnseen : null}>
+        <TableView
+          view={view}
+          trick={trick}
+          sweepTo={held && sweeping ? held.winner : null}
+          trumpsUnseen={settings.trumpCounter && !quizActive ? view.trumpsUnseen : null}
+          showVoids={settings.voids && !quizActive}
+        >
           <div className="status-row">
             <div className="status" role="status">
               {prompt(view) || message}
@@ -371,6 +399,7 @@ export function App() {
               </button>
             )}
           </div>
+          {quizActive && <CountingQuiz key={view.actionCount} view={view} onDone={() => setQuizzed(view.actionCount)} />}
           {currentHint && <HintPanel hint={currentHint} onClose={() => setHint(null)} />}
           {lastGrade && !currentHint && <GradeBar grade={lastGrade} onUndo={() => void undo(lastGrade)} onClose={() => setLastGrade(null)} />}
           {view.humanToAct && !paused && view.phase === "bidding" && (
@@ -410,7 +439,14 @@ export function App() {
               />
             ))}
           </div>
-          {settings.tracker && view.phase === "playing" && <CardTracker played={view.played} />}
+          {settings.tracker && !quizActive && view.phase === "playing" && (
+            <CardTracker
+              played={view.played}
+              unseen={view.unseenBySuit}
+              jokerUnseen={view.jokerUnseen}
+              trump={view.contract && view.contract.strain !== "NT" ? view.contract.strain : null}
+            />
+          )}
         </TableView>
       ) : (
         <div className="loading">Shuffling…</div>
@@ -452,6 +488,7 @@ export function App() {
           <ScorePad history={view.history} players={view.players} onReview={(h) => { setShowScores(false); setReview(h); }} />
         </Dialog>
       )}
+      {showLearn && <Learn coach={coachRef.current} onClose={() => setShowLearn(false)} />}
       {showCoach && <CoachDialog settings={settings} onChange={changeSettings} onClose={() => setShowCoach(false)} />}
       {showNewGame && personas.length > 0 && (
         <NewGameDialog personas={personas} initial={settings} onStart={startGame} onCancel={view ? () => setShowNewGame(false) : undefined} />

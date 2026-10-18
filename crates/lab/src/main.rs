@@ -12,6 +12,7 @@ mod calibrate;
 mod coach;
 mod dataset;
 mod habits;
+mod leads;
 mod duel;
 mod sim;
 mod terminal;
@@ -53,6 +54,11 @@ fn main() {
             flag(&flags, "seed", 70_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
             flags.get("bot").map_or("counter", |s| s.as_str()),
+        ),
+        "leads" => leads::run(
+            flag(&flags, "deals", 400),
+            flag(&flags, "seed", 120_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),
         "play" => terminal::run(flag(&flags, "seed", now_seed()), flags.contains_key("watch")),

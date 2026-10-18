@@ -11,6 +11,7 @@ pub mod nn;
 pub mod personas;
 pub mod rule_bot;
 pub mod search_bot;
+pub mod signals;
 pub mod solver;
 pub mod thumb;
 

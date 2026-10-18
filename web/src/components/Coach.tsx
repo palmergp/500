@@ -85,17 +85,21 @@ export function GradeBar({ grade, onUndo, onClose }: { grade: GradeView; onUndo?
 }
 
 const TRACK_ORDER = ["S", "H", "C", "D"] as const;
+const SUIT_INDEX = { S: 0, C: 1, D: 2, H: 3 } as const;
 
-/** Every card played this hand, by suit: a memory aid you can switch off. */
-export function CardTracker({ played }: { played: CardView[] }) {
+/** Every card played this hand, by suit, and how many of each suit you haven't seen: a memory aid
+ * you can switch off. Suits are effective suits, so a bower counts as a trump. */
+export function CardTracker({ played, unseen, jokerUnseen, trump }: { played: CardView[]; unseen: number[]; jokerUnseen: boolean; trump: string | null }) {
   return (
     <div className="tracker" aria-label="Cards played">
       {TRACK_ORDER.map((suit) => (
         <span key={suit} className={suit === "H" || suit === "D" ? "red" : ""}>
-          {SUIT_SYMBOL[suit]} {played.filter((c) => c.suit === suit).map((c) => c.rank).join(" ") || "—"}
+          {SUIT_SYMBOL[suit]}
+          {trump === suit ? " (trumps)" : ""} {played.filter((c) => (trump === suit ? c.trump : c.suit === suit && !c.trump)).map((c) => (c.suit === null ? "Jk" : c.rank)).join(" ") || "—"}
+          <em> · {unseen[SUIT_INDEX[suit]]} out</em>
         </span>
       ))}
-      {played.some((c) => c.suit === null) && <span>Joker</span>}
+      {trump === null && <span>Joker {jokerUnseen ? "out" : "seen"}</span>}
     </div>
   );
 }

@@ -101,6 +101,12 @@ export interface View {
   played: CardView[];
   /** Trumps not in your hand, not played, and not among your discards. */
   trumpsUnseen: number | null;
+  /** For each seat, the suits (S C D H, by effective suit) it has shown out of this hand. */
+  shownOut: boolean[][];
+  /** For each suit (S C D H, by effective suit), cards you haven't seen. */
+  unseenBySuit: number[];
+  /** Whether you haven't seen the Joker yet. */
+  jokerUnseen: boolean;
 }
 
 // ---- Coach (mirrors crates/wasm/src/coach.rs) --------------------------------------------
@@ -137,6 +143,11 @@ export interface GradeView {
 export interface TraceView {
   par: number;
   plays: { seat: SeatIndex; card: CardView; parAfter: number; cost: number }[];
+}
+
+export interface DrillView {
+  view: View;
+  save: string;
 }
 
 export interface ExpertView {

@@ -176,6 +176,12 @@ impl RuleBot {
         if let Some(&boss) = side.iter().filter(|&&c| is_boss(c, seen, trump)).max_by_key(|c| c.rank()) {
             return boss;
         }
+        // Partner signalled their strongest suit: lead to it.
+        if let Some(suit) = crate::signals::discard_signals(obs)[obs.seat.partner().index()] {
+            if let Some(&low) = side.iter().filter(|&&c| effective_suit(c, trump) == Some(suit)).min_by_key(|c| c.rank()) {
+                return low;
+            }
+        }
         // Otherwise lead low from our longest side suit, keeping trumps back.
         let longest = side.iter().copied().max_by_key(|&c| {
             let len = hand.iter().filter(|&h| effective_suit(h, trump) == effective_suit(c, trump)).count();
@@ -195,12 +201,27 @@ impl RuleBot {
 
         let partner_winning = winner == obs.seat.partner();
         if partner_winning && (last || is_boss(winning, seen, trump)) {
+            let void = !cards.iter().any(|&c| effective_suit(c, trump) == Some(led));
+            if void && crate::signals::first_time_void(obs, obs.seat) {
+                if let Some(card) = crate::signals::signal_card(hand, trump, led).filter(|c| cards.contains(c)) {
+                    return card;
+                }
+            }
             return cheapest(cards, hand, trump);
         }
         let to_beat = trick_strength(winning, led, trump);
         let winners: Vec<Card> = cards.iter().copied().filter(|&c| trick_strength(c, led, trump) > to_beat).collect();
+        let void = !cards.iter().any(|&c| effective_suit(c, trump) == Some(led));
+        // The discard signal: the first throw-off comes from our strongest side suit.
+        let signal = || {
+            if void && crate::signals::first_time_void(obs, obs.seat) {
+                crate::signals::signal_card(hand, trump, led).filter(|c| cards.contains(c))
+            } else {
+                None
+            }
+        };
         if winners.is_empty() {
-            return cheapest(cards, hand, trump);
+            return signal().unwrap_or_else(|| cheapest(cards, hand, trump));
         }
         let cheapest_winner = cheapest(&winners, hand, trump);
         let ruffing = is_trump(cheapest_winner, trump) && Some(led) != trump;

@@ -36,13 +36,19 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 
 **Card play**
 
-9. **As declarer, cash a side ace early, then draw trumps gradually.**
+9. **As declarer with 5+ trumps, open with your top trump; with fewer, cash a side ace.** Rarely lead a small trump, unless partner called 6.
+    - **In no trumps,** cash side winners and keep the Joker.
 10. **Don't rush the Joker.** The expert usually plays it in tricks 3–5.
 11. **Second hand low,** almost always in no trumps.
 12. **Trump the opponents' winners, not your partner's.** Do protect partner's trick when someone can still beat it.
-13. **On defense, lead low from a side suit more often than cashing an ace.**
+13. **On defense, lead a side ace if you have one.** Never a low trump, and partner's mention isn't a reason to lead that suit.
 14. **Holding the Joker but no bid? Call 6.** It's worth ¾ of a trick to your partner.
 15. **Kitty discards come from your shortest side suits,** to make a void.
+
+**Signals and counting**
+
+16. **The first time you're out of a suit, throw off from your strongest side suit.** It tells partner where to lead.
+17. **Count trumps (13 red, 12 black) and every suit, and remember who has thrown off:** that player is out of the suit for good.
 
 ---
 
@@ -160,14 +166,44 @@ A searched choice of discards, comparing options across sampled deals, did no be
 
 ## Card play
 
-*Source: expert habits, The Counter in all four seats over 600 hands* (`fh-lab habits`). These describe what our strongest player does. They are strong guidance, not proofs: the expert plays by sampling deals and solving them with all cards visible, which has blind spots of its own.
+There are two kinds of evidence here:
 
-### 9. As declarer, cash a side ace early, and draw trumps gradually
+- **Lead analysis:** every legal opening lead in 600 deals, scored on the same 32 likely layouts of the hidden cards (`fh-lab leads`). "Cost" means the average expected points a type of lead gives up against the best lead.
+- **Expert habits:** what The Counter does over 600 hands (`fh-lab habits`).
 
-- **The opening lead.** Even with 6 or more trumps, the expert's opening lead is a side winner (usually an ace) **52%** of the time, and a trump only about **32%**.
-- **Why:** a side ace is safest before the opponents have had a chance to throw that suit away and trump it.
-- **After that,** about half the declarer's leads in tricks 2–3 are trumps, and **60%** from trick 4 on, while trumps are still out.
-- **"Draw every trump first" isn't the expert's rule.** "Cash a side ace, then start drawing trumps" is closer.
+Both use the expert's search, which has blind spots of its own, so read them as strong guidance rather than proofs. Where they disagree, the lead analysis wins, because it scores every option.
+
+### 9. As declarer, lead a top trump with five or more; with fewer, cash a side ace
+
+*Opening leads in suit contracts:*
+
+| You hold | Best opening lead | Then | Worst |
+|---|---|---|---|
+| **5+ trumps** | Your **top trump**: best 70–74% of the time, cost 2–4 | Side ace (cost 7–8) | Low trump (cost 24–32), low side card (cost 25–32) |
+| **4 or fewer trumps** | A **side ace**: cost 7 | Top trump (cost 8½) | Low side card (cost 29) |
+
+"Top trump" means the highest trump still out, other than the Joker (see rule 10).
+
+**After the opening lead,** keep drawing trumps gradually while the opponents still have some. About half the expert's leads in tricks 2–3 are trumps, and 60% from trick 4 on.
+
+**Should the bidder always lead trump?** No:
+
+- With five or more trumps, yes, the top one.
+- With four or fewer, cash a side ace first.
+- A **small** trump is almost never the right opening lead (best only 21–30% of the time). There's one exception, in rule 9a.
+
+### 9a. If partner called 6, a small trump becomes a good lead
+
+When partner showed the Joker, leading a **small trump** was the best opening lead **62%** of the time, against about 25% normally (cost 8). A side ace was close (cost 5).
+
+Leading small toward partner's Joker draws the opponents' trumps without spending your own top ones. This is a small sample (16 deals), so treat it as a strong hint.
+
+**If partner mentioned your trump suit** (a bower), the usual rule stands: lead your top trump (cost 2).
+
+### 9b. In no trumps, cash side winners, and never open with the Joker
+
+- **Side winners:** an ace or other sure winner was the best opening lead **87%** of the time (cost 5).
+- **The Joker:** leading it was the worst choice (cost 49). It's your stopper in whichever suit the opponents attack, so keep it.
 
 ### 10. Don't rush the Joker as declarer
 
@@ -180,6 +216,14 @@ In suit contracts the declarer's Joker is played:
 | 6–10 | 28% |
 
 Draw the first round of trumps with lower ones if you can, and keep the Joker to regain control later.
+
+The lead analysis agrees. Holding the Joker as declarer:
+
+| Opening lead | Cost |
+|---|---|
+| The next-highest trump | **4.7** |
+| The Joker itself | 9.1 |
+| A low trump | 40 |
 
 ### 11. Second hand low
 
@@ -202,15 +246,20 @@ When you can't follow suit:
 | Partner is winning with a sure winner | **Discards 95%** of the time |
 | Partner is winning but could still be beaten | Trumps **55%**: protect the trick when a later player might take it |
 
-### 13. As a defender, lead low from a side suit more often than an ace
+### 13. As a defender, lead a side ace if you have one, and never a low trump
 
 The defenders' first lead in a suit contract:
 
-| Lead | Share |
-|---|---|
-| Low card from a side suit | **50%** |
-| A side winner | **38%** |
-| A trump | **11%** |
+| Lead | Best | Cost |
+|---|---|---|
+| **A side ace or winner** | **68%** | **8** |
+| A low card from a side suit | 50% | 18 |
+| Partner's mentioned suit | 34% | 20 |
+| The Joker | 23% | 36 |
+| A low trump | 17% | **44** |
+
+- **Partner's mention isn't a lead signal.** Leading partner's mentioned suit is no better than average: the mention helps you bid, not lead. Partner's **discard signal** (rule 16) is the lead-directing one.
+- *(The Counter's habits lean toward low side cards, 50% of its first leads. The full lead analysis prefers the ace.)*
 
 ### 14. Signal when you hold the Joker
 
@@ -235,6 +284,36 @@ The expert's first discard comes from:
 | Three or more cards | 10% |
 
 Two discards from a doubleton leave you void and able to trump.
+
+---
+
+## Signals and counting
+
+### 16. The discard signal: throw off from your strongest side suit the first time you're out
+
+**The convention.** The first time you can't follow suit and don't trump, discard a low card from your strongest side suit. It tells partner where to lead when they run out of winners. Every bot here uses it and reads it.
+
+*Source: lab, 400 duplicate deals* (finding 11). For the expert bots the convention was a wash: **−0.8 ± 5 points a hand**.
+
+- **It costs a little:** the signal sometimes gives up a useful card in your best suit.
+- **It's worth little to an expert bot,** which already places most cards from the bidding and play.
+- **Human partners get more out of it.** They can't infer as well, so the signal tells them something they wouldn't otherwise know. Use it freely; it isn't costing you anything measurable.
+
+### 17. Count every suit, and notice every throw-off
+
+**Count trumps.** There are 13 trumps in a red suit and 12 in a black suit, counting the Joker and both bowers.
+
+- Subtract each one as it falls.
+- When the trumps you haven't seen reach zero, your remaining trumps and side aces are safe.
+
+**Count side suits.** A side suit has 10 or 11 cards, minus its jack when that jack is the left bower.
+
+**Watch who throws off.** A player who fails to follow suit is out of it for the rest of the hand.
+
+- Two players out of a suit means the rest are with the other two, or in the kitty.
+- Combined with the bidding (who called 6, who mentioned what), this slowly places the hidden cards.
+
+The game can show who is out of each suit, and a tracker of what's still out. The counting quiz turns those aids off and asks you instead.
 
 ---
 

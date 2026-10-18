@@ -80,6 +80,11 @@ pub struct SearchConfig {
     pub search_bidding: bool,
     /// Bid with the neural evaluator (takes precedence over `search_bidding`).
     pub neural_bidding: bool,
+    /// Make and read the discard signal (first throw-off from the strongest side suit).
+    pub signals: bool,
+    /// Expected points the bot may give up to make the signal. All-cards-visible analysis can't
+    /// value the information, so it needs an allowance; the lab measures the real effect.
+    pub signal_allowance: f64,
     pub search_discards: bool,
     /// Aggression of the rule bot used when search bidding is off. +0.7 won the lab's sweep
     /// (docs/lab/README.md, finding 6).
@@ -104,6 +109,8 @@ impl SearchConfig {
         // lab (finding 7), so the expert bids by calibrated rules until a learned evaluator exists.
         search_bidding: false,
         neural_bidding: false,
+        signals: true,
+        signal_allowance: 25.0,
         // Searched kitty choice gained +0.1 points a hand over the heuristic (finding 8): not
         // worth the time.
         search_discards: false,
@@ -176,7 +183,7 @@ impl SearchBot {
         let (declarer, contract) = obs.contract.expect("playing without a contract");
         let trump = contract.trump();
         let trick = obs.current_trick.clone().expect("playing phase has a trick");
-        let belief = Belief::new(obs, self.config.inference);
+        let belief = Belief::new_with(obs, self.config.inference, self.config.inference && self.config.signals);
         let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
         let won_so_far = obs.tricks_won[declarer.team().index()];
 
@@ -245,6 +252,24 @@ impl SearchBot {
         let pick = (0..scored.len()).filter(|&i| top - scored[i].1 < 0.5).min_by_key(|&i| cost(&scored[i].0)).unwrap();
         scored[..=pick].rotate_right(1);
         scored
+    }
+
+    /// At a first show-out, the discard signal if it costs at most `signal_allowance` points.
+    fn with_signal(&self, obs: &Observation, ranked: &[(Action, f64)]) -> Option<Action> {
+        if !self.config.signals {
+            return None;
+        }
+        let trick = obs.current_trick.as_ref()?;
+        let led = trick.led_suit()?;
+        let trump = obs.trump();
+        let following = ranked.iter().any(|(a, _)| matches!(a, Action::Play(p) if fh_core::effective_suit(p.card, trump) == Some(led)));
+        if following || !crate::signals::first_time_void(obs, obs.seat) {
+            return None;
+        }
+        let card = crate::signals::signal_card(obs.hand, trump, led)?;
+        let best = ranked[0].1;
+        let allowance = self.config.signal_allowance;
+        ranked.iter().find(|(a, ev)| matches!(a, Action::Play(p) if p.card == card) && best - ev <= allowance).map(|&(a, _)| a)
     }
 
     // ---- Kitty -------------------------------------------------------------------------------
@@ -545,7 +570,10 @@ impl Bot for SearchBot {
                 }
                 Action::Discard(self.discard_plan.remove(0))
             }
-            Phase::Playing => self.evaluate_plays(obs, legal)[0].0,
+            Phase::Playing => {
+                let ranked = self.evaluate_plays(obs, legal);
+                self.with_signal(obs, &ranked).unwrap_or(ranked[0].0)
+            }
             Phase::GameOver => legal[0],
         }
     }

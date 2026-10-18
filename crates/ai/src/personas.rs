@@ -78,6 +78,10 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { search_bidding: true, search_discards: false, ..SearchConfig::FAST };
             return Some(Box::new(SearchBot::new("Search bid", config, seed)));
         }
+        "oracle-nosignals" => {
+            let config = SearchConfig { signals: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (no signals)", config, seed)));
+        }
         "counter-search-kitty" => {
             let config = SearchConfig { search_discards: true, ..SearchConfig::COUNTER };
             return Some(Box::new(SearchBot::new("Counter (searched kitty)", config, seed)));

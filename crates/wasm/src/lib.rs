@@ -95,3 +95,15 @@ pub fn coach_trace(save: &str, number: u32) -> Result<JsValue, JsError> {
 pub fn coach_expert(save: &str, number: u32) -> Result<JsValue, JsError> {
     to_js(&coach::expert(save, number as usize).map_err(js_err)?)
 }
+
+/// A bidding drill: { view, save } at South's turn to call.
+#[wasm_bindgen(js_name = drillBidding)]
+pub fn drill_bidding(seed: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::drill_bidding(seed as u64).map_err(js_err)?)
+}
+
+/// A card-play puzzle: { view, save } at a South decision with one clearly best play.
+#[wasm_bindgen(js_name = drillPlay)]
+pub fn drill_play(seed: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::drill_play(seed as u64).map_err(js_err)?)
+}

@@ -258,6 +258,13 @@ pub struct View {
     pub played: Vec<CardView>,
     /// Trumps you have not seen (not in your hand, not played, not among your discards).
     pub trumps_unseen: Option<usize>,
+    /// For each seat, the suits (♠ ♣ ♦ ♥, by effective suit) it has shown out of this hand.
+    pub shown_out: [[bool; 4]; 4],
+    /// For each suit (♠ ♣ ♦ ♥, by effective suit, so bowers count as trumps), cards you have
+    /// not seen: not in your hand, not played, not among your discards.
+    pub unseen_by_suit: [usize; 4],
+    /// Whether you have not seen the Joker (in no trumps it belongs to no suit).
+    pub joker_unseen: bool,
 }
 
 impl View {
@@ -316,8 +323,30 @@ impl View {
                 let seen = obs.hand.union(obs.played()).union(obs.discards.unwrap_or_default());
                 CardSet::pack().minus(seen).iter().filter(|&c| is_trump(c, trump)).count()
             }),
+            shown_out: shown_out(&obs),
+            unseen_by_suit: {
+                let seen = obs.hand.union(obs.played()).union(obs.discards.unwrap_or_default());
+                let unseen = CardSet::pack().minus(seen);
+                Suit::ALL.map(|s| unseen.iter().filter(|&c| fh_core::effective_suit(c, trump) == Some(s)).count())
+            },
+            joker_unseen: !obs.hand.union(obs.played()).union(obs.discards.unwrap_or_default()).contains(Card::JOKER),
         }
     }
+}
+
+/// The suits each seat has failed to follow this hand (public information).
+fn shown_out(obs: &fh_core::Observation) -> [[bool; 4]; 4] {
+    let trump = obs.trump();
+    let mut out = [[false; 4]; 4];
+    for trick in obs.tricks.iter().chain(obs.current_trick.iter()) {
+        let Some(led) = trick.led_suit() else { continue };
+        for (seat, card) in trick.plays() {
+            if seat != trick.leader() && fh_core::effective_suit(card, trump) != Some(led) {
+                out[seat.index()][led.index()] = true;
+            }
+        }
+    }
+    out
 }
 
 /// A short description of an event, for the table's message line and animation timing.

@@ -161,6 +161,33 @@ The Oracle bids from these distributions and plays like The Counter:
 
 These now live in `docs/rules-of-thumb.md`. They come from `train/rules_of_thumb.py` on the same data, and from `fh-lab habits` (The Counter in all four seats, 600 hands).
 
+### 11. The discard signal costs expert bots nothing measurable
+
+*Measured by `duel` with 400 deals: the Oracle with the discard signal vs the Oracle without.*
+
+**The convention:** the first throw-off comes from the strongest side suit. Search bots may give up as much as 25 expected points (all-cards-visible) to make it, because that analysis can't value information.
+
+**Result: −0.8 points a hand** (95% CI −5.9 to +4.4). Both sides declared 50% and made 76%.
+
+Neutral for experts, so the bots keep it: it's the house convention, and human partners rely on it.
+
+### 12. Opening leads, scored
+
+*Measured by `fh-lab leads` over 600 deals.*
+
+**Method:** at the declarer's opening lead and the defenders' first lead, every legal lead was scored on the same 32 sampled worlds. Each type of lead got a "best" rate and a cost: the average expected points it gives up against the best lead. The Oracle played the auctions; full tables are in `train/data/leads.txt` (regenerate with the command).
+
+**Findings:**
+
+- **Declarer with 5+ trumps:** the top trump is the best lead 70–74% of the time (cost 2–4). A side ace costs 7–8; a low trump 24–32.
+- **Declarer with 4 or fewer trumps:** the side ace is best (cost 7).
+- **Declarer holding the Joker:** the next-highest trump costs 4.7, the Joker itself 9.1.
+- **Partner called 6:** a small trump was best 62% of the time (n = 16).
+- **No trumps:** side winners are best 87% of the time; leading the Joker costs 49.
+- **Defenders in a suit contract:** a side ace costs 8 (best 68%), a low side card 18, partner's mentioned suit 20, a low trump 44.
+
+**Correction:** finding 10's habit-based "cash a side ace first" holds only with four or fewer trumps.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

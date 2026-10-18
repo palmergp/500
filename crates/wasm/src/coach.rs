@@ -186,6 +186,23 @@ mod tests {
     use crate::table::Table;
 
     #[test]
+    fn drills_produce_positions_for_south() {
+        let bid = drill_bidding(5).unwrap();
+        assert_eq!(bid.view.phase, "bidding");
+        assert!(bid.view.human_to_act);
+        let puzzle = drill_play(5).unwrap();
+        assert_eq!(puzzle.view.phase, "playing");
+        assert!(puzzle.view.human_to_act);
+        // The puzzle's answer is graded best by the same analysis.
+        let h = hint(&puzzle.save).unwrap();
+        let mut save: SaveData = serde_json::from_str(&puzzle.save).unwrap();
+        let number = save.log.len();
+        save.log.push(h.best as u16);
+        let g = grade(&serde_json::to_string(&save).unwrap(), number).unwrap().unwrap();
+        assert_eq!(g.verdict, "best");
+    }
+
+    #[test]
     fn hints_grades_traces_and_replays_from_a_save() {
         let mut table = Table::new(21, "steady", "steady", "steady").unwrap();
         let mut graded = 0;
@@ -213,4 +230,76 @@ mod tests {
         let replayed = expert(&save, deal).unwrap();
         assert!(replayed.expert_contract.is_some() || replayed.expert == 0);
     }
+}
+
+// ---- Drills ---------------------------------------------------------------------------------
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DrillView {
+    pub view: crate::view::View,
+    pub save: String,
+}
+
+fn drill_view(table: &crate::table::Table) -> DrillView {
+    DrillView { view: table.view(), save: serde_json::to_string(&table.save()).expect("save serializes") }
+}
+
+/// A bidding decision: a fresh deal with the bots calling until it is South's turn.
+pub fn drill_bidding(seed: u64) -> Result<DrillView, String> {
+    let mut table = crate::table::Table::new(seed, "oracle", "oracle", "oracle")?;
+    while !table.human_to_act() {
+        table.step_bot().ok_or("the bots couldn't reach your call")?;
+    }
+    Ok(drill_view(&table))
+}
+
+/// A card-play puzzle: hands are played by quick rule bots (one in South's seat too) until South
+/// faces a decision where one play is clearly best, judged by the same analysis that grades the
+/// answer. The moves leading up to it don't need to be expert; the puzzle position is checked
+/// properly.
+pub fn drill_play(seed: u64) -> Result<DrillView, String> {
+    for attempt in 0..30u64 {
+        let mut table = crate::table::Table::new(seed.wrapping_add(attempt * 7919), "steady", "steady", "steady")?;
+        let mut south = fh_ai::make_bot("steady", seed ^ attempt).ok_or("no bot")?;
+        let mut screen = fh_ai::SearchBot::new("screen", fh_ai::SearchConfig::FAST, seed ^ attempt);
+        let start = table.game().history().len();
+        let mut checked = 0;
+        while table.game().history().len() == start && table.game().phase() != Phase::GameOver && checked < 4 {
+            if !table.human_to_act() {
+                table.step_bot();
+                continue;
+            }
+            let game = table.game();
+            let obs = game.observe(HUMAN);
+            let legal = game.legal_actions();
+            let tricks = obs.tricks.len();
+            if obs.phase == Phase::Playing && (1..=7).contains(&tricks) && legal.len() >= 3 {
+                // Cheap screen first, then the coach's own analysis.
+                // Equivalent cards tie, so compare the best group with the next-best group.
+                let ranked = screen.evaluate_plays(&obs, &legal);
+                let best_ev = ranked[0].1;
+                let next_ev = ranked.iter().map(|r| r.1).find(|&ev| ev < best_ev - 2.0);
+                if next_ev.is_some_and(|ev| best_ev - ev >= 20.0) {
+                    checked += 1;
+                    let save = table.save();
+                    let number = save.log.len();
+                    let mut coach = Coach::new(save.seed ^ number as u64);
+                    let analysis = coach.analyze(&obs, &legal, None);
+                    let top = analysis.options.first().map_or(0.0, |o| o.ev);
+                    let runner_up = analysis.options.iter().find(|o| o.ev < top - 2.0).map(|o| o.action);
+                    if let Some(second) = runner_up {
+                        let grade = Coach::new(save.seed ^ number as u64).grade(&obs, &legal, second);
+                        if grade.verdict >= fh_ai::coach::Verdict::Mistake && grade.best == analysis.best {
+                            return Ok(drill_view(&table));
+                        }
+                    }
+                }
+            }
+            let action = south.choose(&obs, &legal);
+            let index = legal.iter().position(|&a| a == action).unwrap();
+            table.act(index)?;
+        }
+    }
+    Err("no clear puzzle found in these deals; try again".into())
 }

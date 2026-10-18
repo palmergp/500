@@ -7,10 +7,12 @@ interface Props {
   onClose: () => void;
 }
 
-const OPTIONS: { key: "grade" | "trumpCounter" | "tracker"; label: string; detail: string }[] = [
+const OPTIONS: { key: "grade" | "trumpCounter" | "tracker" | "voids" | "quiz"; label: string; detail: string }[] = [
   { key: "grade", label: "Grade my decisions", detail: "After each bid and card, see how it compares with the expert's choice, and undo mistakes." },
   { key: "trumpCounter", label: "Trump counter", detail: "Show how many trumps you haven't seen yet." },
-  { key: "tracker", label: "Card tracker", detail: "List every card played this hand. Turn it off to practise counting." },
+  { key: "tracker", label: "Card tracker", detail: "List every card played this hand and how many of each suit you haven't seen. Turn it off to practice counting." },
+  { key: "voids", label: "Show who is out of a suit", detail: "Mark each player with the suits they've failed to follow. A player who throws off is out of that suit for the rest of the hand." },
+  { key: "quiz", label: "Counting quiz", detail: "Now and then during play, answer a quick question: how many trumps are still out, who is out of a suit. The aids above are hidden while you answer." },
 ];
 
 export function CoachDialog({ settings, onChange, onClose }: Props) {

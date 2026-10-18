@@ -19,7 +19,10 @@ function lastCall(calls: CallView[], seat: SeatIndex) {
   return calls.find((c) => c.seat === seat);
 }
 
-function SeatPlate({ view, seat }: { view: View; seat: SeatIndex }) {
+const VOID_SUITS = ["S", "C", "D", "H"] as const;
+
+function SeatPlate({ view, seat, showVoids }: { view: View; seat: SeatIndex; showVoids: boolean }) {
+  const voids = showVoids && view.phase === "playing" ? VOID_SUITS.filter((_, i) => view.shownOut[seat][i]) : [];
   const player = view.players[seat];
   const call = view.phase === "bidding" ? lastCall(view.calls, seat) : undefined;
   const declarer = view.contract?.declarer === seat;
@@ -36,7 +39,14 @@ function SeatPlate({ view, seat }: { view: View; seat: SeatIndex }) {
         {view.dealer === seat && <span className="chip">dealer</span>}
         {declarer && <span className="chip declarer">{view.contract!.label}</span>}
       </div>
-      <div className="seat-sub">{SEAT_NAMES[seat]}</div>
+      <div className="seat-sub">
+        {SEAT_NAMES[seat]}
+        {voids.map((s) => (
+          <span key={s} className={`void-chip${s === "D" || s === "H" ? " red" : ""}`} title={`Out of ${SUIT_SYMBOL[s]}`}>
+            no {SUIT_SYMBOL[s]}
+          </span>
+        ))}
+      </div>
       {seat !== 0 && (
         <div className="backs" aria-label={`${view.handCounts[seat]} cards`}>
           {Array.from({ length: backs }, (_, i) => (
@@ -91,16 +101,18 @@ interface Props {
   trumpsUnseen?: number | null;
   /** Sweep the finished trick toward its winner. */
   sweepTo?: SeatIndex | null;
+  /** Mark the suits each player has shown out of. */
+  showVoids?: boolean;
   children: React.ReactNode;
 }
 
 /** The felt: three opponents' and partner's seats around the trick, your seat and hand below. */
-export function TableView({ view, trick, trumpsUnseen, sweepTo = null, children }: Props) {
+export function TableView({ view, trick, trumpsUnseen, sweepTo = null, showVoids = false, children }: Props) {
   const showTrick = view.phase === "playing" || (trick && trick.plays.length > 0);
   return (
     <div className="table">
-      <SeatPlate view={view} seat={2} />
-      <SeatPlate view={view} seat={1} />
+      <SeatPlate view={view} seat={2} showVoids={showVoids} />
+      <SeatPlate view={view} seat={1} showVoids={showVoids} />
       <div className="center">
         {view.contract && (
           <div className="contract">
@@ -118,7 +130,7 @@ export function TableView({ view, trick, trumpsUnseen, sweepTo = null, children 
           <div className="waiting">{view.players[view.contract!.declarer].name} is taking the kitty…</div>
         )}
       </div>
-      <SeatPlate view={view} seat={3} />
+      <SeatPlate view={view} seat={3} showVoids={showVoids} />
       <div className="south">{children}</div>
     </div>
   );

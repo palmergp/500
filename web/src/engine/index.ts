@@ -1,7 +1,7 @@
 // The game engine (Rust compiled to WebAssembly), running in a Web Worker.
 
 import type { Request, Response, Snapshot } from "./protocol";
-import type { ExpertView, GradeView, HintView, Persona, TraceView } from "./types";
+import type { DrillView, ExpertView, GradeView, HintView, Persona, TraceView } from "./types";
 
 export * from "./types";
 export type { Snapshot } from "./protocol";
@@ -87,5 +87,15 @@ export class CoachClient extends WorkerClient {
   /** Deal `number` replayed with The Counter in your seat. */
   expert(save: string, number: number): Promise<ExpertView> {
     return this.call("expert", { save, number }) as Promise<ExpertView>;
+  }
+
+  /** A bidding decision to practice: a fresh deal at your turn to call. */
+  drillBidding(seed: number): Promise<DrillView> {
+    return this.call("drillBidding", { seed }) as Promise<DrillView>;
+  }
+
+  /** A card-play puzzle: a position with one clearly best play. */
+  drillPlay(seed: number): Promise<DrillView> {
+    return this.call("drillPlay", { seed }) as Promise<DrillView>;
   }
 }

@@ -14,6 +14,10 @@ export interface Settings {
   trumpCounter: boolean;
   /** Show every card played this hand. */
   tracker: boolean;
+  /** Mark the suits each player has shown out of. */
+  voids: boolean;
+  /** Ask counting questions during play. */
+  quiz: boolean;
   /** Sound effects. */
   sound: boolean;
   /** Background music. */
@@ -28,6 +32,8 @@ export const DEFAULT_SETTINGS: Settings = {
   grade: true,
   trumpCounter: true,
   tracker: false,
+  voids: true,
+  quiz: false,
   sound: true,
   music: false,
 };

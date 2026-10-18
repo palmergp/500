@@ -146,3 +146,22 @@ fn follows_suit_with_the_left_bower_only_when_it_is_the_only_trump() {
     };
     assert_eq!(spot.choose(), Card::parse("JD").unwrap());
 }
+
+#[test]
+fn first_throw_off_signals_the_strongest_side_suit() {
+    // Spades trumps. West's A♦ wins the trick; East has no diamonds for the first time and holds
+    // A K and three small hearts: the throw-off should be the low heart, telling partner to lead
+    // hearts.
+    let spot = Spot {
+        seat: Seat::EAST,
+        declarer: Seat::SOUTH,
+        contract: Contract::new(7, Strain::Spades),
+        hand: "AH KH 7H 6H 5H 9C 8C 10S 9S 6S",
+        leader: Seat::SOUTH,
+        trick: "5D AD 4D",
+        kitty: None,
+    };
+    assert_eq!(spot.choose(), Card::parse("5H").unwrap());
+}
+
+

@@ -1,6 +1,6 @@
 # 500 — Game & Trainer: Project Plan
 
-*Status: Phases 0–5 done (rules engine, bots, simulator, web game, expert AI and lab, coach, neural bidding) · 2026-10-18*
+*Status: Phases 0–6 done (rules engine, bots, simulator, web game, expert AI and lab, coach, neural bidding, curriculum) · 2026-10-18*
 
 ## 1. Goals
 
@@ -204,7 +204,7 @@ Each phase ends with something usable.
 | **3. Expert AI + lab** ✅ | Double-dummy solver, PIMC card play with inference, lab-tuned bidding, heuristic kitty discards (searched discards tested: no gain); Counter and Shark; `fh-lab duel`, `calibrate` and `bench`; engine in a Web Worker; findings in `docs/lab/README.md` | Expert beats the rule bots in duplicate (Counter +29 points per hand over Steady, 95% CI +16 to +42); every expert move ≤ 1.1 s in the browser on this laptop |
 | **4. Coach** ✅ | Hint button with reasons; live grades (best → blunder by expected points, capped when the sampled deals cannot separate two plays) with Undo; review tabs for your decisions, trick-by-trick hindsight (all cards visible) and luck vs skill (replay with The Counter in your seat); trump counter and card tracker; coach in its own worker | Every decision in a hand can be graded and explained (`crates/ai/src/coach.rs`, `web/e2e/coach.spec.ts`) |
 | **5. Neural AI** ✅ (first stage) | Neural bidding evaluator (`fh-lab dataset` → `train/train_bid.py` → `crates/ai/src/nn.rs`), one self-play refinement round, The Oracle (now the default partner), coach bids graded by the evaluator, `docs/rules-of-thumb.md` from solver data and expert habits. Play-policy distillation and self-play RL are left for a later stage | The Oracle beats The Counter: +12.4 points per hand on 400 duplicate deals, +8 to +12 across three matches |
-| **6. Curriculum** | Lessons, drills, puzzles, progress dashboard, lab insights | The full beginner-to-expert path is playable |
+| **6. Curriculum** ✅ | Learn screen: 9 lessons with quizzes (`web/src/learn/lessons.ts`), bidding trainer, play puzzles (positions with one clearly best play), progress dashboard; counting aids (who is out of which suit, cards out per suit) and an in-game counting quiz; the discard-signal convention in every bot; opening-lead analysis (`fh-lab leads`) behind the play tips | The full beginner-to-expert path is playable; `web/e2e/learn.spec.ts` covers lessons, drills, quiz and progress |
 | **7. Polish & extras** | Animations and sound, accessibility, offline install, 3/5/6-player variants; online play optional | — |
 
 Phase 5's data generation can run in the background while Phase 4 is built.

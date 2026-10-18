@@ -11,7 +11,9 @@ export type Request =
   | { id: number; op: "hint"; save: string }
   | { id: number; op: "grade"; save: string; number: number }
   | { id: number; op: "trace"; save: string; number: number }
-  | { id: number; op: "expert"; save: string; number: number };
+  | { id: number; op: "expert"; save: string; number: number }
+  | { id: number; op: "drillBidding"; seed: number }
+  | { id: number; op: "drillPlay"; seed: number };
 
 export type Response = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 
