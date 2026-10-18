@@ -98,8 +98,55 @@ export const LESSONS: Lesson[] = [
     ],
   },
   {
+    id: "strain",
+    title: "4. Suit or no trumps? Length or strength?",
+    summary: "When no trumps pays, and what really makes tricks.",
+    body: [
+      "These numbers come from 107,000 hands, each solved in every strain and scored at the 7 level.",
+      "## The Joker decides no trumps",
+      "• Without the Joker, no trumps beats your longest suit only about 30% of the time, whatever your shape. Bid the suit.",
+      "• With the Joker, no trumps wins 55–80% of the time. With the Joker and 2 aces, and no suit longer than 4, it wins 79% of the time.",
+      "• Aces matter more than stoppers: 0 aces gives NT about 25%, 2 aces about 50%, 3+ aces 63%.",
+      "• From the 8 level up, lean toward the suit. Even with the Joker, no trumps wins only 44% of the time there.",
+      "## Lots of one suit?",
+      "Without the Joker, bid it. With the Joker, no trumps is still often better at the 7 level, even with a 6-card suit. You lose only about a third of a trick, and no trumps is worth more points.",
+      "## Length or strength in a suit contract",
+      "• Top trumps win. Swapping a small trump for the Joker or a bower adds about ¾ of a trick.",
+      "• One more small trump adds ½ a trick when you hold none of the top three trumps, but only ¼ once you hold two of them.",
+      "• Three trumps that include the Joker and both bowers are worth about as much as seven small trumps.",
+      "## Length in no trumps",
+      "A long suit counts only if the ace heads it. Without the ace, a longer suit actually produced fewer no-trump tricks. With A-K at the top, length barely helped. Count the Joker and your aces.",
+    ],
+    quiz: [
+      {
+        q: "No Joker, three aces, a balanced hand. Suit or no trumps?",
+        options: ["No trumps", "Your best suit"],
+        answer: 1,
+        explain: "Without the Joker, no trumps is right only about 30% of the time. Bid your best suit.",
+      },
+      {
+        q: "You hold the Joker, two aces and no suit longer than four. Which strain?",
+        options: ["No trumps", "Your four-card suit"],
+        answer: 0,
+        explain: "That pattern favored no trumps on 79% of hands.",
+      },
+      {
+        q: "Hearts are trumps. Which adds more: a sixth small heart, or turning a small heart into the right bower?",
+        options: ["The sixth small heart", "The right bower"],
+        answer: 1,
+        explain: "A top trump adds about ¾ of a trick; another small trump adds ¼–½.",
+      },
+      {
+        q: "No trumps: your long suit is Q J 10 9 8 7 with no ace. How much does its length help?",
+        options: ["A lot: it will run", "Very little"],
+        answer: 1,
+        explain: "Without the ace, a long suit rarely runs in no trumps: hands are only 10 cards and the opponents may hold the Joker.",
+      },
+    ],
+  },
+  {
     id: "reading-auction",
-    title: "4. Reading the auction",
+    title: "5. Reading the auction",
     summary: "What partner's and opponents' calls are worth.",
     body: [
       "Add these to your count for the strain you're considering (measured):",
@@ -125,7 +172,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "kitty",
-    title: "5. The kitty",
+    title: "6. The kitty",
     summary: "What to put back.",
     body: [
       "Keep every trump and your aces. Use the three discards to shorten your shortest side suits: two discards from a doubleton leave you void, ready to trump that suit.",
@@ -142,7 +189,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "declarer",
-    title: "6. Playing the hand as declarer",
+    title: "7. Playing the hand as declarer",
     summary: "Which card to lead first, and how partner's calls change it.",
     body: [
       "These tips come from scoring every possible opening lead in 600 deals, using the expert's search over likely layouts of the hidden cards.",
@@ -156,7 +203,7 @@ export const LESSONS: Lesson[] = [
       "• Partner called 6 (they hold the Joker): now a small trump is often the right lead (best 62% of the time). You draw trumps toward partner's Joker without spending your own top trumps.",
       "• Partner mentioned your trump suit (a bower): lead your top trump as usual.",
       "## After the first lead",
-      "Keep drawing trumps gradually while the opponents still have some, mixing in your side winners. Count trumps as they fall (lesson 8): when none are left out, your side aces can't be trumped.",
+      "Keep drawing trumps gradually while the opponents still have some, mixing in your side winners. Count trumps as they fall (lesson 9): when none are left out, your side aces can't be trumped.",
       "## No trumps",
       "Cash your side winners first: an ace or sure winner was the best lead 87% of the time. Never open with the Joker: it's your stopper for whichever suit the opponents attack.",
     ],
@@ -183,7 +230,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "defense",
-    title: "7. Defense and signals",
+    title: "8. Defense and signals",
     summary: "Opening leads, when to trump, and the discard signal.",
     body: [
       "## The first lead",
@@ -221,7 +268,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "counting-cards",
-    title: "8. Counting cards",
+    title: "9. Counting cards",
     summary: "Keep track of trumps, suits, and who is out of what.",
     body: [
       "Good players count as they play. Three habits:",
@@ -245,7 +292,7 @@ export const LESSONS: Lesson[] = [
   },
   {
     id: "score",
-    title: "9. Playing to the score",
+    title: "10. Playing to the score",
     summary: "How the house rules on winning change your choices.",
     body: [
       "• Defenders can win the game with their 10 a trick. Near 500, every defensive trick matters, and you can go out on defense.",

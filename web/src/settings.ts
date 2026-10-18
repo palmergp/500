@@ -22,6 +22,10 @@ export interface Settings {
   sound: boolean;
   /** Background music. */
   music: boolean;
+  /** Four-color deck: diamonds blue, clubs green. */
+  fourColor: boolean;
+  /** Larger cards. */
+  bigCards: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -36,6 +40,8 @@ export const DEFAULT_SETTINGS: Settings = {
   quiz: false,
   sound: true,
   music: false,
+  fourColor: false,
+  bigCards: false,
 };
 
 const SETTINGS_KEY = "fh500.settings";

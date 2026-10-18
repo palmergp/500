@@ -27,6 +27,13 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 5. **No trumps:**
    - count Joker 2¼, each ace 1, guarded king ½, then add 3⅓;
    - an unstopped suit hurts far less than its reputation.
+   - **Suit or no trumps? Bid no trumps mainly with the Joker.**
+     - Without it, no trumps beats your suit only about 30% of the time.
+     - With the Joker and 2 aces, it wins 79% of the time.
+     - Above the 7 level, lean toward the suit.
+   - **Length or strength?**
+     - In a suit, a top trump (the Joker or a bower) is worth more than an extra small trump: about ¾ against ¼–½ of a trick.
+     - In no trumps, a long suit counts only if the ace heads it.
 6. **Compete for the contract.** The neural bidder declares twice as often as the rule-based expert and scores 12 points a hand more.
 7. **Trust partner's bid.** Raise it or pass; don't pull partner into your suit.
 
@@ -132,6 +139,52 @@ Then **add 3⅓**. The bidding thresholds are the same as in rule 2.
 *Source: solver data.*
 
 **Surprise:** an unstopped suit cost almost nothing (+0.06 ± 0.05 tricks). That's against the usual "stoppers in every suit" advice. With the kitty to discard into and the Joker guarding any suit, gaps hurt less than you'd expect.
+
+### 5a. Suit or no trumps? The Joker decides it
+
+*Source: solver data* (107,000 hands, each solved in every strain; `train/strain_choice.py`). Each hand compares your longest trump suit with no trumps at the 7 level, under the house scoring.
+
+| You hold | No trumps scores better |
+|---|---|
+| **No Joker** (any shape) | **about 30%**: bid your suit |
+| **The Joker** | **55–80%** |
+| The Joker + 2 aces + no suit longer than 4 | **79%** |
+| 3+ aces, 3+ stoppers, no singleton | 62% |
+| 0 aces | 22–28% |
+| 2 aces | about 50% |
+| 3+ aces | 63% |
+
+- **Aces matter more than stoppers.** With the same number of aces, extra stoppers move the figure only a few points.
+- **A long suit and the Joker?** No trumps is still better at the 7 level (76–80% with a 6-card suit). You give up only about a third of a trick, and no trumps is worth more. Without the Joker, bid the suit.
+- **From the 8 level up, lean toward the suit.** No trumps is better only 44% of the time with the Joker, and 20% without it.
+
+### 5b. Length or strength?
+
+**In a suit contract, top trumps beat length.** Average tricks for your side, by trumps held and how many of the top three (Joker, right bower, left bower) you hold:
+
+| Trumps | none | 1 | 2 | all 3 |
+|---|---|---|---|---|
+| 3 | 5.3 | 6.0 | 6.7 | 7.4 |
+| 4 | 5.8 | 6.6 | 7.3 | 8.0 |
+| 5 | 6.3 | 7.0 | 7.7 | 8.4 |
+| 6 | 6.8 | 7.4 | 8.0 | 8.6 |
+| 7 | 7.2 | 7.6 | 8.3 | 8.6 |
+
+- **Swapping a small trump for one of the top three** adds about **0.7 tricks**, at any length.
+- **One more small trump** adds **0.5** when you hold none of the top three, but only about **0.25** once you hold two of them.
+- **Length matters most when your trumps are weak.** Past six trumps it adds little.
+- **Three trumps including the Joker and both bowers** (7.4) are worth about as much as **seven small trumps** (7.2).
+
+**In no trumps, length without the ace is worthless.** Average no-trump tricks by your longest suit:
+
+| Longest suit | no ace | ace, no king | ace and king |
+|---|---|---|---|
+| 4 | 5.1 | 5.9 | 6.4 |
+| 5 | 4.9 | 5.8 | 6.3 |
+| 6 | 4.7 | 5.9 | 6.3 |
+| 7+ | 4.3 | — | 6.4 |
+
+With 10-card hands and the Joker against you, long suits rarely run. Count the Joker and your aces, not your length.
 
 ### 6. Compete for the contract: the neural bidder's lesson
 

@@ -1,6 +1,6 @@
 # 500 — Game & Trainer: Project Plan
 
-*Status: Phases 0–6 done (rules engine, bots, simulator, web game, expert AI and lab, coach, neural bidding, curriculum) · 2026-10-18*
+*Status: Phases 0–6 done; Phase 7 polish in progress (offline app, accessibility and wifi play done) · 2026-10-18*
 
 ## 1. Goals
 
@@ -16,7 +16,7 @@
 | Topic | Decision |
 |---|---|
 | Game | Trick-taking 500, **American rules** (section 3) |
-| Platform | **Web app**, solo vs AI, installable and playable offline, no server |
+| Platform | **Web app**, solo vs AI, installable and playable offline, no server. For playing friends: an optional host program on one PC serves the same app over home wifi (`crates/host`) |
 | Architecture | **Rust core** shared by the game (WebAssembly), the lab (native) and training (Python module) |
 | AI ambition | **Research + simulation lab + self-learning neural AI** |
 | Your level | **Casual**: you know the rules and want to sharpen bidding, counting and defense |
@@ -103,6 +103,8 @@ The engine supports every toggle in `01-rules-and-variants.md` §5, but the AIs 
 │  │                       bidding/kitty evaluators, inference (belief over hidden cards)
 │  ├─ lab/                 CLI: duplicate tournaments, experiments, training-data generation (all cores)
 │  ├─ wasm/                wasm-bindgen API → npm package used by web/
+│  ├─ host/                fh-host: serves web/ on the home network; one authoritative table for
+│  │                       friends' browsers (WebSocket), bots and the coach run on the host
 │  └─ py/                  PyO3/maturin module → `import five_hundred` in train/
 ├─ web/                    Vite + React + TypeScript game & trainer (PWA)
 │                          AI runs in Web Workers (WASM search + onnxruntime-web for neural nets)
@@ -205,7 +207,7 @@ Each phase ends with something usable.
 | **4. Coach** ✅ | Hint button with reasons; live grades (best → blunder by expected points, capped when the sampled deals cannot separate two plays) with Undo; review tabs for your decisions, trick-by-trick hindsight (all cards visible) and luck vs skill (replay with The Counter in your seat); trump counter and card tracker; coach in its own worker | Every decision in a hand can be graded and explained (`crates/ai/src/coach.rs`, `web/e2e/coach.spec.ts`) |
 | **5. Neural AI** ✅ (first stage) | Neural bidding evaluator (`fh-lab dataset` → `train/train_bid.py` → `crates/ai/src/nn.rs`), one self-play refinement round, The Oracle (now the default partner), coach bids graded by the evaluator, `docs/rules-of-thumb.md` from solver data and expert habits. Play-policy distillation and self-play RL are left for a later stage | The Oracle beats The Counter: +12.4 points per hand on 400 duplicate deals, +8 to +12 across three matches |
 | **6. Curriculum** ✅ | Learn screen: 9 lessons with quizzes (`web/src/learn/lessons.ts`), bidding trainer, play puzzles (positions with one clearly best play), progress dashboard; counting aids (who is out of which suit, cards out per suit) and an in-game counting quiz; the discard-signal convention in every bot; opening-lead analysis (`fh-lab leads`) behind the play tips | The full beginner-to-expert path is playable; `web/e2e/learn.spec.ts` covers lessons, drills, quiz and progress |
-| **7. Polish & extras** | Animations and sound, accessibility, offline install, 3/5/6-player variants; online play optional | — |
+| **7. Polish & extras** (in progress) | Done: sound effects and music, animations, avatars, celebrations; installable offline app (manifest, icons, service worker); screen-reader announcements, four-color deck, larger cards, reduced motion and forced colors. Wifi play: `fh-host` on one PC serves the app and keeps the game; friends join from a phone or laptop browser (QR code), pick seats in a lobby, bots fill empty seats, each person's coach runs on the host from their own seat, and a dropped phone gets its seat back (`docs/playing-over-wifi.md`). Dropped: 3/5/6-player variants (the user only plays 4-handed) | `web/e2e/offline.spec.ts` plays a game with the network off; `web/e2e/lan.spec.ts` has two browsers play a deal at a host, with private hands, a hint and a reconnect |
 
 Phase 5's data generation can run in the background while Phase 4 is built.
 
@@ -227,5 +229,5 @@ Phase 5's data generation can run in the background while Phase 4 is built.
 | Search too slow in the browser or on phones | WASM + Web Workers, time budgets, fewer samples on slow devices |
 | Neural training limited by CPU-only hardware | Small networks, distillation first, cloud GPU only if needed; the game never depends on the neural net |
 | A search or neural AI can't explain itself | Reasons generated from search statistics and hand features; neural suggestions cross-checked by search |
-| Scope creep | Each phase ships something usable; online play and other player counts are deferred |
+| Scope creep | Each phase ships something usable; internet play and other player counts are deferred (wifi play is local only) |
 | Users suspect the AI cheats | Seat views enforced by the engine, reproducible deals, and "what the AI knew" in the review |

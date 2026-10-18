@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import type { CoachClient, ExpertView, GradeView, HandView, PlayerView, TraceView } from "../engine";
+import type { Coach, ExpertView, GradeView, HandView, PlayerView, TraceView } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { Card } from "./Card";
 import { VerdictChip } from "./Coach";
@@ -9,7 +9,7 @@ interface Props {
   players: PlayerView[];
   /** The coach's grades for your decisions on this deal. */
   grades: GradeView[];
-  coach: CoachClient | null;
+  coach: Coach | null;
   /** The game's save, for the coach to rebuild positions. */
   save: string | null;
 }
@@ -147,7 +147,7 @@ function useCoach<T>(load: (() => Promise<T>) | null): { value: T | null; error:
   return { value, error };
 }
 
-function Tricks({ hand, coach, save }: { hand: HandView; coach: CoachClient | null; save: string | null }) {
+function Tricks({ hand, coach, save }: { hand: HandView; coach: Coach | null; save: string | null }) {
   const { value: trace, error } = useCoach<TraceView | null>(coach && save ? () => coach.trace(save, hand.number) : null);
   const c = hand.contract!;
   if (error) return <p>Could not analyze this hand: {error}</p>;
@@ -178,7 +178,7 @@ function Tricks({ hand, coach, save }: { hand: HandView; coach: CoachClient | nu
   );
 }
 
-function Luck({ hand, coach, save }: { hand: HandView; coach: CoachClient | null; save: string | null }) {
+function Luck({ hand, coach, save }: { hand: HandView; coach: Coach | null; save: string | null }) {
   const [started, setStarted] = useState(false);
   const [result, setResult] = useState<ExpertView | null>(null);
   const [error, setError] = useState<string | null>(null);

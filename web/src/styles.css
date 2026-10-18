@@ -1266,3 +1266,198 @@ button:focus-visible {
   font-size: 0.7rem;
   opacity: 0.6;
 }
+
+/* ---- Accessibility and display options ------------------------------------------------------ */
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.four-color .card.suit-D,
+.four-color .call.strain-D {
+  color: #1565c0;
+}
+.four-color .card.suit-C,
+.four-color .call.strain-C {
+  color: #2e7d32;
+}
+.big-cards {
+  --card-w: clamp(52px, 11vw, 96px);
+}
+.big-cards .seat-name,
+.big-cards .status {
+  font-size: 1.1rem;
+}
+@media (forced-colors: active) {
+  .card {
+    border: 2px solid CanvasText;
+  }
+  .card.playable {
+    outline: 2px solid Highlight;
+  }
+}
+
+/* ---- LAN table lobby ---------------------------------------------------------------- */
+
+.lobby {
+  display: grid;
+  gap: 14px;
+}
+.lobby .join {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+}
+.lobby .join img {
+  flex: none;
+  background: #fff;
+  border-radius: 8px;
+}
+.lobby .join p {
+  margin: 0;
+}
+.lobby .url {
+  white-space: nowrap;
+  font-family: ui-monospace, monospace;
+}
+.lobby-warning {
+  margin: 0;
+  color: var(--danger);
+  font-weight: 600;
+}
+.lobby-name label {
+  display: grid;
+  gap: 4px;
+  max-width: 260px;
+}
+.lobby-name input,
+.lobby-seat select {
+  font: inherit;
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid var(--panel-line);
+  min-width: 0;
+}
+.lobby-seats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-areas:
+    ". north ."
+    "west center east"
+    ". south .";
+  gap: 8px;
+}
+.lobby-seat {
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 8px;
+  display: grid;
+  gap: 6px;
+  align-content: start;
+}
+.lobby-seat.mine {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+.lobby-seat.north {
+  grid-area: north;
+}
+.lobby-seat.west {
+  grid-area: west;
+}
+.lobby-seat.east {
+  grid-area: east;
+}
+.lobby-seat.south {
+  grid-area: south;
+}
+.lobby-center {
+  grid-area: center;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--panel-ink) 65%, transparent);
+}
+.lobby-seat-head {
+  font-weight: 700;
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.lobby-seat .tag {
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--accent) 18%, transparent);
+}
+.lobby-person {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-wrap: anywhere;
+}
+.lobby-person .dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--accent);
+}
+.lobby-person .dot.away {
+  background: transparent;
+  border: 2px solid var(--danger);
+}
+.lobby-seat-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.lobby-seat-actions button {
+  font-size: 0.85rem;
+}
+.lobby-pace {
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+}
+.lobby-pace label.inline {
+  display: inline-flex;
+  gap: 4px;
+  margin-right: 14px;
+  text-transform: capitalize;
+}
+.lobby .actions {
+  flex-wrap: wrap;
+  align-items: center;
+}
+.lobby .confirm {
+  margin-right: auto;
+  font-size: 0.9rem;
+}
+button.danger {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+@media (max-width: 520px) {
+  .lobby-seats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-areas:
+      "north north"
+      "west east"
+      "south south";
+  }
+  .lobby-center {
+    display: none;
+  }
+  .lobby .join img {
+    width: 96px;
+    height: 96px;
+  }
+}

@@ -24,4 +24,6 @@ export interface Snapshot {
   events: EventView[];
   /** Milliseconds the engine spent on this request (mostly bot thinking). */
   ms: number;
+  /** Identifies a LAN game (whose save stays on the host, so is empty here). */
+  game?: string;
 }

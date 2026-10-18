@@ -68,8 +68,16 @@ export class Engine extends WorkerClient {
   }
 }
 
+/** What the game screens ask of the coach: the browser's own worker, or the LAN host. */
+export interface Coach {
+  hint(save: string): Promise<HintView>;
+  grade(save: string, number: number): Promise<GradeView | null>;
+  trace(save: string, number: number): Promise<TraceView | null>;
+  expert(save: string, number: number): Promise<ExpertView>;
+}
+
 /** A second worker for the coach: it rebuilds positions from saves, so play never waits on it. */
-export class CoachClient extends WorkerClient {
+export class CoachClient extends WorkerClient implements Coach {
   hint(save: string): Promise<HintView> {
     return this.call("hint", { save }) as Promise<HintView>;
   }

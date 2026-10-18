@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionView, CardView, GradeView, HandView, HintView, Persona, Snapshot, TrickView, View } from "./engine";
+import type { ActionView, CardView, Coach, GradeView, HandView, HintView, Persona, Snapshot, TrickView, View } from "./engine";
 import { CoachClient, Engine, SUIT_SYMBOL } from "./engine";
+import { detectHost, NetClient, savedName, type HostInfo, type Lobby as LobbyState } from "./net";
+import { Lobby } from "./components/Lobby";
 import { BiddingBox } from "./components/BiddingBox";
 import { Card } from "./components/Card";
 import { CardTracker, GradeBar, HintPanel } from "./components/Coach";
@@ -27,6 +29,29 @@ function gameId(save: string): string {
   } catch {
     return "unknown";
   }
+}
+
+/** On a LAN host, whether you chose to play solo instead (remembered for this tab). */
+const soloOnHost = {
+  get: () => {
+    try {
+      return sessionStorage.getItem("fh500.soloOnHost") === "1";
+    } catch {
+      return false;
+    }
+  },
+  set: (on: boolean) => {
+    try {
+      if (on) sessionStorage.setItem("fh500.soloOnHost", "1");
+      else sessionStorage.removeItem("fh500.soloOnHost");
+    } catch {
+      // Not remembered.
+    }
+  },
+};
+
+function names(list: string[]): string {
+  return list.length <= 1 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
 }
 
 function randomSeed(): number {
@@ -72,15 +97,36 @@ export function App() {
   const [sweeping, setSweeping] = useState(false);
   const [quizzed, setQuizzed] = useState<number | null>(null);
   const [showLearn, setShowLearn] = useState(false);
+  const [announcement, setAnnouncement] = useState("");
+  // Playing at a table on a LAN host (crates/host) rather than against bots on this device.
+  const [mode, setMode] = useState<"starting" | "solo" | "lan">("starting");
+  const modeRef = useRef(mode);
+  const netRef = useRef<NetClient | null>(null);
+  const gameRef = useRef<string | null>(null);
+  const gradesRef = useRef(grades);
+  const [host, setHost] = useState<HostInfo | null>(null);
+  const [lobby, setLobby] = useState<LobbyState | null>(null);
+  const [connected, setConnected] = useState(true);
+  const [name, setName] = useState(savedName);
+  const [showLobby, setShowLobby] = useState(false);
+  const lan = mode === "lan";
+  useEffect(() => {
+    gradesRef.current = grades;
+  }, [grades]);
 
-  const factor = SPEED_FACTOR[settings.speed];
+  const factor = SPEED_FACTOR[lan && lobby ? lobby.pace : settings.speed];
+  /** Answers hints and reviews: the host for a LAN game (it holds the cards), else this device. */
+  const coach: Coach | null = lan ? netRef.current : coachRef.current;
+  /** The coach rebuilds positions from the save; a LAN host already has the game. */
+  const coachSave = () => (modeRef.current === "lan" ? "lan" : saveRef.current);
 
   const handle = useCallback((snapshot: Snapshot) => {
     const next = snapshot.view;
     if (snapshot.ms > 50) console.debug(`engine: ${snapshot.ms.toFixed(0)} ms (${snapshot.events.map((e) => e.text).join("; ")})`);
     setView(next);
     saveRef.current = snapshot.save;
-    savedGame.store(snapshot.save);
+    gameRef.current = snapshot.game ?? gameId(snapshot.save);
+    if (modeRef.current === "solo") savedGame.store(snapshot.save);
     for (const e of snapshot.events) {
       if (e.kind === "played") audio.play("card");
       else if (e.kind === "dealt") audio.play("deal");
@@ -93,9 +139,12 @@ export function App() {
         audio.play(hand && ours === !!hand.made ? "made" : "set");
       } else if (e.kind === "gameWon") {
         audio.play(next.winner === 0 ? "win" : "lose");
-        recordGrades(gameId(snapshot.save), savedGrades.load(), true, next.winner === 0);
+        recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
       }
     }
+    // Screen readers hear every call, card, trick and score as it happens.
+    const spoken = snapshot.events.filter((e) => e.kind !== "discarded").map((e) => e.text);
+    if (spoken.length > 0) setAnnouncement(spoken.join(". "));
     const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
     if (snapshot.events.some((e) => e.kind === "trickWon")) {
@@ -116,7 +165,8 @@ export function App() {
       if (snapshot) handle(snapshot);
       return snapshot;
     } catch (e) {
-      setError(String(e));
+      if (modeRef.current === "lan") setMessage(e instanceof Error ? e.message : String(e));
+      else setError(String(e));
       return null;
     } finally {
       busy.current = false;
@@ -141,7 +191,63 @@ export function App() {
     [request],
   );
 
-  // Start the engine, then resume the saved game or ask for a new one.
+  const clearTable = useCallback(() => {
+    setView(null);
+    setHeld(null);
+    setResult(null);
+    setReview(null);
+    setHint(null);
+    setLastGrade(null);
+    setSelected([]);
+    setJokerLeads(null);
+    setMessage("");
+  }, []);
+
+  /** Against bots on this device: resume the saved game or ask for a new one. */
+  const startSolo = useCallback(async () => {
+    netRef.current?.close();
+    netRef.current = null;
+    modeRef.current = "solo";
+    setMode("solo");
+    clearTable();
+    setGrades(savedGrades.load<GradeView>());
+    const save = savedGame.load();
+    if (save && engineRef.current) {
+      try {
+        handle(await engineRef.current.load(save));
+        setMessage("Welcome back: your game was restored.");
+        return;
+      } catch {
+        savedGame.clear();
+      }
+    }
+    setShowNewGame(true);
+  }, [handle, clearTable]);
+
+  /** At the LAN host's table. */
+  const joinHost = useCallback(() => {
+    modeRef.current = "lan";
+    setMode("lan");
+    clearTable();
+    setGrades([]);
+    setShowNewGame(false);
+    netRef.current?.close();
+    netRef.current = new NetClient(
+      {
+        lobby: setLobby,
+        snapshot: handle,
+        ended: () => {
+          clearTable();
+          setGrades([]);
+        },
+        notice: setMessage,
+        connection: setConnected,
+      },
+      savedName() || "Player",
+    );
+  }, [handle, clearTable]);
+
+  // Start the engine; join the table if the app came from a LAN host, else play solo.
   useEffect(() => {
     if (engineRef.current) return;
     const engine = new Engine();
@@ -151,20 +257,13 @@ export function App() {
       .personas()
       .then(async (list) => {
         setPersonas(list);
-        const save = savedGame.load();
-        if (save) {
-          try {
-            handle(await engine.load(save));
-            setMessage("Welcome back: your game was restored.");
-            return;
-          } catch {
-            savedGame.clear();
-          }
-        }
-        setShowNewGame(true);
+        const info = await detectHost();
+        setHost(info);
+        if (info && !soloOnHost.get()) joinHost();
+        else await startSolo();
       })
       .catch((e: unknown) => setError(String(e)));
-  }, [handle]);
+  }, [startSolo, joinHost]);
 
   // Show a finished trick for a moment before play continues.
   useEffect(() => {
@@ -193,22 +292,24 @@ export function App() {
     };
   }, [settings.sound, settings.music]);
 
-  const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach || showLearn;
+  const lobbyOpen = lan && (showLobby || !lobby?.playing || lobby.you === null || !view);
+  // At a LAN table, nobody moves until everyone has seen the last hand's result.
+  const waitingOnOthers = lan && !!lobby && lobby.waiting.length > 0;
+  const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach || showLearn || lobbyOpen || waitingOnOthers;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
   useEffect(() => {
-    if (!view || paused || view.humanToAct || view.phase === "gameOver") return;
+    if (mode !== "solo" || !view || paused || view.humanToAct || view.phase === "gameOver") return;
     const pause = new Promise((r) => setTimeout(r, DELAY[view.phase] * factor));
     void request(async (engine) => {
       const [snapshot] = await Promise.all([engine.stepBot(), pause]);
       return snapshot;
     });
-  }, [view, paused, factor, request]);
+  }, [mode, view, paused, factor, request]);
 
   /** Asks the coach to grade your actions `numbers` (positions in the game's action log). */
   const gradeLater = (save: string, numbers: number[]) => {
-    const coach = coachRef.current;
     if (!coach || !settings.grade) return;
     for (const number of numbers) {
       coach
@@ -217,8 +318,8 @@ export function App() {
           if (!g) return;
           setGrades((all) => {
             const next = [...all.filter((x) => x.actionNumber !== g.actionNumber), g].sort((a, b) => a.actionNumber - b.actionNumber);
-            savedGrades.store(next);
-            recordGrades(gameId(save), next);
+            if (modeRef.current === "solo") savedGrades.store(next);
+            recordGrades(gameRef.current ?? gameId(save), next);
             return next;
           });
           setLastGrade(g);
@@ -227,17 +328,20 @@ export function App() {
     }
   };
 
+  /** Your action: to this device's engine, or to the host (`expect` guards against a stale click). */
+  const send = (engine: Engine, index: number, expect: number) =>
+    modeRef.current === "lan" && netRef.current ? netRef.current.act(index, expect) : engine.act(index);
+
   const act = (index: number) => {
     if (!view) return;
     const number = view.actionCount;
     setJokerLeads(null);
     setHint(null);
-    void request((engine) => engine.act(index)).then((snapshot) => snapshot && gradeLater(snapshot.save, [number]));
+    void request((engine) => send(engine, index, number)).then((snapshot) => snapshot && gradeLater(snapshot.save, [number]));
   };
 
   const askHint = () => {
-    const coach = coachRef.current;
-    const save = saveRef.current;
+    const save = coachSave();
     if (!coach || !save || !view) return;
     const forAction = view.actionCount;
     setHintLoading(true);
@@ -313,7 +417,7 @@ export function App() {
         const action = current.legal.find((a) => a.kind === "discard" && a.card === id);
         if (action) {
           numbers.push(current.actionCount);
-          snapshot = await engine.act(action.index);
+          snapshot = await send(engine, action.index, current.actionCount);
         }
       }
       return snapshot;
@@ -322,9 +426,29 @@ export function App() {
 
   if (error) return <div className="fatal">Could not start the game engine: {error}</div>;
 
+  /** On a LAN table: who or what the game is waiting on, when it isn't you. */
+  const lanStatus = (() => {
+    if (!lan || !lobby || lobby.you === null || !view) return null;
+    if (!connected) return { text: "Reconnecting to the host…" };
+    if (lobby.waiting.length > 0 && !result) return { text: `Waiting for ${names(lobby.waiting)} to see the result…` };
+    if (view.toAct !== null && !view.humanToAct && view.phase !== "gameOver") {
+      const seat = (view.toAct + lobby.you) % 4;
+      const person = lobby.seats[seat].person;
+      if (person && !person.connected) return { text: `Waiting for ${person.name} to reconnect…`, seat };
+    }
+    return null;
+  })();
+  const leaveSolo = () => {
+    soloOnHost.set(false);
+    joinHost();
+  };
+
   const trick = held ?? view?.trick ?? null;
   return (
-    <div className="app">
+    <div className={`app${settings.fourColor ? " four-color" : ""}${settings.bigCards ? " big-cards" : ""}`}>
+      <div className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {announcement}
+      </div>
       <header className="topbar">
         <h1>500</h1>
         {view && (
@@ -375,9 +499,22 @@ export function App() {
           <button type="button" onClick={() => setShowScores(true)} disabled={!view}>
             Score pad
           </button>
-          <button type="button" onClick={() => setShowNewGame(true)} disabled={personas.length === 0}>
-            New game
-          </button>
+          {lan ? (
+            <button type="button" onClick={() => setShowLobby(true)}>
+              Table
+            </button>
+          ) : (
+            <>
+              {host && (
+                <button type="button" onClick={leaveSolo}>
+                  Join table
+                </button>
+              )}
+              <button type="button" onClick={() => setShowNewGame(true)} disabled={personas.length === 0}>
+                New game
+              </button>
+            </>
+          )}
         </nav>
       </header>
 
@@ -391,8 +528,13 @@ export function App() {
         >
           <div className="status-row">
             <div className="status" role="status">
-              {prompt(view) || message}
+              {lanStatus?.text || prompt(view) || message}
             </div>
+            {lanStatus?.seat !== undefined && lobby && (
+              <button type="button" onClick={() => netRef.current?.setBot(lanStatus.seat!, lobby.seats[lanStatus.seat!].bot)}>
+                Let a bot play for them
+              </button>
+            )}
             {view.humanToAct && !paused && view.phase !== "gameOver" && (
               <button type="button" className="hint-button" onClick={askHint} disabled={hintLoading || !!currentHint}>
                 {hintLoading ? "Thinking…" : "Hint"}
@@ -401,7 +543,9 @@ export function App() {
           </div>
           {quizActive && <CountingQuiz key={view.actionCount} view={view} onDone={() => setQuizzed(view.actionCount)} />}
           {currentHint && <HintPanel hint={currentHint} onClose={() => setHint(null)} />}
-          {lastGrade && !currentHint && <GradeBar grade={lastGrade} onUndo={() => void undo(lastGrade)} onClose={() => setLastGrade(null)} />}
+          {lastGrade && !currentHint && (
+            <GradeBar grade={lastGrade} onUndo={lan ? undefined : () => void undo(lastGrade)} onClose={() => setLastGrade(null)} />
+          )}
           {view.humanToAct && !paused && view.phase === "bidding" && (
             <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} hinted={hintedAction?.index} />
           )}
@@ -449,7 +593,7 @@ export function App() {
           )}
         </TableView>
       ) : (
-        <div className="loading">Shuffling…</div>
+        <div className="loading">{lan ? "At the table…" : "Shuffling…"}</div>
       )}
 
       {result && view && (
@@ -461,11 +605,27 @@ export function App() {
               Review hand
             </button>
             {view.phase === "gameOver" ? (
-              <button type="button" className="primary" onClick={() => { setResult(null); setShowNewGame(true); }}>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  setResult(null);
+                  if (lan) netRef.current?.endGame();
+                  else setShowNewGame(true);
+                }}
+              >
                 New game
               </button>
             ) : (
-              <button type="button" className="primary" onClick={() => setResult(null)} autoFocus>
+              <button
+                type="button"
+                className="primary"
+                onClick={() => {
+                  setResult(null);
+                  if (lan) netRef.current?.continue();
+                }}
+                autoFocus
+              >
                 Next hand
               </button>
             )}
@@ -478,8 +638,8 @@ export function App() {
             hand={review}
             players={view.players}
             grades={grades.filter((g) => g.deal === review.number)}
-            coach={coachRef.current}
-            save={saveRef.current}
+            coach={coach}
+            save={coachSave()}
           />
         </Dialog>
       )}
@@ -490,6 +650,26 @@ export function App() {
       )}
       {showLearn && <Learn coach={coachRef.current} onClose={() => setShowLearn(false)} />}
       {showCoach && <CoachDialog settings={settings} onChange={changeSettings} onClose={() => setShowCoach(false)} />}
+      {lobbyOpen && host && netRef.current && (
+        <Lobby
+          host={host}
+          lobby={lobby}
+          net={netRef.current}
+          connected={connected}
+          name={name}
+          onName={(n) => {
+            setName(n);
+            netRef.current?.rename(n);
+          }}
+          onSolo={() => {
+            soloOnHost.set(true);
+            setShowLobby(false);
+            setLobby(null);
+            void startSolo();
+          }}
+          onClose={lobby?.playing && lobby.you !== null && view ? () => setShowLobby(false) : undefined}
+        />
+      )}
       {showNewGame && personas.length > 0 && (
         <NewGameDialog personas={personas} initial={settings} onStart={startGame} onCancel={view ? () => setShowNewGame(false) : undefined} />
       )}

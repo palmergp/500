@@ -67,13 +67,17 @@ fn parse(save: &str) -> Result<SaveData, String> {
 
 /// What the coach would do now, for South to act.
 pub fn hint(save: &str) -> Result<HintView, String> {
-    let save = parse(save)?;
-    let game = replay(&save, save.log.len())?;
-    if game.to_act() != Some(HUMAN) {
+    hint_for(&parse(save)?, HUMAN)
+}
+
+/// What the coach would do now, for `seat` to act.
+pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
+    let game = replay(save, save.log.len())?;
+    if game.to_act() != Some(seat) {
         return Err("it is not your turn".into());
     }
     let legal = game.legal_actions();
-    let obs = game.observe(HUMAN);
+    let obs = game.observe(seat);
     let analysis = Coach::new(save.seed ^ save.log.len() as u64).analyze(&obs, &legal, None);
     let best = legal.iter().position(|&a| a == analysis.best).unwrap_or(0);
     Ok(HintView {
@@ -87,17 +91,21 @@ pub fn hint(save: &str) -> Result<HintView, String> {
 
 /// Grades action `number` of the save (it must be one of South's, with a real choice).
 pub fn grade(save: &str, number: usize) -> Result<Option<GradeView>, String> {
-    let save = parse(save)?;
+    grade_for(&parse(save)?, number, HUMAN)
+}
+
+/// Grades action `number` of the save, which must have been `seat`'s.
+pub fn grade_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<GradeView>, String> {
     let index = *save.log.get(number).ok_or("no such action")? as usize;
-    let game = replay(&save, number)?;
-    if game.to_act() != Some(HUMAN) {
+    let game = replay(save, number)?;
+    if game.to_act() != Some(seat) {
         return Err("that action was not yours".into());
     }
     let legal = game.legal_actions();
     if legal.len() < 2 {
         return Ok(None);
     }
-    let obs = game.observe(HUMAN);
+    let obs = game.observe(seat);
     let chosen = legal[index];
     let grade: Grade = Coach::new(save.seed ^ number as u64).grade(&obs, &legal, chosen);
     Ok(Some(GradeView {
@@ -137,15 +145,20 @@ pub struct TraceView {
 
 /// The double-dummy trace of deal `number` (hindsight: every card visible).
 pub fn trace(save: &str, number: usize) -> Result<Option<TraceView>, String> {
-    let save = parse(save)?;
-    let game = replay(&save, save.log.len())?;
+    trace_for(&parse(save)?, number, HUMAN)
+}
+
+/// The trace of deal `number`, with seats as `viewer` sees them. The deal must be finished.
+pub fn trace_for(save: &SaveData, number: usize, viewer: Seat) -> Result<Option<TraceView>, String> {
+    let game = replay(save, save.log.len())?;
+    let rotate = |s: Seat| (s.index() + 4 - viewer.index()) % 4;
     let record = game.history().get(number - 1).ok_or("no such deal")?;
     let trump = record.contract.and_then(|(_, c)| c.trump());
     Ok(dd_trace(record).map(|(par, plays)| TraceView {
         par,
         plays: plays
             .into_iter()
-            .map(|p| TracedPlayView { seat: p.seat.index(), card: card_view(p.card, trump), par_after: p.par_after, cost: p.cost })
+            .map(|p| TracedPlayView { seat: rotate(p.seat), card: card_view(p.card, trump), par_after: p.par_after, cost: p.cost })
             .collect(),
     }))
 }
@@ -164,18 +177,24 @@ pub struct ExpertView {
 
 /// Luck vs skill: replays deal `number` with The Counter in South's seat.
 pub fn expert(save: &str, number: usize) -> Result<ExpertView, String> {
-    let save = parse(save)?;
-    let full = replay(&save, save.log.len())?;
+    expert_for(&parse(save)?, number, HUMAN)
+}
+
+/// Luck vs skill for `seat`: deal `number` replayed with The Counter there. Other people's seats
+/// are played by expert bots in the replay.
+pub fn expert_for(save: &SaveData, number: usize, seat: Seat) -> Result<ExpertView, String> {
+    let full = replay(save, save.log.len())?;
     let actual_record = full.history().get(number - 1).ok_or("no such deal")?;
-    let (start, _) = replay_to_deal(&save, number)?;
+    let (start, _) = replay_to_deal(save, number)?;
     let players: [&str; 4] = std::array::from_fn(|i| save.players[i].as_str());
-    let diff = |change: [i32; 2]| change[0] - change[1];
-    let record = expert_replay(start, players, HUMAN, save.seed ^ 0xC0AC4 ^ number as u64).ok_or("replay failed")?;
+    let (us, them) = (seat.team().index(), seat.team().other().index());
+    let diff = |change: [i32; 2]| change[us] - change[them];
+    let record = expert_replay(start, players, seat, save.seed ^ 0xC0AC4 ^ number as u64).ok_or("replay failed")?;
     Ok(ExpertView {
         actual: diff(actual_record.score_change),
         expert: diff(record.score_change),
         expert_contract: record.contract.map(|(_, c)| c.to_string()),
-        expert_declarer: record.contract.map(|(s, _)| s.index()),
+        expert_declarer: record.contract.map(|(s, _)| (s.index() + 4 - seat.index()) % 4),
         expert_made: record.contract.map(|(s, c): (Seat, _)| record.tricks_won[s.team().index()] >= c.level),
     })
 }

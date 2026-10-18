@@ -188,6 +188,32 @@ Neutral for experts, so the bots keep it: it's the house convention, and human p
 
 **Correction:** finding 10's habit-based "cash a side ace first" holds only with four or fewer trumps.
 
+### 13. Suit or no trumps, and length or strength
+
+*Measured by `train/strain_choice.py` on 107,000 bidding hands*, each solved in every strain. Scores use the 7 level and the real-play correction.
+
+**No trumps against the bidder's longest trump suit:**
+
+| You hold | NT better |
+|---|---|
+| No Joker | about 30% |
+| The Joker | 55–80% |
+| Joker + 2 aces + no suit longer than 4 | 79% |
+| 0 aces | 22–28% |
+| 2 aces | about 50% |
+| 3+ aces | 63% |
+| Joker, 8 level | 44% |
+| No Joker, 8 level | 20% |
+
+- Stoppers change the figure only a few points once aces are accounted for.
+- The long suit's colour barely matters: 57% for red, 59% for black, with the Joker.
+
+**Length or strength, in suit contracts:**
+- A top trump (the Joker or a bower) is worth about 0.7 tricks more than a small trump, at any length.
+- An extra small trump adds 0.48 tricks with none of the top three, 0.32 with one, 0.26 with two.
+
+**In no trumps:** a long suit without the ace yields fewer tricks as it grows (5.1 at four cards, 4.3 at seven or more). With A-K at the head, length barely helps (6.3–6.4).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

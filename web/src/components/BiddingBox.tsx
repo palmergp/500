@@ -22,7 +22,7 @@ export function BiddingBox({ legal, mustBid, onAct, hinted }: Props) {
     <button
       type="button"
       key={title}
-      className={`call ${isRed(strain) ? "red" : ""}${action && action.index === hinted ? " hinted" : ""}`}
+      className={`call ${isRed(strain) ? "red" : ""} strain-${strain ?? "none"}${action && action.index === hinted ? " hinted" : ""}`}
       disabled={!action}
       title={title}
       onClick={() => action && onAct(action.index)}

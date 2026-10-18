@@ -33,6 +33,7 @@ export function Card({ card, onClick, playable, selected, fromKitty, small, hint
   const classes = [
     "card",
     card.suit === null ? "joker" : card.red ? "red" : "black",
+    card.suit ? `suit-${card.suit}` : "",
     playable ? "playable" : "",
     selected ? "selected" : "",
     small ? "small" : "",

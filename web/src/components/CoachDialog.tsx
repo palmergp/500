@@ -29,6 +29,21 @@ export function CoachDialog({ settings, onChange, onClose }: Props) {
           </label>
         ))}
         <p className="note">The Hint button is always available on your turn.</p>
+        <h3>Display</h3>
+        <label className="check">
+          <input type="checkbox" checked={settings.fourColor} onChange={(e) => onChange({ ...settings, fourColor: e.target.checked })} />
+          <span>
+            Four-color deck
+            <small>Diamonds blue and clubs green, so every suit has its own color. Bowers still pair hearts with diamonds and spades with clubs.</small>
+          </span>
+        </label>
+        <label className="check">
+          <input type="checkbox" checked={settings.bigCards} onChange={(e) => onChange({ ...settings, bigCards: e.target.checked })} />
+          <span>
+            Larger cards
+            <small>Bigger cards and text on the table.</small>
+          </span>
+        </label>
         <div className="actions">
           <button type="button" className="primary" onClick={onClose}>
             Done

@@ -412,6 +412,21 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     let shown: Vec<String> = parts.iter().take(6).map(|(l, v)| format!("{l} {}", thumb::fraction(*v))).collect();
     reasons.push(format!("Rule-of-thumb count for {focus}: about {} ({}).", thumb::fraction(total), shown.join(", ")));
     reasons.push("A 7 bid pays from about 7¼, an 8 from about 8¼.".into());
+    // Suit or no trumps (docs/rules-of-thumb.md, rule 5a).
+    let joker = hand.contains(Card::JOKER);
+    let aces = fh_core::Suit::ALL.iter().filter(|&&s| hand.contains(Card::new(s, fh_core::cards::ACE))).count();
+    let longest = fh_core::Suit::ALL.iter().map(|&s| hand.of_printed_suit(s).len()).max().unwrap_or(0);
+    let strain_of = |a: Option<Action>| match a {
+        Some(Action::Call(Call::Bid(c))) => Some(c.strain),
+        Some(Action::Call(Call::Mention(s) | Call::Six(s))) => Some(s),
+        _ => None,
+    };
+    let considered = |strain: Strain| focus == strain || strain_of(chosen) == Some(strain);
+    if joker && aces >= 2 && longest <= 4 && focus != Strain::NoTrumps {
+        reasons.push("With the Joker, two aces and no long suit, no trumps scores better on about 79% of hands like this.".into());
+    } else if !joker && considered(Strain::NoTrumps) {
+        reasons.push("Without the Joker, no trumps beats your best suit only about 30% of the time.".into());
+    }
     let partner = obs.seat.partner();
     for (seat, call) in obs.auction.calls() {
         if seat == partner {

@@ -186,7 +186,8 @@ function useDrills(load: (seed: number) => Promise<DrillView>) {
   const [current, setCurrent] = useState<DrillView | null>(null);
   const [error, setError] = useState<string | null>(null);
   const next = useRef<Promise<DrillView> | null>(null);
-  const fetchOne = () => load(randomSeed());
+  // A batch of deals occasionally holds no clear puzzle; quietly try fresh ones before giving up.
+  const fetchOne = (tries = 3): Promise<DrillView> => load(randomSeed()).catch((e: unknown) => (tries > 1 ? fetchOne(tries - 1) : Promise.reject(e)));
   const advance = () => {
     setCurrent(null);
     setError(null);

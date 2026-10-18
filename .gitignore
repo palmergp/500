@@ -8,3 +8,6 @@ __pycache__/
 web/src/engine/pkg/
 web/test-results/
 web/playwright-report/
+# The LAN host's saved table
+fh-host-table.json
+fh-host-table.tmp

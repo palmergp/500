@@ -1,9 +1,10 @@
-//! A game table for the browser: the human sits South, bots fill the other seats.
+//! A game table: people sit in seats marked "human", bots fill the rest. In the browser the one
+//! person sits South; on a LAN host (`fh-host`) any seat can be a person.
 //! Plain Rust (no JS types), so it is tested natively; `lib.rs` wraps it for wasm-bindgen.
 
-use crate::view::{event_view, EventView, View};
+use crate::view::{event_view, EventView, Lens, View};
 use fh_ai::Bot;
-use fh_core::{Action, Game, Phase, Rules, Seat};
+use fh_core::{Action, Event, Game, Phase, Rules, Seat};
 use serde::{Deserialize, Serialize};
 
 pub const HUMAN: Seat = Seat::SOUTH;
@@ -14,7 +15,7 @@ pub const HUMAN: Seat = Seat::SOUTH;
 pub struct SaveData {
     pub version: u32,
     pub seed: u64,
-    /// Persona ids for South (always "human"), West, North, East.
+    /// Persona ids for South, West, North, East; "human" for a seat a person plays.
     pub players: [String; 4],
     pub log: Vec<u16>,
 }
@@ -34,14 +35,24 @@ impl Table {
         Table::build(seed, players)
     }
 
+    /// A new game with `players` by seat (South, West, North, East): persona ids, or "human".
+    pub fn with_players(seed: u64, players: [String; 4]) -> Result<Table, String> {
+        Table::build(seed, players)
+    }
+
     fn build(seed: u64, players: [String; 4]) -> Result<Table, String> {
         let mut bots: [Option<Box<dyn Bot>>; 4] = Default::default();
-        for seat in [Seat::WEST, Seat::NORTH, Seat::EAST] {
-            let id = &players[seat.index()];
-            let bot = fh_ai::make_bot(id, seed.wrapping_mul(4).wrapping_add(seat.index() as u64));
-            bots[seat.index()] = Some(bot.ok_or_else(|| format!("unknown player type {id:?}"))?);
+        for seat in Seat::ALL {
+            bots[seat.index()] = make_bot(&players[seat.index()], seed, seat)?;
         }
         Ok(Table { game: Game::new(Rules::default(), seed), seed, players, bots, log: Vec::new() })
+    }
+
+    /// Puts a person ("human") or a bot persona in `seat`, mid-game if need be.
+    pub fn set_player(&mut self, seat: Seat, id: &str) -> Result<(), String> {
+        self.bots[seat.index()] = make_bot(id, self.seed, seat)?;
+        self.players[seat.index()] = id.to_string();
+        Ok(())
     }
 
     pub fn game(&self) -> &Game {
@@ -61,8 +72,46 @@ impl Table {
         View::build(self)
     }
 
+    /// South's lens: "You", then the bots' persona names.
+    pub fn lens(&self) -> Lens {
+        Lens::new(
+            Seat::SOUTH,
+            std::array::from_fn(|i| {
+                if i == 0 {
+                    "You".to_string()
+                } else {
+                    fh_ai::persona(&self.players[i]).map_or(self.players[i].clone(), |p| p.name.to_string())
+                }
+            }),
+        )
+    }
+
+    /// Whether South, the browser's one person, is to act.
     pub fn human_to_act(&self) -> bool {
         self.game.to_act() == Some(HUMAN)
+    }
+
+    /// Whether a bot is to act (so the game moves without anyone).
+    pub fn bot_to_act(&self) -> bool {
+        self.game.to_act().is_some_and(|s| self.bots[s.index()].is_some())
+    }
+
+    /// The action of the person in `seat`, by its index in their view's `legal` list.
+    pub fn act_as(&mut self, seat: Seat, index: usize) -> Result<Vec<Event>, String> {
+        if self.game.to_act() != Some(seat) || self.bots[seat.index()].is_some() {
+            return Err("it is not your turn".into());
+        }
+        self.apply_raw(index)
+    }
+
+    /// Lets the bot whose turn it is act. `None` if a person is to act or the game is over.
+    pub fn step_bot_events(&mut self) -> Option<Vec<Event>> {
+        let seat = self.game.to_act()?;
+        let bot = self.bots[seat.index()].as_mut()?;
+        let legal = self.game.legal_actions();
+        let action = bot.choose(&self.game.observe(seat), &legal);
+        let index = legal.iter().position(|&a| a == action).expect("bots choose legal actions");
+        Some(self.apply_raw(index).expect("legal index"))
     }
 
     /// The human's action, by its index in `view().legal`.
@@ -75,20 +124,23 @@ impl Table {
 
     /// Lets the bot whose turn it is act. Returns `None` if it is the human's turn or the game is over.
     pub fn step_bot(&mut self) -> Option<Vec<EventView>> {
-        let seat = self.game.to_act()?;
-        let bot = self.bots[seat.index()].as_mut()?;
-        let legal = self.game.legal_actions();
-        let action = bot.choose(&self.game.observe(seat), &legal);
-        let index = legal.iter().position(|&a| a == action).expect("bots choose legal actions");
-        Some(self.apply_index(index).expect("legal index"))
+        let events = self.step_bot_events()?;
+        let lens = self.lens();
+        Some(events.iter().map(|e| event_view(e, &lens)).collect())
     }
 
     fn apply_index(&mut self, index: usize) -> Result<Vec<EventView>, String> {
+        let events = self.apply_raw(index)?;
+        let lens = self.lens();
+        Ok(events.iter().map(|e| event_view(e, &lens)).collect())
+    }
+
+    fn apply_raw(&mut self, index: usize) -> Result<Vec<Event>, String> {
         let legal = self.game.legal_actions();
         let action: Action = *legal.get(index).ok_or_else(|| format!("no legal action #{index}"))?;
         let events = self.game.apply(action).map_err(|e| e.to_string())?;
         self.log.push(index as u16);
-        Ok(events.iter().map(event_view).collect())
+        Ok(events)
     }
 
     pub fn save(&self) -> SaveData {
@@ -104,10 +156,19 @@ impl Table {
             if table.game.phase() == Phase::GameOver {
                 return Err("save continues past the end of the game".into());
             }
-            table.apply_index(index as usize)?;
+            table.apply_raw(index as usize)?;
         }
         Ok(table)
     }
+}
+
+/// The bot for `seat`, or `None` for a person. Each seat's bot gets its own seed.
+fn make_bot(id: &str, seed: u64, seat: Seat) -> Result<Option<Box<dyn Bot>>, String> {
+    if id == "human" {
+        return Ok(None);
+    }
+    let bot = fh_ai::make_bot(id, seed.wrapping_mul(4).wrapping_add(seat.index() as u64));
+    bot.map(Some).ok_or_else(|| format!("unknown player type {id:?}"))
 }
 
 /// The game after the first `actions` actions of a save (no bots needed).
@@ -198,6 +259,30 @@ mod tests {
         while !table.human_to_act() && table.step_bot().is_some() {}
         assert!(table.human_to_act());
         assert!(table.act(999).is_err());
+    }
+
+    #[test]
+    fn views_rotate_to_the_viewer() {
+        let mut table = Table::new(9, "steady", "steady", "steady").unwrap();
+        for _ in 0..30 {
+            if table.human_to_act() {
+                table.act(0).unwrap();
+            } else {
+                table.step_bot();
+            }
+        }
+        let game = table.game();
+        let names = ["S".to_string(), "W".to_string(), "N".to_string(), "E".to_string()];
+        let east = crate::view::View::build_for(game, &Lens::new(Seat::EAST, names), table.players(), table.action_count());
+        let south = table.view();
+        // East sees their own hand, at index 0, with their side's score first.
+        assert_eq!(east.hand.len(), game.hand(Seat::EAST).len());
+        assert!(east.hand.iter().all(|c| game.hand(Seat::EAST).iter().any(|h| h.id() == c.id)));
+        assert_eq!(east.hand_counts[0], game.hand(Seat::EAST).len());
+        assert_eq!(east.scores, [south.scores[1], south.scores[0]]);
+        assert_eq!(east.dealer, (south.dealer + 1) % 4, "South's seat 3 (East) is East's seat 0");
+        assert_eq!(east.players[0].name, "E");
+        assert_eq!(east.players[2].name, "W", "East's partner is West");
     }
 
     #[test]
