@@ -252,6 +252,12 @@ pub struct View {
     pub legal: Vec<ActionView>,
     pub players: Vec<PlayerView>,
     pub history: Vec<HandView>,
+    /// Actions taken so far in the game: identifies a decision for the coach.
+    pub action_count: usize,
+    /// Every card played to a trick this hand, for the card tracker.
+    pub played: Vec<CardView>,
+    /// Trumps you have not seen (not in your hand, not played, not among your discards).
+    pub trumps_unseen: Option<usize>,
 }
 
 impl View {
@@ -304,6 +310,12 @@ impl View {
                 })
                 .collect(),
             history: game.history().iter().enumerate().map(|(i, h)| hand_view(i + 1, h)).collect(),
+            action_count: table.action_count(),
+            played: cards_view(obs.played(), trump),
+            trumps_unseen: trump.map(|_| {
+                let seen = obs.hand.union(obs.played()).union(obs.discards.unwrap_or_default());
+                CardSet::pack().minus(seen).iter().filter(|&c| is_trump(c, trump)).count()
+            }),
         }
     }
 }

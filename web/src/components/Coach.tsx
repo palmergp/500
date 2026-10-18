@@ -1,0 +1,101 @@
+import type { CardView, GradeView, HintView, Verdict } from "../engine";
+import { SUIT_SYMBOL } from "../engine";
+
+const VERDICT_TEXT: Record<Verdict, string> = {
+  best: "Best",
+  good: "Good",
+  inaccuracy: "Inaccuracy",
+  mistake: "Mistake",
+  blunder: "Blunder",
+};
+
+export function VerdictChip({ verdict }: { verdict: Verdict }) {
+  return <span className={`verdict ${verdict}`}>{VERDICT_TEXT[verdict]}</span>;
+}
+
+function pct(x: number | null) {
+  return x === null ? "" : `${Math.round(100 * x)}%`;
+}
+
+/** The coach's suggestion for the decision in front of you. */
+export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => void }) {
+  const showMakes = hint.options.some((o) => o.makes !== null);
+  return (
+    <div className="coach-panel" role="note" aria-label="Coach's hint">
+      <div className="coach-head">
+        <strong>Coach suggests: {hint.bestLabel}</strong>
+        <button type="button" className="icon" aria-label="Close hint" onClick={onClose}>
+          ×
+        </button>
+      </div>
+      <ul>
+        {hint.reasons.map((r) => (
+          <li key={r}>{r}</li>
+        ))}
+      </ul>
+      {showMakes && hint.options.length > 1 && (
+        <p className="coach-options">
+          {hint.options.map((o) => (
+            <span key={o.index}>
+              {o.label}: makes {pct(o.makes)}
+            </span>
+          ))}
+        </p>
+      )}
+      <p className="coach-foot">Based on {hint.worlds} likely layouts of the hidden cards.</p>
+    </div>
+  );
+}
+
+/** The grade for your last decision, with the reasons and a way back. */
+export function GradeBar({ grade, onUndo, onClose }: { grade: GradeView; onUndo?: () => void; onClose: () => void }) {
+  const fine = grade.verdict === "best" || grade.verdict === "good";
+  return (
+    <div className={`coach-panel grade ${grade.verdict}`} role="status" aria-label="Coach's grade">
+      <div className="coach-head">
+        <span>
+          <VerdictChip verdict={grade.verdict} /> {grade.chosenLabel}
+          {!fine && (
+            <>
+              {" "}
+              · better: <strong>{grade.bestLabel}</strong> <span className="loss">(−{Math.round(grade.loss)} pts)</span>
+            </>
+          )}
+        </span>
+        <span className="coach-actions">
+          {onUndo && !fine && (
+            <button type="button" onClick={onUndo}>
+              Undo
+            </button>
+          )}
+          <button type="button" className="icon" aria-label="Close grade" onClick={onClose}>
+            ×
+          </button>
+        </span>
+      </div>
+      {grade.reasons.length > 0 && (
+        <ul>
+          {grade.reasons.map((r) => (
+            <li key={r}>{r}</li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+const TRACK_ORDER = ["S", "H", "C", "D"] as const;
+
+/** Every card played this hand, by suit: a memory aid you can switch off. */
+export function CardTracker({ played }: { played: CardView[] }) {
+  return (
+    <div className="tracker" aria-label="Cards played">
+      {TRACK_ORDER.map((suit) => (
+        <span key={suit} className={suit === "H" || suit === "D" ? "red" : ""}>
+          {SUIT_SYMBOL[suit]} {played.filter((c) => c.suit === suit).map((c) => c.rank).join(" ") || "—"}
+        </span>
+      ))}
+      {played.some((c) => c.suit === null) && <span>Joker</span>}
+    </div>
+  );
+}

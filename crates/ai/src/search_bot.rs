@@ -21,6 +21,30 @@ use fh_core::{Action, Call, Card, CardSet, Contract, Observation, Phase, Rng, Ru
 /// Solver nodes any one world may use before it is dropped (about 0.1–0.3 s).
 const WORLD_NODE_LIMIT: u64 = 1_500_000;
 
+/// One legal play's results over the sampled worlds.
+#[derive(Copy, Clone, Debug)]
+pub struct PlayStat {
+    pub action: Action,
+    /// Expected value (points, or win chance × 1000, per the bot's goal).
+    pub ev: f64,
+    /// Chance the declarer makes the contract.
+    pub makes: f64,
+    /// Declarer's expected trick count.
+    pub tricks: f64,
+}
+
+#[derive(Clone, Debug)]
+pub struct PlayStats {
+    pub stats: Vec<PlayStat>,
+    /// Per world (that solved), each play's utility in `stats` order, with the world's weight:
+    /// for paired comparisons between plays.
+    pub per_world: Vec<(f64, Vec<f64>)>,
+    /// Worlds sampled.
+    pub worlds: usize,
+    /// False if every world hit the solver's node limit.
+    pub valid: bool,
+}
+
 /// What the search bot optimizes.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Goal {
@@ -112,8 +136,13 @@ impl SearchBot {
         &self.config
     }
 
+    /// A fresh seed from the bot's random stream, for callers that sample worlds themselves.
+    pub fn next_seed(&mut self) -> u64 {
+        self.rng.next_u64()
+    }
+
     /// The value of a hand's outcome to `me`, given the declaring side's trick count.
-    fn utility(&self, obs: &Observation, contract: Contract, declarer: Seat, declarer_tricks: u8) -> f64 {
+    pub(crate) fn utility(&self, obs: &Observation, contract: Contract, declarer: Seat, declarer_tricks: u8) -> f64 {
         let rules = &obs.rules;
         let side = declarer.team();
         let tricks = if side == Team::NorthSouth {
@@ -134,8 +163,9 @@ impl SearchBot {
 
     // ---- Card play ---------------------------------------------------------------------------
 
-    /// Each legal play with its expected value, best first.
-    pub fn evaluate_plays(&mut self, obs: &Observation, legal: &[Action]) -> Vec<(Action, f64)> {
+    /// Statistics for each legal play over the same sampled worlds: expected value, the chance
+    /// the declarer makes the contract, and the declarer's expected tricks. In `legal` order.
+    pub fn play_stats(&mut self, obs: &Observation, legal: &[Action]) -> PlayStats {
         let (declarer, contract) = obs.contract.expect("playing without a contract");
         let trump = contract.trump();
         let trick = obs.current_trick.clone().expect("playing phase has a trick");
@@ -143,7 +173,8 @@ impl SearchBot {
         let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
         let won_so_far = obs.tricks_won[declarer.team().index()];
 
-        let mut totals = vec![0.0f64; legal.len()];
+        let mut stats: Vec<PlayStat> = legal.iter().map(|&action| PlayStat { action, ev: 0.0, makes: 0.0, tricks: 0.0 }).collect();
+        let mut per_world = Vec::new();
         let mut weight_sum = 0.0;
         let mut samples = 0;
         while samples < self.config.play_samples {
@@ -157,33 +188,55 @@ impl SearchBot {
             if solver.aborted() {
                 continue;
             }
-            for (i, action) in legal.iter().enumerate() {
-                let Action::Play(play) = action else { continue };
-                let from_now = values.iter().find(|(p, _)| p == play).map_or(0, |&(_, v)| v);
-                totals[i] += world.weight * self.utility(obs, contract, declarer, won_so_far + from_now);
+            let mut utilities = Vec::with_capacity(stats.len());
+            for stat in stats.iter_mut() {
+                let Action::Play(play) = stat.action else { continue };
+                let tricks = won_so_far + values.iter().find(|(p, _)| *p == play).map_or(0, |&(_, v)| v);
+                let u = self.utility(obs, contract, declarer, tricks);
+                utilities.push(u);
+                stat.ev += world.weight * u;
+                stat.tricks += world.weight * tricks as f64;
+                if tricks >= contract.level {
+                    stat.makes += world.weight;
+                }
             }
+            per_world.push((world.weight, utilities));
             weight_sum += world.weight;
         }
-        if weight_sum == 0.0 {
-            // Every world was pathological: fall back to the cheapest legal card.
-            let cheapest = legal.iter().min_by_key(|a| if let Action::Play(p) = a { card_cost(p.card, trump) } else { 0 });
-            return vec![(*cheapest.expect("legal actions"), 0.0)];
+        if weight_sum > 0.0 {
+            for stat in stats.iter_mut() {
+                stat.ev /= weight_sum;
+                stat.makes /= weight_sum;
+                stat.tricks /= weight_sum;
+            }
         }
-        let mut scored: Vec<(Action, f64)> =
-            legal.iter().zip(totals).map(|(&a, t)| (a, t / weight_sum.max(1e-9))).collect();
-        // Best first; among near-equal plays prefer the cheaper card, so we don't waste high cards.
+        PlayStats { stats, per_world, worlds: samples, valid: weight_sum > 0.0 }
+    }
+
+    /// Each legal play with its expected value, best first. Among plays within half a point of the
+    /// best, the cheapest card comes first, so the bot doesn't waste high cards.
+    pub fn evaluate_plays(&mut self, obs: &Observation, legal: &[Action]) -> Vec<(Action, f64)> {
+        let result = self.play_stats(obs, legal);
+        self.evaluate_plays_from(obs, &result)
+    }
+
+    /// Ranks plays from statistics already gathered by [`SearchBot::play_stats`].
+    pub fn evaluate_plays_from(&self, obs: &Observation, result: &PlayStats) -> Vec<(Action, f64)> {
+        let trump = obs.trump();
         let cost = |a: &Action| match a {
             Action::Play(p) => card_cost(p.card, trump),
             _ => 0,
         };
-        scored.sort_by(|a, b| {
-            let close = (a.1 - b.1).abs() < 0.5;
-            if close {
-                cost(&a.0).cmp(&cost(&b.0))
-            } else {
-                b.1.total_cmp(&a.1)
-            }
-        });
+        let legal: Vec<Action> = result.stats.iter().map(|s| s.action).collect();
+        if !result.valid {
+            // Every world was pathological: fall back to the cheapest legal card.
+            return vec![(*legal.iter().min_by_key(|a| cost(a)).expect("legal actions"), 0.0)];
+        }
+        let mut scored: Vec<(Action, f64)> = result.stats.iter().map(|s| (s.action, s.ev)).collect();
+        scored.sort_by(|a, b| b.1.total_cmp(&a.1));
+        let top = scored[0].1;
+        let pick = (0..scored.len()).filter(|&i| top - scored[i].1 < 0.5).min_by_key(|&i| cost(&scored[i].0)).unwrap();
+        scored[..=pick].rotate_right(1);
         scored
     }
 
@@ -191,7 +244,7 @@ impl SearchBot {
 
     /// Candidate sets of `count` discards: the heuristic choice, plus variants that void each short
     /// side suit.
-    fn discard_candidates(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Vec<Card>> {
+    pub(crate) fn discard_candidates(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Vec<Card>> {
         let mut candidates = vec![heuristic_discards(hand, trump, count)];
         let is_trump = |c: Card| fh_core::rules::is_trump(c, trump) || c.is_joker();
         for suit in Suit::ALL {
@@ -255,7 +308,7 @@ impl SearchBot {
 
     /// Simulated trick counts if `declarer` plays `strain`: for each world, the declarer takes the
     /// kitty, discards heuristically, leads, and both sides play perfectly.
-    fn simulate(&mut self, worlds: &[World], declarer: Seat, strain: Strain) -> Vec<(u8, f64)> {
+    pub(crate) fn simulate(&mut self, worlds: &[World], declarer: Seat, strain: Strain) -> Vec<(u8, f64)> {
         let trump = strain.trump();
         let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
         let results: Vec<(u8, f64)> = worlds
@@ -287,7 +340,7 @@ impl SearchBot {
         self.simulate(&worlds, declarer, strain)
     }
 
-    fn expected(&self, obs: &Observation, results: &[(u8, f64)], contract: Contract, declarer: Seat) -> f64 {
+    pub(crate) fn expected(&self, obs: &Observation, results: &[(u8, f64)], contract: Contract, declarer: Seat) -> f64 {
         let bias = self.config.dd_bias.max(0.0);
         let (whole, frac) = (bias.floor() as u8, bias.fract());
         let mut total = 0.0;

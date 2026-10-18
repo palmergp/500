@@ -17,9 +17,11 @@ interface CardProps {
   selected?: boolean;
   fromKitty?: boolean;
   small?: boolean;
+  /** The coach's suggestion. */
+  hinted?: boolean;
 }
 
-export function Card({ card, onClick, playable, selected, fromKitty, small }: CardProps) {
+export function Card({ card, onClick, playable, selected, fromKitty, small, hinted }: CardProps) {
   const symbol = card.suit ? SUIT_SYMBOL[card.suit] : "★";
   const classes = [
     "card",
@@ -28,6 +30,7 @@ export function Card({ card, onClick, playable, selected, fromKitty, small }: Ca
     selected ? "selected" : "",
     small ? "small" : "",
     card.trump ? "trump" : "",
+    hinted ? "hinted" : "",
   ];
   return (
     <button

@@ -73,11 +73,13 @@ interface Props {
   view: View;
   /** The trick to draw in the middle: the live one, or the one just completed. */
   trick: TrickView | null;
+  /** Shown when the trump counter is on. */
+  trumpsUnseen?: number | null;
   children: React.ReactNode;
 }
 
 /** The felt: three opponents' and partner's seats around the trick, your seat and hand below. */
-export function TableView({ view, trick, children }: Props) {
+export function TableView({ view, trick, trumpsUnseen, children }: Props) {
   const showTrick = view.phase === "playing" || (trick && trick.plays.length > 0);
   return (
     <div className="table">
@@ -88,6 +90,11 @@ export function TableView({ view, trick, children }: Props) {
           <div className="contract">
             {view.players[view.contract.declarer].name}: <strong>{view.contract.label}</strong> · tricks {view.tricksWon[view.contract.declarer % 2]}
             /{view.contract.level}
+            {trumpsUnseen != null && view.phase === "playing" && (
+              <span className="trump-count" title="Trumps not in your hand, not yet played, and not among your discards">
+                trumps out: {trumpsUnseen}
+              </span>
+            )}
           </div>
         )}
         {showTrick && trick ? <TrickArea trick={trick} /> : view.phase === "bidding" ? <AuctionArea view={view} /> : null}

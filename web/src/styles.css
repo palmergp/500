@@ -657,6 +657,10 @@ button:focus-visible {
   .topbar h1 {
     font-size: 1.15rem;
   }
+  .topbar nav button {
+    padding: 4px 8px;
+    font-size: 0.85rem;
+  }
   .scores {
     font-size: 0.85rem;
     gap: 10px;
@@ -690,4 +694,194 @@ button:focus-visible {
     min-height: 32px;
     font-size: 0.85rem;
   }
+}
+
+/* ---- Coach ------------------------------------------------------------------------------ */
+
+:root {
+  --best: #2e8b57;
+  --good: #5a9e6f;
+  --inaccuracy: #c08a00;
+  --mistake: #d2691e;
+  --blunder: #c62828;
+}
+
+.status-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.hint-button {
+  background: rgba(242, 193, 78, 0.15);
+  color: var(--gold);
+  border-color: var(--gold);
+  padding: 3px 12px;
+  font-weight: 600;
+}
+.coach-panel {
+  width: min(560px, 100%);
+  background: var(--panel);
+  color: var(--panel-ink);
+  border-radius: 12px;
+  padding: 8px 12px;
+  border-left: 5px solid var(--gold);
+  font-size: 0.9rem;
+}
+.coach-panel.grade.best,
+.coach-panel.grade.good {
+  border-left-color: var(--best);
+}
+.coach-panel.grade.inaccuracy {
+  border-left-color: var(--inaccuracy);
+}
+.coach-panel.grade.mistake {
+  border-left-color: var(--mistake);
+}
+.coach-panel.grade.blunder {
+  border-left-color: var(--blunder);
+}
+.coach-panel ul {
+  margin: 6px 0 2px;
+  padding-left: 18px;
+}
+.coach-panel li + li {
+  margin-top: 2px;
+}
+.coach-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+.coach-head .icon {
+  border: none;
+  background: none;
+  font-size: 1.2rem;
+  padding: 0 4px;
+  color: inherit;
+}
+.coach-actions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.coach-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 4px 0;
+}
+.coach-foot {
+  margin: 4px 0 0;
+  font-size: 0.75rem;
+  opacity: 0.7;
+}
+.verdict {
+  display: inline-block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 1px 7px;
+  border-radius: 999px;
+  color: #fff;
+  background: var(--good);
+}
+.verdict.best {
+  background: var(--best);
+}
+.verdict.inaccuracy {
+  background: var(--inaccuracy);
+}
+.verdict.mistake {
+  background: var(--mistake);
+}
+.verdict.blunder {
+  background: var(--blunder);
+}
+.loss {
+  opacity: 0.75;
+}
+.card.hinted {
+  box-shadow: 0 0 0 3px var(--gold), 0 0 14px 4px rgba(242, 193, 78, 0.7) !important;
+}
+.call.hinted {
+  outline: 3px solid var(--gold);
+  outline-offset: 1px;
+}
+.trump-count {
+  margin-left: 10px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--ink);
+  font-size: 0.8rem;
+}
+.tracker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  justify-content: center;
+  font-size: 0.85rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  padding: 4px 12px;
+}
+.tracker .red {
+  color: #ff8a8a;
+}
+
+.tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid var(--panel-line);
+  margin-bottom: 10px;
+}
+.tabs button {
+  border: none;
+  border-radius: 8px 8px 0 0;
+  background: none;
+  padding: 6px 10px;
+}
+.tabs button.active {
+  background: var(--panel-line);
+  font-weight: 600;
+}
+.decision-list {
+  padding-left: 22px;
+}
+.decision-list > li {
+  margin-bottom: 8px;
+}
+.decision-list ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: 0.88rem;
+}
+.trick-list .costly {
+  color: var(--blunder);
+}
+.trick-list .par {
+  opacity: 0.6;
+  font-size: 0.8rem;
+}
+.waiting-text {
+  font-style: italic;
+  opacity: 0.75;
+}
+.new-game label.check {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.new-game label.check span {
+  display: grid;
+  gap: 2px;
+}
+.note {
+  font-size: 0.85rem;
+  opacity: 0.8;
 }

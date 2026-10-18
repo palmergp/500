@@ -9,10 +9,12 @@ interface Props {
   legal: ActionView[];
   mustBid: boolean;
   onAct: (index: number) => void;
+  /** Index of the coach's suggested call. */
+  hinted?: number;
 }
 
 /** Pass, mentions, 6-calls and the 7–10 bid grid. Calls that aren't legal now are disabled. */
-export function BiddingBox({ legal, mustBid, onAct }: Props) {
+export function BiddingBox({ legal, mustBid, onAct, hinted }: Props) {
   const find = (kind: ActionView["kind"], strain?: StrainCode, level?: number) =>
     legal.find((a) => a.kind === kind && (strain === undefined || a.strain === strain) && (level === undefined || a.level === level));
 
@@ -20,7 +22,7 @@ export function BiddingBox({ legal, mustBid, onAct }: Props) {
     <button
       type="button"
       key={title}
-      className={`call ${isRed(strain) ? "red" : ""}`}
+      className={`call ${isRed(strain) ? "red" : ""}${action && action.index === hinted ? " hinted" : ""}`}
       disabled={!action}
       title={title}
       onClick={() => action && onAct(action.index)}
@@ -49,7 +51,7 @@ export function BiddingBox({ legal, mustBid, onAct }: Props) {
           )}
         </div>
       ))}
-      <button type="button" className="call pass" disabled={!pass} onClick={() => pass && onAct(pass.index)}>
+      <button type="button" className={`call pass${pass && pass.index === hinted ? " hinted" : ""}`} disabled={!pass} onClick={() => pass && onAct(pass.index)}>
         Pass
       </button>
     </div>

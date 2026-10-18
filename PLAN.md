@@ -1,6 +1,6 @@
 # 500 — Game & Trainer: Project Plan
 
-*Status: Phases 0–3 done (rules engine, bots, simulator, playable web game, expert AI and lab) · 2026-10-17*
+*Status: Phases 0–4 done (rules engine, bots, simulator, web game, expert AI and lab, coach) · 2026-10-18*
 
 ## 1. Goals
 
@@ -191,7 +191,7 @@ Each phase ends with something usable.
 | **1. Rules engine** ✅ | Rust core for the house rules, plus the toggles we use (mentions, 6-calls, redeals, slam, defensive cap); a rule bot in three styles; terminal play; `fh-lab sim` | Every house rule has a test; 1M bot games (9.1M deals, 353M actions) with every invariant holding after every action. The full regional variant catalogue is deferred until someone needs it |
 | **2. Playable web game (MVP)** ✅ | React table over the WASM engine (`crates/wasm`, `web/`); Rookie, Rock, Gambler and Steady; save and resume; score pad; hand review; bower badges. The rule bots are instant, so moving the AI to Web Workers waits for Phase 3 | Playwright plays complete hands at desktop and phone sizes (`npm run e2e`) |
 | **3. Expert AI + lab** ✅ | Double-dummy solver, PIMC card play with inference, lab-tuned bidding, heuristic kitty discards (searched discards tested: no gain); Counter and Shark; `fh-lab duel`, `calibrate` and `bench`; engine in a Web Worker; findings in `docs/lab/README.md` | Expert beats the rule bots in duplicate (Counter +29 points per hand over Steady, 95% CI +16 to +42); every expert move ≤ 1.1 s in the browser on this laptop |
-| **4. Coach** | Hints with reasons, live grading, post-hand review, luck vs skill | Every decision in a hand can be graded and explained |
+| **4. Coach** ✅ | Hint button with reasons; live grades (best → blunder by expected points, capped when the sampled deals cannot separate two plays) with Undo; review tabs for your decisions, trick-by-trick hindsight (all cards visible) and luck vs skill (replay with The Counter in your seat); trump counter and card tracker; coach in its own worker | Every decision in a hand can be graded and explained (`crates/ai/src/coach.rs`, `web/e2e/coach.spec.ts`) |
 | **5. Neural AI** | Distillation → self-play → ONNX; the Oracle; lesson mining | Oracle scores ≥ PIMC expert in duplicate (or the hybrid improves it) |
 | **6. Curriculum** | Lessons, drills, puzzles, progress dashboard, lab insights | The full beginner-to-expert path is playable |
 | **7. Polish & extras** | Animations and sound, accessibility, offline install, 3/5/6-player variants; online play optional | — |

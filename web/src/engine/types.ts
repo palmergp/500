@@ -95,6 +95,56 @@ export interface View {
   legal: ActionView[];
   players: PlayerView[];
   history: HandView[];
+  /** Actions taken so far: identifies a decision for the coach. */
+  actionCount: number;
+  /** Cards played to tricks this hand. */
+  played: CardView[];
+  /** Trumps not in your hand, not played, and not among your discards. */
+  trumpsUnseen: number | null;
+}
+
+// ---- Coach (mirrors crates/wasm/src/coach.rs) --------------------------------------------
+
+export interface OptionView {
+  index: number;
+  label: string;
+  ev: number;
+  makes: number | null;
+}
+
+export interface HintView {
+  best: number;
+  bestLabel: string;
+  reasons: string[];
+  options: OptionView[];
+  worlds: number;
+}
+
+export type Verdict = "best" | "good" | "inaccuracy" | "mistake" | "blunder";
+
+export interface GradeView {
+  actionNumber: number;
+  phase: Phase;
+  chosenLabel: string;
+  bestLabel: string;
+  verdict: Verdict;
+  loss: number;
+  reasons: string[];
+  options: OptionView[];
+  deal: number;
+}
+
+export interface TraceView {
+  par: number;
+  plays: { seat: SeatIndex; card: CardView; parAfter: number; cost: number }[];
+}
+
+export interface ExpertView {
+  actual: number;
+  expert: number;
+  expertContract: string | null;
+  expertDeclarer: SeatIndex | null;
+  expertMade: boolean | null;
 }
 
 export interface EventView {

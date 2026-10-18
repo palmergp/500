@@ -3,6 +3,7 @@
 
 pub mod belief;
 pub mod cardplay;
+pub mod coach;
 pub mod evaluate;
 pub mod personas;
 pub mod rule_bot;

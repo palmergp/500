@@ -52,6 +52,11 @@ impl Table {
         &self.players
     }
 
+    /// Actions taken so far (the length of the save log).
+    pub fn action_count(&self) -> usize {
+        self.log.len()
+    }
+
     pub fn view(&self) -> View {
         View::build(self)
     }
@@ -102,6 +107,37 @@ impl Table {
             table.apply_index(index as usize)?;
         }
         Ok(table)
+    }
+}
+
+/// The game after the first `actions` actions of a save (no bots needed).
+pub fn replay(save: &SaveData, actions: usize) -> Result<Game, String> {
+    let mut game = Game::new(Rules::default(), save.seed);
+    for &index in save.log.iter().take(actions) {
+        let legal = game.legal_actions();
+        let action = *legal.get(index as usize).ok_or("save does not match the game")?;
+        game.apply(action).map_err(|e| e.to_string())?;
+    }
+    Ok(game)
+}
+
+/// The game at the start of deal `number` (1-based, counting passed-out deals), and the number
+/// of actions taken to get there.
+pub fn replay_to_deal(save: &SaveData, number: usize) -> Result<(Game, usize), String> {
+    let mut game = Game::new(Rules::default(), save.seed);
+    for (i, &index) in save.log.iter().enumerate() {
+        if game.history().len() + 1 >= number {
+            return Ok((game, i));
+        }
+        let legal = game.legal_actions();
+        let action = *legal.get(index as usize).ok_or("save does not match the game")?;
+        game.apply(action).map_err(|e| e.to_string())?;
+    }
+    if game.history().len() + 1 >= number {
+        let n = save.log.len();
+        Ok((game, n))
+    } else {
+        Err(format!("no deal {number} in this save"))
     }
 }
 

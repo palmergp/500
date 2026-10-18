@@ -1,14 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionView, CardView, HandView, Persona, Snapshot, TrickView, View } from "./engine";
-import { Engine, SUIT_SYMBOL } from "./engine";
+import type { ActionView, CardView, GradeView, HandView, HintView, Persona, Snapshot, TrickView, View } from "./engine";
+import { CoachClient, Engine, SUIT_SYMBOL } from "./engine";
 import { BiddingBox } from "./components/BiddingBox";
 import { Card } from "./components/Card";
+import { CardTracker, GradeBar, HintPanel } from "./components/Coach";
+import { CoachDialog } from "./components/CoachDialog";
 import { Dialog } from "./components/Dialog";
 import { HandReview } from "./components/HandReview";
 import { NewGameDialog } from "./components/NewGameDialog";
 import { ScorePad } from "./components/ScorePad";
 import { TableView } from "./components/TableView";
-import { loadSettings, savedGame, saveSettings, SPEED_FACTOR, type Settings } from "./settings";
+import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
 const TRICK_HOLD = 1300;
@@ -33,6 +35,8 @@ function prompt(view: View): string {
 
 export function App() {
   const engineRef = useRef<Engine | null>(null);
+  const coachRef = useRef<CoachClient | null>(null);
+  const saveRef = useRef<string | null>(null);
   const busy = useRef(false);
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -46,6 +50,11 @@ export function App() {
   const [showNewGame, setShowNewGame] = useState(false);
   const [selected, setSelected] = useState<number[]>([]);
   const [jokerLeads, setJokerLeads] = useState<ActionView[] | null>(null);
+  const [hint, setHint] = useState<{ forAction: number; hint: HintView } | null>(null);
+  const [hintLoading, setHintLoading] = useState(false);
+  const [grades, setGrades] = useState<GradeView[]>(() => savedGrades.load<GradeView>());
+  const [lastGrade, setLastGrade] = useState<GradeView | null>(null);
+  const [showCoach, setShowCoach] = useState(false);
 
   const factor = SPEED_FACTOR[settings.speed];
 
@@ -53,6 +62,7 @@ export function App() {
     const next = snapshot.view;
     if (snapshot.ms > 50) console.debug(`engine: ${snapshot.ms.toFixed(0)} ms (${snapshot.events.map((e) => e.text).join("; ")})`);
     setView(next);
+    saveRef.current = snapshot.save;
     savedGame.store(snapshot.save);
     const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
@@ -85,6 +95,10 @@ export function App() {
     (chosen: Settings) => {
       saveSettings(chosen);
       setSettings(chosen);
+      savedGrades.clear();
+      setGrades([]);
+      setLastGrade(null);
+      setHint(null);
       setHeld(null);
       setResult(null);
       setSelected([]);
@@ -100,6 +114,7 @@ export function App() {
     if (engineRef.current) return;
     const engine = new Engine();
     engineRef.current = engine;
+    coachRef.current = new CoachClient();
     engine
       .personas()
       .then(async (list) => {
@@ -126,7 +141,7 @@ export function App() {
     return () => clearTimeout(timer);
   }, [held, factor]);
 
-  const paused = !!held || !!result || !!review || showScores || showNewGame;
+  const paused = !!held || !!result || !!review || showScores || showNewGame || showCoach;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -139,10 +154,76 @@ export function App() {
     });
   }, [view, paused, factor, request]);
 
-  const act = (index: number) => {
-    setJokerLeads(null);
-    void request((engine) => engine.act(index));
+  /** Asks the coach to grade your actions `numbers` (positions in the game's action log). */
+  const gradeLater = (save: string, numbers: number[]) => {
+    const coach = coachRef.current;
+    if (!coach || !settings.grade) return;
+    for (const number of numbers) {
+      coach
+        .grade(save, number)
+        .then((g) => {
+          if (!g) return;
+          setGrades((all) => {
+            const next = [...all.filter((x) => x.actionNumber !== g.actionNumber), g].sort((a, b) => a.actionNumber - b.actionNumber);
+            savedGrades.store(next);
+            return next;
+          });
+          setLastGrade(g);
+        })
+        .catch(() => {});
+    }
   };
+
+  const act = (index: number) => {
+    if (!view) return;
+    const number = view.actionCount;
+    setJokerLeads(null);
+    setHint(null);
+    void request((engine) => engine.act(index)).then((snapshot) => snapshot && gradeLater(snapshot.save, [number]));
+  };
+
+  const askHint = () => {
+    const coach = coachRef.current;
+    const save = saveRef.current;
+    if (!coach || !save || !view) return;
+    const forAction = view.actionCount;
+    setHintLoading(true);
+    coach
+      .hint(save)
+      .then((h) => setHint({ forAction, hint: h }))
+      .catch(() => {})
+      .finally(() => setHintLoading(false));
+  };
+
+  /** Takes back the graded action and everything after it. */
+  const undo = async (grade: GradeView) => {
+    const save = saveRef.current;
+    if (!save) return;
+    while (busy.current) await new Promise((r) => setTimeout(r, 50));
+    const data = JSON.parse(save) as { log: number[] };
+    data.log = data.log.slice(0, grade.actionNumber);
+    setHeld(null);
+    setResult(null);
+    setHint(null);
+    setLastGrade(null);
+    const snapshot = await request((engine) => engine.load(JSON.stringify(data)));
+    if (snapshot) {
+      setGrades((all) => {
+        const next = all.filter((g) => g.actionNumber < grade.actionNumber);
+        savedGrades.store(next);
+        return next;
+      });
+      setMessage("Taken back: try again.");
+    }
+  };
+
+  const changeSettings = (next: Settings) => {
+    setSettings(next);
+    saveSettings(next);
+  };
+
+  const currentHint = hint && view && hint.forAction === view.actionCount && view.humanToAct ? hint.hint : null;
+  const hintedAction = currentHint ? view?.legal[currentHint.best] : undefined;
 
   const legalCards = useMemo(() => {
     if (!view?.humanToAct || paused) return new Set<number>();
@@ -165,16 +246,21 @@ export function App() {
 
   const confirmDiscards = () => {
     const chosen = selected;
+    const numbers: number[] = [];
     setSelected([]);
+    setHint(null);
     void request(async (engine) => {
       let snapshot: Snapshot | null = null;
       for (const id of chosen) {
-        const legal = (snapshot ?? { view }).view!.legal;
-        const action = legal.find((a) => a.kind === "discard" && a.card === id);
-        if (action) snapshot = await engine.act(action.index);
+        const current = (snapshot ?? { view }).view!;
+        const action = current.legal.find((a) => a.kind === "discard" && a.card === id);
+        if (action) {
+          numbers.push(current.actionCount);
+          snapshot = await engine.act(action.index);
+        }
       }
       return snapshot;
-    });
+    }).then((snapshot) => snapshot && gradeLater(snapshot.save, numbers));
   };
 
   if (error) return <div className="fatal">Could not start the game engine: {error}</div>;
@@ -199,6 +285,9 @@ export function App() {
           </div>
         )}
         <nav>
+          <button type="button" onClick={() => setShowCoach(true)}>
+            Coach
+          </button>
           <button type="button" onClick={() => setShowScores(true)} disabled={!view}>
             Score pad
           </button>
@@ -209,12 +298,21 @@ export function App() {
       </header>
 
       {view ? (
-        <TableView view={view} trick={trick}>
-          <div className="status" role="status">
-            {prompt(view) || message}
+        <TableView view={view} trick={trick} trumpsUnseen={settings.trumpCounter ? view.trumpsUnseen : null}>
+          <div className="status-row">
+            <div className="status" role="status">
+              {prompt(view) || message}
+            </div>
+            {view.humanToAct && !paused && view.phase !== "gameOver" && (
+              <button type="button" className="hint-button" onClick={askHint} disabled={hintLoading || !!currentHint}>
+                {hintLoading ? "Thinking…" : "Hint"}
+              </button>
+            )}
           </div>
+          {currentHint && <HintPanel hint={currentHint} onClose={() => setHint(null)} />}
+          {lastGrade && !currentHint && <GradeBar grade={lastGrade} onUndo={() => void undo(lastGrade)} onClose={() => setLastGrade(null)} />}
           {view.humanToAct && !paused && view.phase === "bidding" && (
-            <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} />
+            <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} hinted={hintedAction?.index} />
           )}
           {jokerLeads && (
             <div className="joker-choice">
@@ -244,10 +342,12 @@ export function App() {
                 playable={legalCards.has(card.id)}
                 selected={selected.includes(card.id)}
                 fromKitty={kittyIds.has(card.id)}
+                hinted={hintedAction?.card === card.id}
                 onClick={legalCards.has(card.id) ? () => clickCard(card) : undefined}
               />
             ))}
           </div>
+          {settings.tracker && view.phase === "playing" && <CardTracker played={view.played} />}
         </TableView>
       ) : (
         <div className="loading">Shuffling…</div>
@@ -274,7 +374,13 @@ export function App() {
       )}
       {review && view && (
         <Dialog title="Hand review" wide onClose={() => setReview(null)}>
-          <HandReview hand={review} players={view.players} />
+          <HandReview
+            hand={review}
+            players={view.players}
+            grades={grades.filter((g) => g.deal === review.number)}
+            coach={coachRef.current}
+            save={saveRef.current}
+          />
         </Dialog>
       )}
       {showScores && view && (
@@ -282,6 +388,7 @@ export function App() {
           <ScorePad history={view.history} players={view.players} onReview={(h) => { setShowScores(false); setReview(h); }} />
         </Dialog>
       )}
+      {showCoach && <CoachDialog settings={settings} onChange={changeSettings} onClose={() => setShowCoach(false)} />}
       {showNewGame && personas.length > 0 && (
         <NewGameDialog personas={personas} initial={settings} onStart={startGame} onCancel={view ? () => setShowNewGame(false) : undefined} />
       )}

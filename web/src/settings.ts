@@ -8,12 +8,27 @@ export interface Settings {
   north: string;
   east: string;
   speed: Speed;
+  /** Grade each of your decisions as you play. */
+  grade: boolean;
+  /** Show how many trumps you haven't seen yet. */
+  trumpCounter: boolean;
+  /** Show every card played this hand. */
+  tracker: boolean;
 }
 
-export const DEFAULT_SETTINGS: Settings = { west: "rock", north: "counter", east: "gambler", speed: "normal" };
+export const DEFAULT_SETTINGS: Settings = {
+  west: "rock",
+  north: "counter",
+  east: "gambler",
+  speed: "normal",
+  grade: true,
+  trumpCounter: true,
+  tracker: false,
+};
 
 const SETTINGS_KEY = "fh500.settings";
 const SAVE_KEY = "fh500.save";
+const GRADES_KEY = "fh500.grades";
 
 export const SPEED_FACTOR: Record<Speed, number> = { slow: 1.6, normal: 1, fast: 0.45 };
 
@@ -51,4 +66,17 @@ export const savedGame = {
   load: () => read(SAVE_KEY),
   store: (save: string) => write(SAVE_KEY, save),
   clear: () => write(SAVE_KEY, null),
+};
+
+/** The coach's grades for the saved game, kept alongside it. */
+export const savedGrades = {
+  load: <T>(): T[] => {
+    try {
+      return JSON.parse(read(GRADES_KEY) ?? "[]") as T[];
+    } catch {
+      return [];
+    }
+  },
+  store: (grades: unknown[]) => write(GRADES_KEY, JSON.stringify(grades)),
+  clear: () => write(GRADES_KEY, null),
 };

@@ -1,7 +1,8 @@
 // Runs the Rust engine (and its bots' thinking) off the main thread, so the page stays responsive
-// while a search bot works. Each request gets one reply carrying the same id.
+// while a search bot works. A second instance runs the coach, so analysis never delays play.
+// Each request gets one reply carrying the same id.
 
-import init, { WasmTable, personas } from "./pkg/fh_wasm.js";
+import init, { coachExpert, coachGrade, coachHint, coachTrace, WasmTable, personas } from "./pkg/fh_wasm.js";
 import type { Request, Response, Snapshot } from "./protocol";
 
 const ready = init();
@@ -32,6 +33,14 @@ function handle(request: Request): unknown {
       const events = table!.stepBot();
       return events === null ? null : snapshot(events);
     }
+    case "hint":
+      return coachHint(request.save);
+    case "grade":
+      return coachGrade(request.save, request.number);
+    case "trace":
+      return coachTrace(request.save, request.number);
+    case "expert":
+      return coachExpert(request.save, request.number);
   }
 }
 

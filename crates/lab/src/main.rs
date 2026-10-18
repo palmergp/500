@@ -9,6 +9,7 @@
 
 mod bench;
 mod calibrate;
+mod coach;
 mod duel;
 mod sim;
 mod terminal;
@@ -37,6 +38,7 @@ fn main() {
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
             flags.get("play").map_or("search-play", |s| s.as_str()),
         ),
+        "coach" => coach::run(flag(&flags, "seed", 1), flags.get("south").map_or("steady", |s| s.as_str())),
         "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),
         "play" => terminal::run(flag(&flags, "seed", now_seed()), flags.contains_key("watch")),
         "sim" => sim::run(sim::Options {

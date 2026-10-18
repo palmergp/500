@@ -1,5 +1,6 @@
 //! wasm-bindgen bindings for the web app. All game logic lives in [`table`] and [`view`].
 
+pub mod coach;
 pub mod table;
 pub mod view;
 
@@ -65,4 +66,32 @@ pub fn personas() -> Result<JsValue, JsError> {
     let list: Vec<PersonaView> =
         fh_ai::PERSONAS.iter().map(|p| PersonaView { id: p.id, name: p.name, blurb: p.blurb }).collect();
     to_js(&list)
+}
+
+fn js_err(e: String) -> JsError {
+    JsError::new(&e)
+}
+
+/// The coach's recommendation for South's current decision.
+#[wasm_bindgen(js_name = coachHint)]
+pub fn coach_hint(save: &str) -> Result<JsValue, JsError> {
+    to_js(&coach::hint(save).map_err(js_err)?)
+}
+
+/// The coach's grade for action `number` of the save, or null if there was no real choice.
+#[wasm_bindgen(js_name = coachGrade)]
+pub fn coach_grade(save: &str, number: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::grade(save, number as usize).map_err(js_err)?)
+}
+
+/// The double-dummy (all cards visible) trace of deal `number`, or null if it was passed out.
+#[wasm_bindgen(js_name = coachTrace)]
+pub fn coach_trace(save: &str, number: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::trace(save, number as usize).map_err(js_err)?)
+}
+
+/// Luck vs skill: deal `number` replayed with The Counter in your seat.
+#[wasm_bindgen(js_name = coachExpert)]
+pub fn coach_expert(save: &str, number: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::expert(save, number as usize).map_err(js_err)?)
 }
