@@ -67,7 +67,7 @@ impl RuleBot {
         for (seat, call) in obs.auction.calls() {
             let partner = seat == me.partner();
             let delta = match call {
-                Call::Six(suit) => 0.6 + if Strain::from_suit(suit) == strain { 0.4 } else { 0.0 },
+                Call::Six(s) => 0.6 + if s == strain { 0.4 } else { 0.0 },
                 Call::Mention(m) if m == strain => 0.7,
                 Call::Bid(c) if c.strain == strain => 1.0,
                 Call::Bid(_) => 0.3,
@@ -109,9 +109,8 @@ impl RuleBot {
             let forced = legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(c)) if c.strain == best));
             return *forced.unwrap_or(&legal[0]);
         }
-        let best_suit = strains.iter().find_map(|&(s, _)| s.trump()).expect("four suits");
-        if obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best_suit)) {
-            return Action::Call(Call::Six(best_suit));
+        if obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best)) {
+            return Action::Call(Call::Six(best));
         }
         for &(strain, _) in &strains {
             let shows = match strain.trump() {

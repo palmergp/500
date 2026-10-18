@@ -1,6 +1,5 @@
 //! The auction: one call per player, starting left of the dealer (H8–H15).
 
-use crate::cards::Suit;
 use crate::rules::{Contract, Rules, Strain, MAX_BID_LEVEL, MIN_BID_LEVEL};
 use crate::seat::Seat;
 use std::fmt;
@@ -10,8 +9,8 @@ pub enum Call {
     Pass,
     /// "This is my strongest strain, but I can't bid" (H10). Never scores.
     Mention(Strain),
-    /// "I hold the Joker, and this is my best suit" (H11). Never becomes the contract.
-    Six(Suit),
+    /// "I hold the Joker, and this is my best strain" (H11). Never becomes the contract.
+    Six(Strain),
     /// A real bid of 7–10 tricks (H13).
     Bid(Contract),
 }
@@ -21,7 +20,7 @@ impl fmt::Display for Call {
         let text = match self {
             Call::Pass => "Pass".to_string(),
             Call::Mention(strain) => format!("Mention {strain}"),
-            Call::Six(suit) => format!("6{suit} (Joker)"),
+            Call::Six(strain) => format!("6{strain} (Joker)"),
             Call::Bid(contract) => contract.to_string(),
         };
         f.pad(&text)
@@ -78,10 +77,10 @@ impl Auction {
         }).max()
     }
 
-    /// Who called 6, and in which suit.
-    pub fn six(&self) -> Option<(Seat, Suit)> {
+    /// Who called 6, and in which strain.
+    pub fn six(&self) -> Option<(Seat, Strain)> {
         self.calls().find_map(|(seat, call)| match call {
-            Call::Six(suit) => Some((seat, suit)),
+            Call::Six(strain) => Some((seat, strain)),
             _ => None,
         })
     }
@@ -111,7 +110,7 @@ impl Auction {
                     );
                 }
                 if rules.joker_six {
-                    calls.extend(Suit::ALL.into_iter().map(Call::Six));
+                    calls.extend(Strain::ALL.into_iter().map(Call::Six));
                 }
             }
         }

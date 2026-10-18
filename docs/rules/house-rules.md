@@ -26,12 +26,12 @@ This is the authoritative spec for the rules engine. Each rule has an ID; the te
 ## Bidding
 
 - **H8. Once around.** Calling starts left of the dealer; each player makes exactly one call; the dealer calls last.
-- **H9. Calls.** Pass, *mention* a strain, *6 of a suit*, or a *bid* of 7–10 in a strain.
+- **H9. Calls.** Pass, *mention* a strain, *6 of a strain* (including 6NT), or a *bid* of 7–10 in a strain.
   Strains rank ♠ < ♣ < ♦ < ♥ < NT.
 - **H10. Mentions** say "this is my strongest suit (typically I hold a bower), but I can't bid." A mention must
   outrank any earlier mention, so a suit can't be mentioned twice. Mentioning NT is allowed.
-- **H11. 6 of a suit** says "I hold the Joker, and this is my best suit." It may name any suit, whatever has been
-  mentioned. It never becomes the contract and never scores.
+- **H11. 6 of a strain** says "I hold the Joker, and this is my best suit" (6NT: "no trumps suits me"). It may
+  name any strain, including NT, whatever has been mentioned. It never becomes the contract and never scores.
 - **H12. Signals close.** Mentions and 6-calls are allowed only while nobody has called 6 or bid 7+. After that a
   player may only pass or bid.
 - **H13. Bids** are 7–10 tricks in a strain and must beat the previous bid by value (table in H19). The highest bid
@@ -77,4 +77,3 @@ This is the authoritative spec for the rules engine. Each rule has an ID; the te
 
 - **A1.** The engine allows any legal call, but every AI makes mentions and 6-calls honestly.
 - **A2.** If every call on a deal is a pass, mention or 6, the deal counts as passed out (H14).
-- **A3.** A 6-call names one of the four suits; "6 no trumps" is not a call.

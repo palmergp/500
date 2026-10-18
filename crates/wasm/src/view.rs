@@ -95,7 +95,7 @@ fn action_view(index: usize, action: Action) -> ActionView {
         Action::Call(Call::Six(s)) => {
             view.kind = "six";
             view.level = Some(6);
-            view.strain = Some(strain_code(Strain::from_suit(s)));
+            view.strain = Some(strain_code(s));
         }
         Action::Call(Call::Bid(c)) => {
             view.kind = "bid";

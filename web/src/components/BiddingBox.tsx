@@ -1,8 +1,7 @@
-import type { ActionView, StrainCode, SuitCode } from "../engine";
+import type { ActionView, StrainCode } from "../engine";
 import { isRed, strainLabel } from "../engine";
 
 const STRAINS: StrainCode[] = ["S", "C", "D", "H", "NT"];
-const SUITS: SuitCode[] = ["S", "C", "D", "H"];
 const LEVELS = [7, 8, 9, 10];
 const VALUE = (level: number, strain: StrainCode) => 40 + 20 * STRAINS.indexOf(strain) + 100 * (level - 6);
 
@@ -40,7 +39,7 @@ export function BiddingBox({ legal, mustBid, onAct }: Props) {
       </div>
       <div className="call-row">
         <span className="row-label">6 (Joker)</span>
-        {SUITS.map((s) => button(find("six", s), `6${strainLabel(s)}`, s, `6${strainLabel(s)}: I hold the Joker; this is my best suit`))}
+        {STRAINS.map((s) => button(find("six", s), `6${strainLabel(s)}`, s, `6${strainLabel(s)}: I hold the Joker; this is my best ${s === "NT" ? "strain" : "suit"}`))}
       </div>
       {LEVELS.map((level) => (
         <div className="call-row" key={level}>

@@ -177,8 +177,8 @@ fn h10_mentions_must_outrank_earlier_mentions() {
     assert!(legal.contains(&Call::Mention(Strain::Hearts)));
     assert!(legal.contains(&Call::Mention(Strain::NoTrumps)));
     // A 6 of any suit, or a real bid, is still allowed after a mention.
-    for suit in Suit::ALL {
-        assert!(legal.contains(&Call::Six(suit)));
+    for strain in Strain::ALL {
+        assert!(legal.contains(&Call::Six(strain)), "6{strain}");
     }
     assert!(legal.contains(&bid(7, Strain::Spades)));
 }
@@ -188,7 +188,7 @@ fn h11_h12_after_a_six_only_pass_or_bid() {
     let rules = Rules::default();
     let mut auction = Auction::new(Seat::EAST, false);
     assert!(auction.apply(Call::Mention(Strain::Clubs), &rules));
-    assert!(auction.apply(Call::Six(Suit::Spades), &rules), "6 of a lower suit than the mention is fine");
+    assert!(auction.apply(Call::Six(Strain::Spades), &rules), "6 of a lower suit than the mention is fine");
     let legal = auction.legal_calls(&rules);
     assert!(legal.iter().all(|c| matches!(c, Call::Pass | Call::Bid(_))));
     assert!(legal.contains(&bid(7, Strain::Spades)), "next real bid must be at least 7");
@@ -201,7 +201,7 @@ fn h12_no_signals_after_a_real_bid() {
     let mut auction = Auction::new(Seat::EAST, false);
     assert!(auction.apply(bid(7, Strain::Clubs), &rules));
     assert!(!auction.apply(Call::Mention(Strain::NoTrumps), &rules));
-    assert!(!auction.apply(Call::Six(Suit::Hearts), &rules));
+    assert!(!auction.apply(Call::Six(Strain::Hearts), &rules));
 }
 
 #[test]
@@ -258,7 +258,7 @@ fn h14_forced_dealer_may_pass_if_someone_else_bid() {
 #[test]
 fn a2_signals_only_deal_is_passed_out() {
     let mut game = Game::with_dealer(Rules::default(), 6, Seat::NORTH);
-    for call in [Call::Mention(Strain::Clubs), Call::Six(Suit::Hearts), Call::Pass, Call::Pass] {
+    for call in [Call::Mention(Strain::Clubs), Call::Six(Strain::NoTrumps), Call::Pass, Call::Pass] {
         game.apply(Action::Call(call)).unwrap();
     }
     assert_eq!((game.phase(), game.deal_number()), (Phase::Bidding, 2));
