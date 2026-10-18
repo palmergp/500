@@ -10,7 +10,7 @@ export interface Settings {
   speed: Speed;
 }
 
-export const DEFAULT_SETTINGS: Settings = { west: "rock", north: "steady", east: "gambler", speed: "normal" };
+export const DEFAULT_SETTINGS: Settings = { west: "rock", north: "counter", east: "gambler", speed: "normal" };
 
 const SETTINGS_KEY = "fh500.settings";
 const SAVE_KEY = "fh500.save";

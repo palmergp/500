@@ -1,0 +1,132 @@
+# Strategy lab: findings
+
+Measurements from `fh-lab` under the house rules (`docs/rules/house-rules.md`). Each entry says how it was
+measured, so it can be re-run. "Duplicate" means every deal is played twice with the partnerships swapped,
+which cancels most of the luck of the cards.
+
+## Tools
+
+| Command | What it measures |
+|---|---|
+| `fh-lab sim --games N --ns A --ew B` | Whole games between two bots, with every rule invariant checked after every action |
+| `fh-lab duel --a A --b B --deals N` | Duplicate match: points per hand that bot A gains over bot B, with a 95% confidence interval |
+| `fh-lab calibrate --deals N` | How well simulated double-dummy bidding predicts real play |
+| `fh-lab bench --deals N` | Double-dummy solver speed on full ten-card deals |
+
+## Findings (2026-10-17)
+
+### 1. Simple bots bid far too timidly under these rules
+
+*Measured by `sim` with 20,000 games per matchup.*
+
+| Matchup (rule bots) | Win rate |
+|---|---|
+| Steady vs Cautious | Steady 74% |
+| Bold vs Cautious | Bold 61% |
+| Bold vs Steady | about even (48–52%) |
+
+Even Steady passes out 47% of deals. Once-around bidding with defensive points rewards bidding. Why:
+
+- A passed-out deal scores nothing for anyone.
+- A made 7-level contract is worth 140–220.
+
+### 2. A rough trick count underrates hands by about a trick
+
+*Measured by `calibrate` with 120 deals.* South speaks first and declares its best strain at the 7 level.
+
+| Estimate | Tricks |
+|---|---|
+| Rough evaluation + 2 (the rule bots' credit for partner and kitty) | 5.66 |
+| Simulated double-dummy prediction | 7.16 |
+| True double-dummy, actual cards | 7.07 |
+| Actual play by search bots | 6.62 |
+
+- The simulation is unbiased against true double-dummy.
+- Double-dummy runs about **half a trick above real play**, because real players can't see the hidden cards.
+- The search bot now subtracts 0.5 tricks when bidding (`dd_bias`).
+- The rule-of-thumb lesson: count your own tricks and add **about 3** for partner and the kitty, not 2.
+
+### 3. Search card play beats rule-of-thumb play
+
+*Measured by `duel` with 48 deals: search play vs Steady, both using Steady's bidding.*
+
+- **+14.5 points per hand** (95% CI −4 to +33).
+- Search bots made 79% of their contracts; Steady made 73%.
+
+### 4. Trusting partner's bid matters
+
+The first search bidder sampled its partner's hidden hand without regard to what partner had bid. As a result it often "rescued" partner into its own suit, and went down.
+
+Two fixes:
+
+- **Rejection sampling:** keep each sampled world with a probability equal to how well it fits every call.
+- **A higher bar for switching:** require an extra 80-point edge before switching away from partner's strain.
+
+Contracts made rose from 39% to 66–67%.
+
+### 5. The first full search bot vs Steady
+
+The first Counter bid by simulation. *Measured by `duel`.*
+
+| Version | Deals | Gain per hand (95% CI) |
+|---|---|---|
+| Fast settings | 200 | +12.4 (−7.7 to +32.6) |
+| Browser settings | 400 | +5.7 (−8.2 to +19.6) |
+
+The edge was positive but not proven, so findings 6 and 7 below take it apart.
+
+### 6. The best rule bidder adds about 0.7 tricks to Steady's estimates
+
+*Measured by `sim` with 40,000 games each: Steady with an aggression offset vs plain Steady.*
+
+| Offset | −0.3 | +0.2 | +0.4 | +0.6 | +0.8 | +1.0 |
+|---|---|---|---|---|---|---|
+| Win rate vs Steady | 43.4% | 53.3% | 56.5% | **57.5%** | 57.2% | 55.1% |
+
+Head to head, the optimum is flat around +0.6 to +0.9:
+
+| Matchup | Win rate for +0.6 |
+|---|---|
+| +0.6 vs +0.3 | 52.7% |
+| +0.6 vs +0.9 | 50.2% |
+| +0.6 vs +1.2 | 53.8% |
+
+The expert bots use +0.7.
+
+**Lesson for players:** bid a little more than feels safe. In trick terms, credit partner and the kitty with about 2.7 tricks.
+
+### 7. Card play is where search wins today; simulated bidding loses
+
+*Measured by `duel` with 400 deals each.*
+
+| Comparison | Gain per hand (95% CI) | Declared | Made |
+|---|---|---|---|
+| Search play vs Steady (both bid like Steady) | **+9.4** (+0.7 to +18.2) | 50% of hands | 82% (vs Steady's 78%) |
+| Search bidding vs Steady's bidding (both play by search) | **−27.0** (−41.8 to −12.1) | 84% of hands | 58% |
+
+With 5–10 sampled worlds per bid, the estimates are too noisy. Choosing the best of several noisy options also overstates its value. So the expert now bids by the calibrated rule (+0.7) and searches only card play and the kitty.
+
+A learned hand evaluator, trained on millions of solver results, is the planned fix (Phase 5).
+
+### 8. The expert bots now clearly beat the rule bots
+
+*Measured by `duel`.* The Counter and The Shark both bid by the +0.7 rule and play by search. The Shark also bids at +1.0 and plays to maximize its chance of winning the game.
+
+| Comparison | Deals | Gain per hand (95% CI) |
+|---|---|---|
+| **The Counter vs Steady** | 400 | **+29.0** (+15.9 to +42.1) |
+| **The Shark vs Steady** | 200 | **+23.4** (+1.5 to +45.4) |
+| Searched kitty discards vs the heuristic (both Counters) | 300 | +0.1 (−8.5 to +8.6) |
+
+- The Counter declared 70% of hands and made 75% of them. Steady made 78% of its own contracts.
+- Searched discards add nothing measurable, so the Counter uses the faster heuristic: void a short side suit, keep aces, guarded kings and all trumps.
+- The searched version stays available as `counter-search-kitty`.
+
+## Open questions for the lab
+
+- **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
+- **Signals:** what a mention or a 6-call is worth, compared with what it tells the opponents.
+- **Seat position:** what a once-around auction implies for each seat.
+- **The forced dealer:** strategy on the third deal.
+- **Score-aware bidding:** when defenders can go out on tricks.
+- **The playbook:** the 30 hypotheses in `docs/research/02-strategy-playbook.md` still need checking under these rules.

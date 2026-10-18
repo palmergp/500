@@ -1,21 +1,28 @@
 //! AI players for 500. Every bot receives only its own seat's [`Observation`], so it cannot see
 //! hidden cards.
 
+pub mod belief;
 pub mod cardplay;
 pub mod evaluate;
 pub mod personas;
 pub mod rule_bot;
+pub mod search_bot;
 pub mod solver;
 
 use fh_core::{Action, Game, Observation, Phase, Rng, Team};
 
 pub use personas::{make_bot, persona, Persona, PERSONAS};
 pub use rule_bot::{RuleBot, Style};
+pub use search_bot::{SearchBot, SearchConfig};
 
 pub trait Bot {
     fn name(&self) -> &str;
     /// Chooses one of `legal`, which is never empty.
     fn choose(&mut self, obs: &Observation, legal: &[Action]) -> Action;
+    /// A short explanation of the last decision, if the bot keeps one.
+    fn note(&self) -> Option<&str> {
+        None
+    }
 }
 
 /// Picks uniformly among the legal actions. Useful for testing, hopeless as an opponent.

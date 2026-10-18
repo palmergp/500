@@ -12,3 +12,10 @@ debug = 1
 
 [profile.release.package.fh-wasm]
 debug = 0
+
+# Search code is far too slow unoptimized; keep test builds of the engine and AI fast.
+[profile.dev.package.fh-core]
+opt-level = 2
+
+[profile.dev.package.fh-ai]
+opt-level = 2

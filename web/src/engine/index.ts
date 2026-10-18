@@ -1,16 +1,10 @@
-// Typed access to the Rust engine compiled to WebAssembly (crates/wasm).
+// The game engine (Rust compiled to WebAssembly), running in a Web Worker.
 
-import init, { WasmTable, personas as wasmPersonas } from "./pkg/fh_wasm.js";
-import type { EventView, Persona, View } from "./types";
+import type { Request, Response, Snapshot } from "./protocol";
+import type { Persona } from "./types";
 
 export * from "./types";
-
-let ready: Promise<unknown> | null = null;
-
-export function loadEngine(): Promise<unknown> {
-  ready ??= init();
-  return ready;
-}
+export type { Snapshot } from "./protocol";
 
 export interface Seating {
   west: string;
@@ -18,37 +12,55 @@ export interface Seating {
   east: string;
 }
 
-/** A game in progress. Wraps the engine's table so the rest of the app sees plain types. */
-export class Table {
-  private constructor(private inner: WasmTable) {}
+type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
+type Op = Request extends infer R ? (R extends { op: infer O } ? O : never) : never;
+type Args<O extends Op> = Omit<Extract<Request, { op: O }>, "id" | "op">;
 
-  static create(seed: number, seating: Seating): Table {
-    return new Table(new WasmTable(seed >>> 0, seating.west, seating.north, seating.east));
+/** One worker holding one game. Requests are answered in order. */
+export class Engine {
+  private worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" });
+  private pending = new Map<number, Pending>();
+  private nextId = 1;
+
+  constructor() {
+    this.worker.onmessage = (message: MessageEvent<Response>) => {
+      const reply = message.data;
+      const waiting = this.pending.get(reply.id);
+      if (!waiting) return;
+      this.pending.delete(reply.id);
+      if (reply.ok) waiting.resolve(reply.result);
+      else waiting.reject(new Error(reply.error));
+    };
   }
 
-  /** Rebuilds a saved game; throws if the save is unreadable. */
-  static load(save: string): Table {
-    return new Table(WasmTable.load(save));
+  private call<O extends Op>(op: O, args: Args<O>): Promise<unknown> {
+    const id = this.nextId++;
+    return new Promise((resolve, reject) => {
+      this.pending.set(id, { resolve, reject });
+      this.worker.postMessage({ id, op, ...args });
+    });
   }
 
-  save(): string {
-    return this.inner.save();
+  personas(): Promise<Persona[]> {
+    return this.call("personas", {}) as Promise<Persona[]>;
   }
 
-  view(): View {
-    return this.inner.view() as View;
+  create(seed: number, seating: Seating): Promise<Snapshot> {
+    return this.call("create", { seed, ...seating }) as Promise<Snapshot>;
   }
 
-  act(index: number): EventView[] {
-    return this.inner.act(index) as EventView[];
+  /** Rebuilds a saved game; rejects if the save is unreadable. */
+  load(save: string): Promise<Snapshot> {
+    return this.call("load", { save }) as Promise<Snapshot>;
+  }
+
+  /** Your action, by its index in `view.legal`. */
+  act(index: number): Promise<Snapshot> {
+    return this.call("act", { index }) as Promise<Snapshot>;
   }
 
   /** The next bot move, or null if it's your turn or the game is over. */
-  stepBot(): EventView[] | null {
-    return this.inner.stepBot() as EventView[] | null;
+  stepBot(): Promise<Snapshot | null> {
+    return this.call("stepBot", {}) as Promise<Snapshot | null>;
   }
-}
-
-export function personas(): Persona[] {
-  return wasmPersonas() as Persona[];
 }

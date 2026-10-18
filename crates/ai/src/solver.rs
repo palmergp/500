@@ -8,8 +8,6 @@
 
 use crate::cardplay::suit_order;
 use fh_core::{legal_plays, Card, CardSet, Play, Seat, Suit, Team, Trick};
-use std::collections::HashMap;
-use std::hash::{BuildHasherDefault, Hasher};
 
 const JOKER_SUIT: usize = 4;
 
@@ -84,27 +82,6 @@ struct TrickState {
     win_key: u16,
 }
 
-/// FxHash-style hasher: much faster than SipHash for the solver's integer keys.
-#[derive(Default)]
-struct FastHasher(u64);
-
-impl Hasher for FastHasher {
-    fn finish(&self) -> u64 {
-        self.0
-    }
-    fn write(&mut self, bytes: &[u8]) {
-        for &b in bytes {
-            self.write_u64(b as u64);
-        }
-    }
-    fn write_u8(&mut self, n: u8) {
-        self.write_u64(n as u64);
-    }
-    fn write_u64(&mut self, n: u64) {
-        self.0 = (self.0.rotate_left(5) ^ n).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
-    }
-}
-
 /// Bounds on the value, plus the best move found (suit, bit, named suit), or `NO_MOVE`.
 #[derive(Copy, Clone)]
 struct Entry {
@@ -115,17 +92,60 @@ struct Entry {
 
 const NO_MOVE: (u8, u8, u8) = (255, 0, 0);
 
-type Table = HashMap<([u64; 4], u8), Entry, BuildHasherDefault<FastHasher>>;
+/// A direct-mapped transposition table: a fixed array where a new entry overwrites whatever
+/// shares its slot. Much faster than a general hash map, and its memory is bounded.
+struct Table {
+    slots: Vec<(([u64; 4], u8), Entry)>,
+    used: Vec<bool>,
+}
+
+const TABLE_BITS: u32 = 18;
+
+impl Table {
+    fn new() -> Table {
+        let n = 1 << TABLE_BITS;
+        Table { slots: vec![(([0; 4], 0), Entry { lo: 0, hi: 0, best: NO_MOVE }); n], used: vec![false; n] }
+    }
+
+    fn index(key: &([u64; 4], u8)) -> usize {
+        let mut h = key.1 as u64;
+        for part in key.0 {
+            h = (h.rotate_left(5) ^ part).wrapping_mul(0x51_7c_c1_b7_27_22_0a_95);
+        }
+        (h >> (64 - TABLE_BITS)) as usize
+    }
+
+    fn get(&self, key: &([u64; 4], u8)) -> Option<Entry> {
+        let i = Self::index(key);
+        (self.used[i] && self.slots[i].0 == *key).then(|| self.slots[i].1)
+    }
+
+    fn insert(&mut self, key: ([u64; 4], u8), entry: Entry) {
+        let i = Self::index(&key);
+        self.slots[i] = (key, entry);
+        self.used[i] = true;
+    }
+
+    fn clear(&mut self) {
+        self.used.fill(false);
+    }
+}
 
 pub struct Solver {
     map: Mapping,
     trump: Option<u8>,
     hands: [[u16; 5]; 4],
+    /// Cards still in someone's hand, per suit (kept in step with `hands`).
+    live: [u16; 5],
     on_table: [u16; 5],
     max_team: u8,
     table: Table,
     /// Nodes searched since the solver was created.
     pub nodes: u64,
+    /// Nodes one `solve` or `analyze` call may use; see [`Solver::aborted`].
+    limit: u64,
+    call_start: u64,
+    aborted: bool,
 }
 
 impl Solver {
@@ -134,11 +154,26 @@ impl Solver {
             map: Mapping::new(trump),
             trump: trump.map(|t| t.index() as u8),
             hands: [[0; 5]; 4],
+            live: [0; 5],
             on_table: [0; 5],
             max_team: 0,
-            table: Table::default(),
+            table: Table::new(),
             nodes: 0,
+            limit: u64::MAX,
+            call_start: 0,
+            aborted: false,
         }
+    }
+
+    /// A solver that gives up on any single `solve` or `analyze` call after `limit` nodes, so one
+    /// pathological deal can't stall a decision. Check [`Solver::aborted`] after each call.
+    pub fn with_limit(trump: Option<Suit>, limit: u64) -> Solver {
+        Solver { limit, ..Solver::new(trump) }
+    }
+
+    /// Whether the last call hit the node limit; its results are then meaningless.
+    pub fn aborted(&self) -> bool {
+        self.aborted
     }
 
     /// Tricks `team` takes from this position to the end of the hand (including the trick in
@@ -178,7 +213,7 @@ impl Solver {
             return 0;
         }
         let mine = self.hands[seat as usize][suit];
-        let live = self.hands.iter().fold(self.on_table[suit], |acc, h| acc | h[suit]);
+        let live = self.live[suit] | self.on_table[suit];
         let mut top = bit;
         loop {
             let above = live & !((1u32 << (top + 1)) - 1) as u16;
@@ -218,12 +253,23 @@ impl Solver {
     }
 
     fn setup(&mut self, pos: &Position, team: Team) -> TrickState {
+        if self.aborted {
+            self.table.clear(); // entries written while unwinding an aborted search are unreliable
+            self.aborted = false;
+        }
+        self.call_start = self.nodes;
         if self.max_team != team.index() as u8 {
             self.table.clear(); // table values are relative to the maximizing team
         }
         self.max_team = team.index() as u8;
         for seat in Seat::ALL {
             self.hands[seat.index()] = self.map.masks(pos.hands[seat.index()]);
+        }
+        self.live = [0; 5];
+        for hand in &self.hands {
+            for (live, &mask) in self.live.iter_mut().zip(hand) {
+                *live |= mask;
+            }
         }
         self.on_table = [0; 5];
         let mut state = TrickState { leader: pos.trick.leader().index() as u8, count: 0, led: 0, winner: 0, win_key: 0 };
@@ -260,10 +306,10 @@ impl Solver {
     fn table_key(&self, leader: u8) -> ([u64; 4], u8) {
         let mut packed = [0u64; 4];
         for suit in 0..4 {
-            let mut live = self.hands.iter().fold(0u16, |acc, h| acc | h[suit]);
+            let mut live = self.live[suit];
             let mut rank = 0;
             while live != 0 {
-                let bit = live & live.wrapping_neg();
+                let bit = live.isolate_lowest_one();
                 live &= live - 1;
                 for (seat, hand) in self.hands.iter().enumerate() {
                     if hand[suit] & bit != 0 {
@@ -284,6 +330,10 @@ impl Solver {
 
     fn search(&mut self, t: TrickState, alpha: i8, beta: i8) -> i8 {
         self.nodes += 1;
+        if self.aborted || self.nodes - self.call_start > self.limit {
+            self.aborted = true;
+            return alpha.max(0);
+        }
         let seat = (t.leader + t.count) % 4;
         if t.count > 0 {
             return self.search_moves(t, seat, alpha, beta);
@@ -296,7 +346,7 @@ impl Solver {
             return self.last_trick(seat);
         }
         let key = self.table_key(t.leader);
-        let stored = self.table.get(&key).copied();
+        let stored = self.table.get(&key);
         let (mut lo, mut hi) = stored.map_or((0, left), |e| (e.lo, e.hi));
         let hint = stored.map_or(NO_MOVE, |e| e.best);
         // Tricks the side on lead can cash for certain, and top trumps that must each win a trick.
@@ -331,7 +381,9 @@ impl Solver {
         } else {
             (v, v)
         };
-        self.table.insert(key, Entry { lo, hi, best });
+        if !self.aborted {
+            self.table.insert(key, Entry { lo, hi, best });
+        }
         v
     }
 
@@ -367,7 +419,7 @@ impl Solver {
             Some(t) => t as usize,
             None => JOKER_SUIT,
         };
-        let live = self.hands.iter().fold(0u16, |acc, h| acc | h[suit]);
+        let live = self.live[suit];
         if live == 0 {
             return (0, 0);
         }
@@ -393,7 +445,7 @@ impl Solver {
         let hand = &self.hands[seat as usize];
         let opp = [(seat + 1) % 4, (seat + 3) % 4];
         let top_run = |suit: usize| -> i8 {
-            let live = self.hands.iter().fold(0u16, |acc, h| acc | h[suit]);
+            let live = self.live[suit];
             let mut run = 0;
             let mut probe = live;
             while probe != 0 {
@@ -471,6 +523,7 @@ impl Solver {
     fn play(&mut self, seat: u8, t: TrickState, m: Move, alpha: i8, beta: i8) -> i8 {
         let bit = 1u16 << m.bit;
         self.hands[seat as usize][m.suit as usize] &= !bit;
+        self.live[m.suit as usize] &= !bit;
         self.on_table[m.suit as usize] |= bit;
         let mut next = t;
         if t.count == 0 {
@@ -498,6 +551,7 @@ impl Solver {
         };
         self.on_table[m.suit as usize] &= !bit;
         self.hands[seat as usize][m.suit as usize] |= bit;
+        self.live[m.suit as usize] |= bit;
         value
     }
 
@@ -519,7 +573,7 @@ impl Solver {
             if mine == 0 {
                 continue;
             }
-            let live = self.hands.iter().fold(self.on_table[suit], |acc, h| acc | h[suit]);
+            let live = self.live[suit] | self.on_table[suit];
             let top_live = 15 - live.leading_zeros() as u8;
             let mut prev: Option<u8> = None;
             let mut bits = mine;
@@ -561,7 +615,7 @@ impl Solver {
                 push(Move { suit: JOKER_SUIT as u8, bit: 0, named: t.led, order }, &mut out, &mut n);
             }
         }
-        out[..n].sort_unstable_by(|a, b| b.order.cmp(&a.order));
+        out[..n].sort_unstable_by_key(|m| std::cmp::Reverse(m.order));
         (out, n)
     }
 
@@ -642,6 +696,39 @@ mod tests {
             let best = if mover.team() == team { values.iter().max() } else { values.iter().min() }.copied();
             assert_eq!(best, Some(expected), "case {case}: analyze disagrees");
         }
+    }
+
+    #[test]
+    #[ignore = "slow: run with --release -- --ignored"]
+    fn matches_brute_force_on_five_card_endings() {
+        let mut rng = fh_core::Rng::new(77);
+        for case in 0..150 {
+            let mut pack: Vec<Card> = CardSet::pack().iter().collect();
+            rng.shuffle(&mut pack);
+            let hands: [CardSet; 4] = std::array::from_fn(|i| pack[i * 5..i * 5 + 5].iter().copied().collect());
+            let trump = [None, Some(Suit::Spades), Some(Suit::Clubs), Some(Suit::Diamonds), Some(Suit::Hearts)][rng.below(5)];
+            let leader = Seat::new(rng.below(4));
+            let team = Team::ALL[rng.below(2)];
+            let pos = Position { hands, trump, trick: Trick::new(leader) };
+            let expected = brute(hands, trump, leader, Vec::new(), team);
+            assert_eq!(Solver::new(trump).solve(&pos, team), expected, "case {case}: {hands:?} trump {trump:?} leader {leader} team {team}");
+        }
+    }
+
+    #[test]
+    fn node_limit_aborts_and_recovers() {
+        let game = Game::new(Rules::default(), 3);
+        let mut hands: [CardSet; 4] = std::array::from_fn(|i| game.hand(Seat::new(i)));
+        let south = hands[0].union(game.kitty());
+        hands[0] = south.minus(south.iter().take(3).collect());
+        let pos = Position { hands, trump: Some(Suit::Spades), trick: Trick::new(Seat::SOUTH) };
+        let mut limited = Solver::with_limit(Some(Suit::Spades), 50);
+        limited.solve(&pos, Team::NorthSouth);
+        assert!(limited.aborted());
+        // A small ending fits within the limit, and the earlier abort leaves no bad entries.
+        let small = Position { hands: [set("AS KS"), set("10S 9S"), set("8S 7S"), set("6S 5S")], trump: Some(Suit::Spades), trick: Trick::new(Seat::SOUTH) };
+        assert_eq!(limited.solve(&small, Team::NorthSouth), 2);
+        assert!(!limited.aborted());
     }
 
     #[test]

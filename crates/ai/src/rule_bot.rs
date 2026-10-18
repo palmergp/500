@@ -125,27 +125,7 @@ impl RuleBot {
     }
 
     fn discard(&self, obs: &Observation) -> Action {
-        let trump = obs.trump();
-        let hand = obs.hand;
-        let keep_value = |c: Card| -> i32 {
-            if is_trump(c, trump) || c.is_joker() {
-                return 1000 + c.rank() as i32;
-            }
-            let suit = effective_suit(c, trump);
-            let in_suit: Vec<Card> = hand.iter().filter(|&h| effective_suit(h, trump) == suit).collect();
-            let mut value = c.rank() as i32;
-            if c.rank() == ACE {
-                value += 40;
-            } else if c.rank() == KING && in_suit.len() >= 2 {
-                value += 15; // guarded king
-            }
-            if in_suit.len() <= 2 && c.rank() != ACE {
-                value -= 8; // shortening a suit toward a void
-            }
-            value
-        };
-        let card = hand.iter().min_by_key(|&c| (keep_value(c), c.id())).expect("declarer has cards");
-        Action::Discard(card)
+        Action::Discard(heuristic_discards(obs.hand, obs.trump(), 1)[0])
     }
 
     fn play(&mut self, obs: &Observation, legal: &[Action]) -> Action {
@@ -231,6 +211,38 @@ impl RuleBot {
             cheapest(cards, hand, trump) // second hand low
         }
     }
+}
+
+/// How much the declarer wants to keep `card` from `hand`: trumps most, then aces and guarded
+/// kings; cards from short suits are cheaper, since discarding them builds toward a void.
+pub fn keep_value(card: Card, hand: CardSet, trump: Option<Suit>) -> i32 {
+    if is_trump(card, trump) || card.is_joker() {
+        return 1000 + card.rank() as i32;
+    }
+    let suit = effective_suit(card, trump);
+    let in_suit = hand.iter().filter(|&h| effective_suit(h, trump) == suit).count();
+    let mut value = card.rank() as i32;
+    if card.rank() == ACE {
+        value += 40;
+    } else if card.rank() == KING && in_suit >= 2 {
+        value += 15; // guarded king
+    }
+    if in_suit <= 2 && card.rank() != ACE {
+        value -= 8; // shortening a suit toward a void
+    }
+    value
+}
+
+/// The `count` cards to discard from `hand`, chosen greedily by [`keep_value`].
+pub fn heuristic_discards(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Card> {
+    let mut hand = hand;
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count.min(hand.len()) {
+        let card = hand.iter().min_by_key(|&c| (keep_value(c, hand, trump), c.id())).expect("cards to discard");
+        hand.remove(card);
+        out.push(card);
+    }
+    out
 }
 
 impl Bot for RuleBot {

@@ -1,6 +1,6 @@
 # 500 — Game & Trainer: Project Plan
 
-*Status: Phases 0–2 done (rules engine, bots, simulator, playable web game) · 2026-10-17*
+*Status: Phases 0–3 done (rules engine, bots, simulator, playable web game, expert AI and lab) · 2026-10-17*
 
 ## 1. Goals
 
@@ -140,6 +140,10 @@ Every persona makes and reads mentions and 6-calls; the expert bots also use the
 **Engine tiers**
 1. **Rule bots:** hand-written heuristics. Fast and predictable.
 2. **PIMC expert:** sample deals that fit what the seat knows, solve each with a purpose-built 500 double-dummy solver (alpha-beta, transposition table, equivalent-card pruning), and average the results. This is the approach behind the bridge program GIB and the Skat program Kermit. The research found that **inference** (weighting the samples by the bids and plays so far) and score-based evaluation matter more than fancier search.
+   - *Built in Phase 3* (`crates/ai`).
+   - Search wins at card play: +9.4 points per hand over Steady.
+   - Simulated bidding with a handful of samples lost 27 points per hand, so the expert bids by a lab-tuned rule for now. A learned hand evaluator in Phase 5 should fix that.
+   - Details in `docs/lab/README.md`.
 3. **Neural:** see section 7.
 
 ## 6. The trainer (coaching features)
@@ -186,7 +190,7 @@ Each phase ends with something usable.
 | **0. Foundations** ✅ | git repo, Cargo workspace, rules spec in `docs/rules/house-rules.md`. The web and Python scaffolds move to Phases 2 and 5, when they're first needed | `cargo test` runs |
 | **1. Rules engine** ✅ | Rust core for the house rules, plus the toggles we use (mentions, 6-calls, redeals, slam, defensive cap); a rule bot in three styles; terminal play; `fh-lab sim` | Every house rule has a test; 1M bot games (9.1M deals, 353M actions) with every invariant holding after every action. The full regional variant catalogue is deferred until someone needs it |
 | **2. Playable web game (MVP)** ✅ | React table over the WASM engine (`crates/wasm`, `web/`); Rookie, Rock, Gambler and Steady; save and resume; score pad; hand review; bower badges. The rule bots are instant, so moving the AI to Web Workers waits for Phase 3 | Playwright plays complete hands at desktop and phone sizes (`npm run e2e`) |
-| **3. Expert AI + lab** | Double-dummy solver, PIMC with inference, simulated bidding and kitty choice; Counter and Shark; lab CLI with first reports | Expert beats the rule bots in duplicate; an expert move takes ≤ 1.5 s on this laptop |
+| **3. Expert AI + lab** ✅ | Double-dummy solver, PIMC card play with inference, lab-tuned bidding, heuristic kitty discards (searched discards tested: no gain); Counter and Shark; `fh-lab duel`, `calibrate` and `bench`; engine in a Web Worker; findings in `docs/lab/README.md` | Expert beats the rule bots in duplicate (Counter +29 points per hand over Steady, 95% CI +16 to +42); every expert move ≤ 1.1 s in the browser on this laptop |
 | **4. Coach** | Hints with reasons, live grading, post-hand review, luck vs skill | Every decision in a hand can be graded and explained |
 | **5. Neural AI** | Distillation → self-play → ONNX; the Oracle; lesson mining | Oracle scores ≥ PIMC expert in duplicate (or the hybrid improves it) |
 | **6. Curriculum** | Lessons, drills, puzzles, progress dashboard, lab insights | The full beginner-to-expert path is playable |

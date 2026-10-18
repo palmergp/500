@@ -3,10 +3,13 @@
 //!   fh-lab play [--seed N] [--watch]
 //!   fh-lab sim  [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]
 //!   fh-lab bench [--deals N]   (double-dummy solver speed)
+//!   fh-lab duel  [--a BOT] [--b BOT] [--deals N] [--seed N] [--threads N]   (duplicate match)
 //!
 //! STYLE is a persona: steady, rookie, rock, gambler (or random).
 
 mod bench;
+mod calibrate;
+mod duel;
 mod sim;
 mod terminal;
 
@@ -19,6 +22,21 @@ fn main() {
         None => ("help", HashMap::new()),
     };
     match command {
+        "duel" => duel::run({
+            duel::VERBOSE.store(flags.contains_key("verbose"), std::sync::atomic::Ordering::Relaxed);
+            duel::Options {
+            a: flags.get("a").cloned().unwrap_or_else(|| "counter-fast".into()),
+            b: flags.get("b").cloned().unwrap_or_else(|| "steady".into()),
+            deals: flag(&flags, "deals", 200),
+            seed: flag(&flags, "seed", 1),
+            threads: flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        }}),
+        "calibrate" => calibrate::run(
+            flag(&flags, "deals", 100),
+            flag(&flags, "seed", 1),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("play").map_or("search-play", |s| s.as_str()),
+        ),
         "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),
         "play" => terminal::run(flag(&flags, "seed", now_seed()), flags.contains_key("watch")),
         "sim" => sim::run(sim::Options {
@@ -30,7 +48,9 @@ fn main() {
         }),
         _ => {
             println!("usage:\n  fh-lab play [--seed N] [--watch]\n  fh-lab sim [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]");
-            println!("STYLE: steady | rookie | rock | gambler | random");
+            println!("  fh-lab bench [--deals N]
+  fh-lab duel [--a BOT] [--b BOT] [--deals N] [--seed N] [--threads N]");
+            println!("STYLE / BOT: steady | rookie | rock | gambler | counter | shark | counter-fast | random");
         }
     }
 }

@@ -1,0 +1,464 @@
+//! The expert player: Perfect Information Monte Carlo search.
+//!
+//! For each decision it samples worlds consistent with what its seat knows ([`Belief`]), solves
+//! each with the double-dummy [`Solver`], scores the outcomes in game points, and picks the
+//! action with the best weighted average. All candidates are scored on the same worlds, so their
+//! differences are not swamped by the luck of the sample.
+//!
+//! Work is bounded by solver nodes rather than wall-clock time, so decisions are reproducible and
+//! the same budget works natively and in WebAssembly.
+
+use crate::belief::{Belief, World};
+use crate::cardplay::card_cost;
+use crate::evaluate::{has_bower, hand_tricks};
+use crate::rule_bot::{heuristic_discards, RuleBot, Style};
+use crate::solver::{Position, Solver};
+use crate::Bot;
+use fh_core::cards::ACE;
+use fh_core::game::score_hand;
+use fh_core::{Action, Call, Card, CardSet, Contract, Observation, Phase, Rng, Rules, Seat, Strain, Suit, Team, Trick};
+
+/// Solver nodes any one world may use before it is dropped (about 0.1–0.3 s).
+const WORLD_NODE_LIMIT: u64 = 1_500_000;
+
+/// What the search bot optimizes.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum Goal {
+    /// Our points minus theirs from this hand.
+    Points,
+    /// The chance of winning the game, from a simple model of the scores after this hand.
+    WinChance,
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct SearchConfig {
+    /// Worlds sampled for a card-play decision, at most.
+    pub play_samples: usize,
+    /// Worlds always sampled for a card-play decision, however costly.
+    pub min_play_samples: usize,
+    /// Solver nodes to spend on one card-play decision before stopping early.
+    pub node_budget: u64,
+    /// Worlds per candidate strain when deciding what to bid.
+    pub bid_samples: usize,
+    /// Worlds per candidate discard when choosing what to put back from the kitty.
+    pub discard_samples: usize,
+    /// Expected points a bid must beat the alternative by: positive is cautious.
+    pub bid_margin: f64,
+    /// Whether worlds are weighted by how well they fit the auction.
+    pub inference: bool,
+    pub goal: Goal,
+    /// Tricks subtracted from simulated declarer results when bidding: double-dummy analysis
+    /// assumes the declarer sees every card, which real declarers don't.
+    pub dd_bias: f64,
+    /// Use search for bidding and for the kitty (otherwise a rule bot decides).
+    pub search_bidding: bool,
+    pub search_discards: bool,
+    /// Aggression of the rule bot used when search bidding is off. +0.7 won the lab's sweep
+    /// (docs/lab/README.md, finding 6).
+    pub rule_aggression: f32,
+}
+
+impl SearchConfig {
+    /// Sized to think for well under a second per card in a browser on a mid-range laptop.
+    pub const COUNTER: SearchConfig = SearchConfig {
+        play_samples: 20,
+        min_play_samples: 4,
+        node_budget: 2_500_000,
+        bid_samples: 6,
+        discard_samples: 4,
+        bid_margin: 10.0,
+        inference: true,
+        goal: Goal::Points,
+        // Measured with `fh-lab calibrate`: double-dummy results run about half a trick above
+        // what search bots actually take as declarer.
+        dd_bias: 0.5,
+        // Simulated bidding with a handful of worlds lost 27 points a hand to rule bidding in the
+        // lab (finding 7), so the expert bids by calibrated rules until a learned evaluator exists.
+        search_bidding: false,
+        // Searched kitty choice gained +0.1 points a hand over the heuristic (finding 8): not
+        // worth the time.
+        search_discards: false,
+        rule_aggression: 0.7,
+    };
+    pub const SHARK: SearchConfig =
+        SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
+    /// A cheaper setting for bulk lab simulations.
+    pub const FAST: SearchConfig =
+        SearchConfig { play_samples: 8, min_play_samples: 3, node_budget: 800_000, bid_samples: 5, discard_samples: 3, ..SearchConfig::COUNTER };
+}
+
+pub struct SearchBot {
+    name: String,
+    config: SearchConfig,
+    rng: Rng,
+    discard_plan: Vec<Card>,
+    fallback: RuleBot,
+    note: String,
+}
+
+impl SearchBot {
+    pub fn new(name: &str, config: SearchConfig, seed: u64) -> SearchBot {
+        SearchBot {
+            name: name.to_string(),
+            config,
+            rng: Rng::new(seed),
+            discard_plan: Vec::new(),
+            fallback: RuleBot::new(name, Style { aggression: config.rule_aggression, ..Style::STEADY }, seed),
+            note: String::new(),
+        }
+    }
+
+    pub fn config(&self) -> &SearchConfig {
+        &self.config
+    }
+
+    /// The value of a hand's outcome to `me`, given the declaring side's trick count.
+    fn utility(&self, obs: &Observation, contract: Contract, declarer: Seat, declarer_tricks: u8) -> f64 {
+        let rules = &obs.rules;
+        let side = declarer.team();
+        let tricks = if side == Team::NorthSouth {
+            [declarer_tricks, 10 - declarer_tricks]
+        } else {
+            [10 - declarer_tricks, declarer_tricks]
+        };
+        let change = score_hand(rules, contract, side, tricks, obs.scores);
+        let us = obs.seat.team().index();
+        match self.config.goal {
+            Goal::Points => (change[us] - change[1 - us]) as f64,
+            Goal::WinChance => {
+                let after = [obs.scores[0] + change[0], obs.scores[1] + change[1]];
+                1000.0 * win_chance(rules, after, side, obs.seat.team())
+            }
+        }
+    }
+
+    // ---- Card play ---------------------------------------------------------------------------
+
+    /// Each legal play with its expected value, best first.
+    pub fn evaluate_plays(&mut self, obs: &Observation, legal: &[Action]) -> Vec<(Action, f64)> {
+        let (declarer, contract) = obs.contract.expect("playing without a contract");
+        let trump = contract.trump();
+        let trick = obs.current_trick.clone().expect("playing phase has a trick");
+        let belief = Belief::new(obs, self.config.inference);
+        let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
+        let won_so_far = obs.tricks_won[declarer.team().index()];
+
+        let mut totals = vec![0.0f64; legal.len()];
+        let mut weight_sum = 0.0;
+        let mut samples = 0;
+        while samples < self.config.play_samples {
+            if samples >= self.config.min_play_samples && solver.nodes >= self.config.node_budget {
+                break;
+            }
+            let world = belief.sample(&mut self.rng, obs.hand);
+            let pos = Position { hands: world.hands, trump, trick: trick.clone() };
+            let values = solver.analyze(&pos, declarer.team());
+            samples += 1;
+            if solver.aborted() {
+                continue;
+            }
+            for (i, action) in legal.iter().enumerate() {
+                let Action::Play(play) = action else { continue };
+                let from_now = values.iter().find(|(p, _)| p == play).map_or(0, |&(_, v)| v);
+                totals[i] += world.weight * self.utility(obs, contract, declarer, won_so_far + from_now);
+            }
+            weight_sum += world.weight;
+        }
+        if weight_sum == 0.0 {
+            // Every world was pathological: fall back to the cheapest legal card.
+            let cheapest = legal.iter().min_by_key(|a| if let Action::Play(p) = a { card_cost(p.card, trump) } else { 0 });
+            return vec![(*cheapest.expect("legal actions"), 0.0)];
+        }
+        let mut scored: Vec<(Action, f64)> =
+            legal.iter().zip(totals).map(|(&a, t)| (a, t / weight_sum.max(1e-9))).collect();
+        // Best first; among near-equal plays prefer the cheaper card, so we don't waste high cards.
+        let cost = |a: &Action| match a {
+            Action::Play(p) => card_cost(p.card, trump),
+            _ => 0,
+        };
+        scored.sort_by(|a, b| {
+            let close = (a.1 - b.1).abs() < 0.5;
+            if close {
+                cost(&a.0).cmp(&cost(&b.0))
+            } else {
+                b.1.total_cmp(&a.1)
+            }
+        });
+        scored
+    }
+
+    // ---- Kitty -------------------------------------------------------------------------------
+
+    /// Candidate sets of `count` discards: the heuristic choice, plus variants that void each short
+    /// side suit.
+    fn discard_candidates(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Vec<Card>> {
+        let mut candidates = vec![heuristic_discards(hand, trump, count)];
+        let is_trump = |c: Card| fh_core::rules::is_trump(c, trump) || c.is_joker();
+        for suit in Suit::ALL {
+            let cards: Vec<Card> = hand
+                .iter()
+                .filter(|&c| !is_trump(c) && fh_core::effective_suit(c, trump) == Some(suit))
+                .collect();
+            if cards.is_empty() || cards.len() > count {
+                continue;
+            }
+            let rest = hand.minus(cards.iter().copied().collect());
+            let mut set = cards.clone();
+            set.extend(heuristic_discards(rest, trump, count - cards.len()));
+            set.sort();
+            if !candidates.iter().any(|c| {
+                let mut c = c.clone();
+                c.sort();
+                c == set
+            }) {
+                candidates.push(set);
+            }
+        }
+        candidates
+    }
+
+    fn plan_discards(&mut self, obs: &Observation) -> Vec<Card> {
+        let (declarer, contract) = obs.contract.expect("discarding without a contract");
+        let trump = contract.trump();
+        let count = 3 - obs.discards.map_or(0, |d| d.len());
+        let candidates = Self::discard_candidates(obs.hand, trump, count);
+        if candidates.len() == 1 {
+            return candidates.into_iter().next().unwrap();
+        }
+        let belief = Belief::new(obs, self.config.inference);
+        let worlds = belief.sample_fitting(&mut self.rng, obs.hand, self.config.discard_samples);
+        let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
+        let mut best = (f64::MIN, 0);
+        for (i, discards) in candidates.iter().enumerate() {
+            let mut total = 0.0;
+            let mut weights = 0.0;
+            for world in &worlds {
+                let mut hands = world.hands;
+                hands[declarer.index()] = obs.hand.minus(discards.iter().copied().collect());
+                let pos = Position { hands, trump, trick: Trick::new(declarer) };
+                let tricks = solver.solve(&pos, declarer.team());
+                if solver.aborted() {
+                    continue;
+                }
+                total += world.weight * self.utility(obs, contract, declarer, tricks);
+                weights += world.weight;
+            }
+            let value = total / weights.max(1e-9);
+            if value > best.0 {
+                best = (value, i);
+            }
+        }
+        candidates[best.1].clone()
+    }
+
+    // ---- Bidding -----------------------------------------------------------------------------
+
+    /// Simulated trick counts if `declarer` plays `strain`: for each world, the declarer takes the
+    /// kitty, discards heuristically, leads, and both sides play perfectly.
+    fn simulate(&mut self, worlds: &[World], declarer: Seat, strain: Strain) -> Vec<(u8, f64)> {
+        let trump = strain.trump();
+        let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
+        let results: Vec<(u8, f64)> = worlds
+            .iter()
+            .filter_map(|world| {
+                let mut hands = world.hands;
+                let thirteen = hands[declarer.index()].union(world.out);
+                let drop: CardSet = heuristic_discards(thirteen, trump, 3).into_iter().collect();
+                hands[declarer.index()] = thirteen.minus(drop);
+                let pos = Position { hands, trump, trick: Trick::new(declarer) };
+                let tricks = solver.solve(&pos, declarer.team());
+                (!solver.aborted()).then_some((tricks, world.weight))
+            })
+            .collect();
+        if results.is_empty() {
+            // Every world was pathological: assume an average result rather than none.
+            return vec![(6, 1.0)];
+        }
+        results
+    }
+
+    /// Expected utility of `contract` over simulated results, after removing `dd_bias` tricks
+    /// from the declarer (split between the two neighbouring trick counts).
+    /// Simulated declarer trick counts (with weights) if `declarer` plays `strain`, sampling worlds
+    /// from `obs`'s point of view. Used by the lab to calibrate bidding.
+    pub fn simulate_from(&mut self, obs: &Observation, declarer: Seat, strain: Strain, samples: usize) -> Vec<(u8, f64)> {
+        let belief = Belief::new(obs, self.config.inference);
+        let worlds = belief.sample_fitting(&mut self.rng, obs.hand, samples);
+        self.simulate(&worlds, declarer, strain)
+    }
+
+    fn expected(&self, obs: &Observation, results: &[(u8, f64)], contract: Contract, declarer: Seat) -> f64 {
+        let bias = self.config.dd_bias.max(0.0);
+        let (whole, frac) = (bias.floor() as u8, bias.fract());
+        let mut total = 0.0;
+        for &(tricks, w) in results {
+            let low = tricks.saturating_sub(whole + 1);
+            let high = tricks.saturating_sub(whole);
+            total += w * ((1.0 - frac) * self.utility(obs, contract, declarer, high) + frac * self.utility(obs, contract, declarer, low));
+        }
+        total / results.iter().map(|&(_, w)| w).sum::<f64>().max(1e-9)
+    }
+
+    fn call(&mut self, obs: &Observation, legal: &[Action]) -> Action {
+        let is_legal = |call: Call| legal.contains(&Action::Call(call));
+        let belief = Belief::new(obs, self.config.inference);
+        let worlds = belief.sample_fitting(&mut self.rng, obs.hand, self.config.bid_samples);
+        let me = obs.seat;
+
+        // The baseline: what happens if we pass and the current high bid stands (0 if none).
+        let baseline = match obs.auction.high_bid() {
+            Some((seat, contract)) => {
+                let results = self.simulate(&worlds, seat, contract.strain);
+                self.expected(obs, &results, contract, seat)
+            }
+            None => 0.0,
+        };
+
+        // Our best strains by rough evaluation; simulate the top two (plus NT if it is close).
+        let mut strains: Vec<(Strain, f32)> = Strain::ALL.iter().map(|&s| (s, hand_tricks(obs.hand, s))).collect();
+        strains.sort_by(|a, b| b.1.total_cmp(&a.1));
+        // NT replaces the second choice when it is close, keeping the work to two simulations.
+        let mut candidates: Vec<Strain> = strains.iter().take(2).map(|&(s, _)| s).collect();
+        if !candidates.contains(&Strain::NoTrumps) && strains.iter().any(|&(s, e)| s == Strain::NoTrumps && e + 1.0 >= strains[0].1) {
+            candidates[1] = Strain::NoTrumps;
+        }
+
+        let mut best: Option<(f64, Contract, f64)> = None;
+        for &strain in &candidates {
+            let results = self.simulate(&worlds, me, strain);
+            for level in 7..=10 {
+                let contract = Contract::new(level, strain);
+                if !is_legal(Call::Bid(contract)) {
+                    continue;
+                }
+                let value = self.expected(obs, &results, contract, me);
+                if best.is_none_or(|(v, _, _)| value > v) {
+                    let weight: f64 = results.iter().map(|r| r.1).sum();
+                    let bias = self.config.dd_bias;
+                    let makes = results.iter().filter(|r| r.0 as f64 - bias >= level as f64).map(|r| r.1).sum::<f64>() / weight;
+                    best = Some((value, contract, makes));
+                }
+            }
+        }
+
+        let must_bid = obs.auction.must_bid();
+        if let Some((value, contract, makes)) = best {
+            self.note = format!("best {contract}: makes {:.0}%, EV {value:+.0} vs baseline {baseline:+.0}", 100.0 * makes);
+            // Taking partner out of their strain rests on our least reliable estimate (their
+            // hidden hand), so demand a clear edge.
+            let partner_strain = obs.auction.high_bid().filter(|(s, _)| *s == me.partner()).map(|(_, c)| c.strain);
+            let margin = match partner_strain {
+                Some(s) if s != contract.strain => self.config.bid_margin + 80.0,
+                _ => self.config.bid_margin,
+            };
+            if must_bid || value > baseline + margin {
+                return Action::Call(Call::Bid(contract));
+            }
+        }
+        if must_bid {
+            return *legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(_)))).expect("a forced bid exists");
+        }
+
+        // No bid: signal to partner honestly, as the house rules intend.
+        let best_strain = strains[0].0;
+        if obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best_strain)) {
+            return Action::Call(Call::Six(best_strain));
+        }
+        for &(strain, _) in &strains {
+            let shows = match strain.trump() {
+                Some(suit) => has_bower(obs.hand, suit),
+                None => Suit::ALL.iter().filter(|&&s| obs.hand.contains(Card::new(s, ACE))).count() >= 2,
+            };
+            if shows && is_legal(Call::Mention(strain)) {
+                return Action::Call(Call::Mention(strain));
+            }
+        }
+        Action::Call(Call::Pass)
+    }
+}
+
+/// A rough chance that `team` wins the game from scores `after` this hand. Terminal positions
+/// follow the rules (declarers count first); otherwise a logistic curve in the score gap, steeper
+/// as the leader nears the target. The lab will replace this with measured values.
+pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team) -> f64 {
+    let target = rules.target_score;
+    let d = declarers.index();
+    if after[d] >= target {
+        return if team == declarers { 1.0 } else { 0.0 };
+    }
+    if after[1 - d] >= target {
+        return if team == declarers { 0.0 } else { 1.0 };
+    }
+    let (us, them) = (after[team.index()] as f64, after[1 - team.index()] as f64);
+    let closeness = 1.0 + (us.max(them).max(0.0) / target as f64);
+    1.0 / (1.0 + (-(us - them) * closeness / 250.0).exp())
+}
+
+impl Bot for SearchBot {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn note(&self) -> Option<&str> {
+        (!self.note.is_empty()).then_some(self.note.as_str())
+    }
+
+    fn choose(&mut self, obs: &Observation, legal: &[Action]) -> Action {
+        if legal.len() == 1 {
+            return legal[0];
+        }
+        match obs.phase {
+            Phase::Bidding if !self.config.search_bidding => self.fallback.choose(obs, legal),
+            Phase::Discarding if !self.config.search_discards => self.fallback.choose(obs, legal),
+            Phase::Bidding => self.call(obs, legal),
+            Phase::Discarding => {
+                self.discard_plan.retain(|&c| obs.hand.contains(c));
+                if self.discard_plan.is_empty() {
+                    self.discard_plan = self.plan_discards(obs);
+                }
+                Action::Discard(self.discard_plan.remove(0))
+            }
+            Phase::Playing => self.evaluate_plays(obs, legal)[0].0,
+            Phase::GameOver => legal[0],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use fh_core::{Event, Game, Rules};
+
+    #[test]
+    fn plays_complete_hands_legally() {
+        for seed in 0..2 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bots: [SearchBot; 4] = std::array::from_fn(|i| {
+                let config = SearchConfig { play_samples: 3, min_play_samples: 1, bid_samples: 2, discard_samples: 2, ..SearchConfig::FAST };
+                SearchBot::new("test", config, seed * 4 + i as u64)
+            });
+            loop {
+                let seat = game.to_act().unwrap();
+                let legal = game.legal_actions();
+                let action = bots[seat.index()].choose(&game.observe(seat), &legal);
+                assert!(legal.contains(&action), "seed {seed}: illegal {action}");
+                let events = game.apply(action).unwrap();
+                game.check_invariants().unwrap();
+                if events.iter().any(|e| matches!(e, Event::HandScored { .. })) {
+                    break;
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn win_chance_follows_the_rules_at_the_target() {
+        let rules = Rules::default();
+        let ns = Team::NorthSouth;
+        assert_eq!(win_chance(&rules, [510, 520], ns, ns), 1.0, "declarers count first");
+        assert_eq!(win_chance(&rules, [480, 500], ns, ns), 0.0, "defenders can win");
+        let even = win_chance(&rules, [200, 200], ns, ns);
+        assert!((even - 0.5).abs() < 1e-9);
+        assert!(win_chance(&rules, [400, 100], ns, ns) > 0.8);
+    }
+}

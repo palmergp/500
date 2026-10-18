@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { ActionView, CardView, EventView, HandView, Persona, TrickView, View } from "./engine";
-import { loadEngine, personas as listPersonas, SUIT_SYMBOL, Table } from "./engine";
+import type { ActionView, CardView, HandView, Persona, Snapshot, TrickView, View } from "./engine";
+import { Engine, SUIT_SYMBOL } from "./engine";
 import { BiddingBox } from "./components/BiddingBox";
 import { Card } from "./components/Card";
 import { Dialog } from "./components/Dialog";
@@ -32,7 +32,8 @@ function prompt(view: View): string {
 }
 
 export function App() {
-  const tableRef = useRef<Table | null>(null);
+  const engineRef = useRef<Engine | null>(null);
+  const busy = useRef(false);
   const [view, setView] = useState<View | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [personas, setPersonas] = useState<Persona[]>([]);
@@ -48,47 +49,65 @@ export function App() {
 
   const factor = SPEED_FACTOR[settings.speed];
 
-  const handle = useCallback((events: EventView[]) => {
-    const table = tableRef.current!;
-    const next = table.view();
+  const handle = useCallback((snapshot: Snapshot) => {
+    const next = snapshot.view;
+    if (snapshot.ms > 50) console.debug(`engine: ${snapshot.ms.toFixed(0)} ms (${snapshot.events.map((e) => e.text).join("; ")})`);
     setView(next);
-    savedGame.store(table.save());
-    const shown = events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
+    savedGame.store(snapshot.save);
+    const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
-    if (events.some((e) => e.kind === "trickWon")) {
+    if (snapshot.events.some((e) => e.kind === "trickWon")) {
       setHeld(next.lastTrick ?? next.history.at(-1)?.tricks.at(-1) ?? null);
     }
-    if (events.some((e) => e.kind === "handScored")) {
+    if (snapshot.events.some((e) => e.kind === "handScored")) {
       setResult(next.history.filter((h) => !h.passedOut).at(-1) ?? null);
     }
   }, []);
 
-  const startGame = useCallback((chosen: Settings) => {
-    saveSettings(chosen);
-    setSettings(chosen);
-    const table = Table.create(randomSeed(), chosen);
-    tableRef.current = table;
-    savedGame.store(table.save());
-    setView(table.view());
-    setMessage("New game. First to 500 wins.");
-    setHeld(null);
-    setResult(null);
-    setSelected([]);
-    setJokerLeads(null);
-    setShowNewGame(false);
-  }, []);
+  /** Runs one engine request at a time, so moves can't interleave. */
+  const request = useCallback(async (run: (engine: Engine) => Promise<Snapshot | null>) => {
+    const engine = engineRef.current;
+    if (!engine || busy.current) return null;
+    busy.current = true;
+    try {
+      const snapshot = await run(engine);
+      if (snapshot) handle(snapshot);
+      return snapshot;
+    } catch (e) {
+      setError(String(e));
+      return null;
+    } finally {
+      busy.current = false;
+    }
+  }, [handle]);
 
-  // Load the engine, then resume the saved game or deal a new one.
+  const startGame = useCallback(
+    (chosen: Settings) => {
+      saveSettings(chosen);
+      setSettings(chosen);
+      setHeld(null);
+      setResult(null);
+      setSelected([]);
+      setJokerLeads(null);
+      setShowNewGame(false);
+      void request((engine) => engine.create(randomSeed(), chosen)).then(() => setMessage("New game. First to 500 wins."));
+    },
+    [request],
+  );
+
+  // Start the engine, then resume the saved game or ask for a new one.
   useEffect(() => {
-    if (tableRef.current) return;
-    loadEngine()
-      .then(() => {
-        setPersonas(listPersonas());
+    if (engineRef.current) return;
+    const engine = new Engine();
+    engineRef.current = engine;
+    engine
+      .personas()
+      .then(async (list) => {
+        setPersonas(list);
         const save = savedGame.load();
         if (save) {
           try {
-            tableRef.current = Table.load(save);
-            setView(tableRef.current.view());
+            handle(await engine.load(save));
             setMessage("Welcome back: your game was restored.");
             return;
           } catch {
@@ -98,7 +117,7 @@ export function App() {
         setShowNewGame(true);
       })
       .catch((e: unknown) => setError(String(e)));
-  }, []);
+  }, [handle]);
 
   // Show a finished trick for a moment before play continues.
   useEffect(() => {
@@ -109,19 +128,20 @@ export function App() {
 
   const paused = !!held || !!result || !!review || showScores || showNewGame;
 
-  // Let the bots take their turns, one at a time, at a readable pace.
+  // Let the bots take their turns one at a time. Thinking time counts toward the pause between
+  // moves, so a slow search doesn't add to it.
   useEffect(() => {
     if (!view || paused || view.humanToAct || view.phase === "gameOver") return;
-    const timer = setTimeout(() => {
-      const events = tableRef.current?.stepBot();
-      if (events) handle(events);
-    }, DELAY[view.phase] * factor);
-    return () => clearTimeout(timer);
-  }, [view, paused, factor, handle]);
+    const pause = new Promise((r) => setTimeout(r, DELAY[view.phase] * factor));
+    void request(async (engine) => {
+      const [snapshot] = await Promise.all([engine.stepBot(), pause]);
+      return snapshot;
+    });
+  }, [view, paused, factor, request]);
 
   const act = (index: number) => {
     setJokerLeads(null);
-    handle(tableRef.current!.act(index));
+    void request((engine) => engine.act(index));
   };
 
   const legalCards = useMemo(() => {
@@ -144,12 +164,17 @@ export function App() {
   };
 
   const confirmDiscards = () => {
-    const table = tableRef.current!;
-    for (const id of selected) {
-      const action = table.view().legal.find((a) => a.kind === "discard" && a.card === id);
-      if (action) handle(table.act(action.index));
-    }
+    const chosen = selected;
     setSelected([]);
+    void request(async (engine) => {
+      let snapshot: Snapshot | null = null;
+      for (const id of chosen) {
+        const legal = (snapshot ?? { view }).view!.legal;
+        const action = legal.find((a) => a.kind === "discard" && a.card === id);
+        if (action) snapshot = await engine.act(action.index);
+      }
+      return snapshot;
+    });
   };
 
   if (error) return <div className="fatal">Could not start the game engine: {error}</div>;
@@ -258,7 +283,7 @@ export function App() {
         </Dialog>
       )}
       {showNewGame && personas.length > 0 && (
-        <NewGameDialog personas={personas} initial={settings} onStart={startGame} onCancel={tableRef.current ? () => setShowNewGame(false) : undefined} />
+        <NewGameDialog personas={personas} initial={settings} onStart={startGame} onCancel={view ? () => setShowNewGame(false) : undefined} />
       )}
     </div>
   );

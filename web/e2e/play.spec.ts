@@ -1,50 +1,8 @@
-import { expect, test, type Page } from "@playwright/test";
-
-/** Takes the human's turn with a simple policy: pass if allowed, otherwise the first legal option. */
-async function takeTurn(page: Page): Promise<boolean> {
-  const pass = page.locator(".bidding-box .call.pass:not([disabled])");
-  if (await pass.count()) {
-    await pass.click();
-    return true;
-  }
-  const bid = page.locator(".bidding-box .call:not([disabled])").first();
-  if (await bid.count()) {
-    await bid.click();
-    return true;
-  }
-  const discard = page.locator(".discard-bar button");
-  if (await discard.count()) {
-    const needed = Number((await discard.innerText()).split("/")[1]);
-    const cards = page.locator(".hand .card.playable:not(.selected)");
-    for (let i = 0; i < needed; i++) await cards.first().click();
-    await discard.click();
-    return true;
-  }
-  const joker = page.locator(".joker-choice .call").first();
-  if (await joker.count()) {
-    await joker.click();
-    return true;
-  }
-  const card = page.locator(".hand .card.playable").first();
-  if (await card.count()) {
-    await card.click();
-    return true;
-  }
-  return false;
-}
-
-async function startFastGame(page: Page) {
-  await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
-  await page.reload();
-  const dialog = page.getByRole("dialog", { name: "New game" });
-  await expect(dialog).toBeVisible();
-  await dialog.getByLabel("fast").check();
-  await dialog.getByRole("button", { name: "Deal" }).click();
-}
+import { expect, test } from "@playwright/test";
+import { startGame, takeTurn } from "./helpers";
 
 test("plays a hand through to the score", async ({ page }, info) => {
-  await startFastGame(page);
+  await startGame(page);
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   await page.screenshot({ path: `test-results/${info.project.name}-1-deal.png` });
 
@@ -73,7 +31,7 @@ test("plays a hand through to the score", async ({ page }, info) => {
 });
 
 test("restores a game after reload", async ({ page }) => {
-  await startFastGame(page);
+  await startGame(page);
   const hand = page.getByLabel("Your hand");
   await expect(hand.locator(".card")).toHaveCount(10);
   const before = await hand.locator(".card").evaluateAll((cards) => cards.map((c) => c.getAttribute("aria-label")));
