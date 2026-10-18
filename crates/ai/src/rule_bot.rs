@@ -1,0 +1,273 @@
+//! A rule-of-thumb player: counts tricks to bid, signals honestly, draws trumps as declarer,
+//! wins tricks cheaply and doesn't waste cards on a trick its partner has won.
+//!
+//! This is the Phase 1 baseline the search and neural bots will be measured against.
+
+use crate::cardplay::{cheapest, is_boss, trumps};
+use crate::evaluate::{has_bower, hand_tricks};
+use crate::Bot;
+use fh_core::cards::{ACE, KING};
+use fh_core::rules::is_trump;
+use fh_core::trick::trick_strength;
+use fh_core::{effective_suit, Action, Call, Card, CardSet, Contract, Observation, Phase, Play, Strain, Suit};
+
+/// Bidding temperament.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Style {
+    /// Tricks added to every estimate: negative is cautious, positive is reckless.
+    pub aggression: f32,
+    /// Tricks expected from partner before they have called.
+    pub partner_credit: f32,
+    /// Tricks expected from the kitty.
+    pub kitty_credit: f32,
+}
+
+impl Style {
+    pub const STEADY: Style = Style { aggression: 0.0, partner_credit: 1.5, kitty_credit: 0.5 };
+    pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4 };
+    pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7 };
+}
+
+pub struct RuleBot {
+    name: String,
+    style: Style,
+}
+
+impl RuleBot {
+    pub fn new(name: &str, style: Style) -> RuleBot {
+        RuleBot { name: name.to_string(), style }
+    }
+
+    /// Expected tricks for our side in `strain`, adjusted for what the auction has shown.
+    pub fn estimate(&self, obs: &Observation, strain: Strain) -> f32 {
+        let me = obs.seat;
+        let mut support = self.style.partner_credit;
+        for (seat, call) in obs.auction.calls() {
+            let partner = seat == me.partner();
+            let delta = match call {
+                Call::Six(suit) => 0.6 + if Strain::from_suit(suit) == strain { 0.4 } else { 0.0 },
+                Call::Mention(m) if m == strain => 0.7,
+                Call::Bid(c) if c.strain == strain => 1.0,
+                Call::Bid(_) => 0.3,
+                Call::Pass => -0.4,
+                Call::Mention(_) => 0.0,
+            };
+            if partner {
+                support += delta;
+            } else if seat != me && delta > 0.0 && !matches!(call, Call::Bid(c) if c.strain != strain) {
+                support -= delta * 0.5; // the strength an opponent showed is against us
+            }
+        }
+        hand_tricks(obs.hand, strain) + support + self.style.kitty_credit + self.style.aggression
+    }
+
+    fn call(&self, obs: &Observation, legal: &[Action]) -> Action {
+        let is_legal = |call: Call| legal.contains(&Action::Call(call));
+        let mut strains: Vec<(Strain, f32)> = Strain::ALL.into_iter().map(|s| (s, self.estimate(obs, s))).collect();
+        strains.sort_by(|a, b| b.1.total_cmp(&a.1));
+
+        let partner_high = obs.auction.high_bid().map(|(seat, _)| seat) == Some(obs.seat.partner());
+        for &(strain, estimate) in &strains {
+            let level = estimate.floor().min(10.0) as u8;
+            if level >= 7 {
+                let call = Call::Bid(Contract::new(level, strain));
+                // Over partner's bid, only bid if it is clearly better for the side.
+                let worth_it = !partner_high || estimate >= 8.0;
+                if worth_it && is_legal(call) {
+                    return Action::Call(call);
+                }
+            }
+        }
+        let best = strains[0].0;
+        if obs.auction.must_bid() {
+            let forced = legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(c)) if c.strain == best));
+            return *forced.unwrap_or(&legal[0]);
+        }
+        let best_suit = strains.iter().find_map(|&(s, _)| s.trump()).expect("four suits");
+        if obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best_suit)) {
+            return Action::Call(Call::Six(best_suit));
+        }
+        for &(strain, _) in &strains {
+            let shows = match strain.trump() {
+                Some(suit) => has_bower(obs.hand, suit),
+                None => Suit::ALL.iter().filter(|&&s| obs.hand.contains(Card::new(s, ACE))).count() >= 2,
+            };
+            if shows && is_legal(Call::Mention(strain)) {
+                return Action::Call(Call::Mention(strain));
+            }
+        }
+        Action::Call(Call::Pass)
+    }
+
+    fn discard(&self, obs: &Observation) -> Action {
+        let trump = obs.trump();
+        let hand = obs.hand;
+        let keep_value = |c: Card| -> i32 {
+            if is_trump(c, trump) || c.is_joker() {
+                return 1000 + c.rank() as i32;
+            }
+            let suit = effective_suit(c, trump);
+            let in_suit: Vec<Card> = hand.iter().filter(|&h| effective_suit(h, trump) == suit).collect();
+            let mut value = c.rank() as i32;
+            if c.rank() == ACE {
+                value += 40;
+            } else if c.rank() == KING && in_suit.len() >= 2 {
+                value += 15; // guarded king
+            }
+            if in_suit.len() <= 2 && c.rank() != ACE {
+                value -= 8; // shortening a suit toward a void
+            }
+            value
+        };
+        let card = hand.iter().min_by_key(|&c| (keep_value(c), c.id())).expect("declarer has cards");
+        Action::Discard(card)
+    }
+
+    fn play(&self, obs: &Observation, legal: &[Action]) -> Action {
+        let trick = obs.current_trick.as_ref().expect("playing phase has a trick");
+        let options: Vec<Play> = legal.iter().filter_map(|a| if let Action::Play(p) = a { Some(*p) } else { None }).collect();
+        let cards: Vec<Card> = options.iter().map(|p| p.card).collect();
+        let seen = obs.played().union(obs.hand).union(obs.discards.unwrap_or_default());
+
+        let card = if trick.is_empty() {
+            self.lead(obs, &cards, seen)
+        } else {
+            self.follow(obs, &cards, seen)
+        };
+        let play = options.iter().filter(|p| p.card == card).max_by_key(|p| {
+            // When leading the Joker in no trumps, name our longest suit.
+            p.named_suit.map_or(0, |s| obs.hand.of_printed_suit(s).len())
+        });
+        Action::Play(*play.expect("chosen card is legal"))
+    }
+
+    fn lead(&self, obs: &Observation, cards: &[Card], seen: CardSet) -> Card {
+        let trump = obs.trump();
+        let hand = obs.hand;
+        let declaring = obs.declarer().map(|d| d.team()) == Some(obs.seat.team());
+        let my_trumps = trumps(hand, trump);
+
+        // Declarers draw trumps while the defenders may still hold some.
+        if declaring && !my_trumps.is_empty() {
+            let outstanding = trumps(CardSet::pack(), trump).minus(seen);
+            if !outstanding.is_empty() {
+                let top = my_trumps.iter().max_by_key(|&c| trick_strength(c, trump.unwrap(), trump)).unwrap();
+                return if is_boss(top, seen, trump) {
+                    top
+                } else {
+                    cheapest(&my_trumps.iter().collect::<Vec<_>>(), hand, trump)
+                };
+            }
+        }
+        // Cash a sure winner in a side suit.
+        let side: Vec<Card> = cards.iter().copied().filter(|&c| !is_trump(c, trump) && !c.is_joker()).collect();
+        if let Some(&boss) = side.iter().filter(|&&c| is_boss(c, seen, trump)).max_by_key(|c| c.rank()) {
+            return boss;
+        }
+        // Otherwise lead low from our longest side suit, keeping trumps back.
+        let longest = side.iter().copied().max_by_key(|&c| {
+            let len = hand.iter().filter(|&h| effective_suit(h, trump) == effective_suit(c, trump)).count();
+            (len, std::cmp::Reverse(c.rank()))
+        });
+        longest.unwrap_or_else(|| cheapest(cards, hand, trump))
+    }
+
+    fn follow(&self, obs: &Observation, cards: &[Card], seen: CardSet) -> Card {
+        let trump = obs.trump();
+        let hand = obs.hand;
+        let trick = obs.current_trick.as_ref().unwrap();
+        let led = trick.led_suit().unwrap();
+        let winner = trick.winner(trump).unwrap();
+        let winning = trick.winning_card(trump).unwrap();
+        let last = trick.cards().len() == 3;
+
+        let partner_winning = winner == obs.seat.partner();
+        if partner_winning && (last || is_boss(winning, seen, trump)) {
+            return cheapest(cards, hand, trump);
+        }
+        let to_beat = trick_strength(winning, led, trump);
+        let winners: Vec<Card> = cards.iter().copied().filter(|&c| trick_strength(c, led, trump) > to_beat).collect();
+        if winners.is_empty() {
+            return cheapest(cards, hand, trump);
+        }
+        let cheapest_winner = cheapest(&winners, hand, trump);
+        let ruffing = is_trump(cheapest_winner, trump) && Some(led) != trump;
+        let second_hand = trick.cards().len() == 1;
+        if last || ruffing || is_boss(cheapest_winner, seen, trump) || !second_hand {
+            cheapest_winner
+        } else {
+            cheapest(cards, hand, trump) // second hand low
+        }
+    }
+}
+
+impl Bot for RuleBot {
+    fn name(&self) -> &str {
+        &self.name
+    }
+
+    fn choose(&mut self, obs: &Observation, legal: &[Action]) -> Action {
+        match obs.phase {
+            Phase::Bidding => self.call(obs, legal),
+            Phase::Discarding => self.discard(obs),
+            Phase::Playing => self.play(obs, legal),
+            Phase::GameOver => legal[0],
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{play_out, RandomBot};
+    use fh_core::{Game, Rules, Team};
+
+    fn rule_bots() -> [Box<dyn Bot>; 4] {
+        std::array::from_fn(|_| Box::new(RuleBot::new("Steady", Style::STEADY)) as Box<dyn Bot>)
+    }
+
+    #[test]
+    fn rule_bots_finish_games() {
+        for seed in 0..40 {
+            let mut game = Game::new(Rules::default(), seed);
+            let winner = play_out(&mut game, &mut rule_bots(), 100_000);
+            assert!(winner.is_some(), "seed {seed} did not finish: {:?}", game.scores());
+            game.check_invariants().unwrap();
+        }
+    }
+
+    #[test]
+    fn rule_bots_beat_random_bots() {
+        let mut wins = 0;
+        let games = 40;
+        for seed in 0..games {
+            let mut bots: [Box<dyn Bot>; 4] = std::array::from_fn(|i| {
+                if i % 2 == 0 {
+                    Box::new(RuleBot::new("Steady", Style::STEADY)) as Box<dyn Bot>
+                } else {
+                    Box::new(RandomBot::new(seed * 4 + i as u64)) as Box<dyn Bot>
+                }
+            });
+            let mut game = Game::new(Rules::default(), seed);
+            if play_out(&mut game, &mut bots, 100_000) == Some(Team::NorthSouth) {
+                wins += 1;
+            }
+        }
+        assert!(wins >= games * 9 / 10, "rule bots won only {wins}/{games}");
+    }
+
+    #[test]
+    fn joker_holder_signals_six_when_too_weak_to_bid() {
+        let rules = Rules::default();
+        let hand = CardSet::parse("Joker 5S 7S 9C 6C 4D 8D 10D 5H 6H").unwrap();
+        let others = CardSet::pack().minus(hand);
+        let mut rest = others.iter();
+        let mut take = |n: usize| -> CardSet { (&mut rest).take(n).collect() };
+        let hands = [hand, take(10), take(10), take(10)];
+        let kitty = take(3);
+        let game = Game::from_deal(rules, 1, fh_core::Seat::EAST, hands, kitty);
+        let mut bot = RuleBot::new("Steady", Style::STEADY);
+        let action = bot.choose(&game.observe(fh_core::Seat::SOUTH), &game.legal_actions());
+        assert!(matches!(action, Action::Call(Call::Six(_))), "{action}");
+    }
+}

@@ -1,0 +1,10 @@
+[package]
+name = "fh-lab"
+description = "Terminal play and headless simulation for 500"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+fh-core = { path = "../core" }
+fh-ai = { path = "../ai" }
