@@ -20,6 +20,7 @@ import { ScorePad } from "./components/ScorePad";
 import { InfoPanel, TableView } from "./components/TableView";
 import { TricksDialog } from "./components/TricksDialog";
 import { DecisionsDialog } from "./components/DecisionsDialog";
+import { keepMistake } from "./mistakes";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -129,6 +130,8 @@ export function App() {
   const [showDecisions, setShowDecisions] = useState(false);
   /** Grades the coach is still working out. */
   const [grading, setGrading] = useState(0);
+  /** Action numbers you asked a hint for: their grades don't count toward your patterns. */
+  const hintedRef = useRef(new Set<number>());
   const [announcement, setAnnouncement] = useState("");
   /** The main menu, or the table. */
   const [screen, setScreen] = useState<"starting" | "menu" | "table">("starting");
@@ -241,6 +244,7 @@ export function App() {
       toSolo();
       savedGrades.clear();
       setGrades([]);
+      hintedRef.current.clear();
       clearTable();
       setShowNewGame(false);
       setScreen("table");
@@ -363,8 +367,11 @@ export function App() {
     });
   }, [mode, view, paused, factor, request]);
 
-  const keepGrade = (save: string, g: GradeView | null) => {
-    if (!g) return;
+  const keepGrade = (save: string, found: GradeView | null, numbers: number[]) => {
+    if (!found) return;
+    const g: GradeView = { ...found, hinted: numbers.some((n) => hintedRef.current.has(n)) };
+    // Your mistakes become puzzles (solo games only: a LAN host keeps the save to itself).
+    if (modeRef.current === "solo") keepMistake(g, save);
     setGrades((all) => {
       const next = [...all.filter((x) => x.actionNumber !== g.actionNumber), g].sort((a, b) => a.actionNumber - b.actionNumber);
       if (modeRef.current === "solo") savedGrades.store(next);
@@ -376,17 +383,17 @@ export function App() {
 
   /** Asks the coach to grade your actions `numbers` (positions in the game's action log). */
   /** Runs one grading request, counting it while it's out. */
-  const grade = (run: () => Promise<GradeView | null>, save: string) => {
+  const grade = (run: () => Promise<GradeView | null>, save: string, numbers: number[]) => {
     setGrading((n) => n + 1);
     run()
-      .then((g) => keepGrade(save, g))
+      .then((g) => keepGrade(save, g, numbers))
       .catch(() => {})
       .finally(() => setGrading((n) => n - 1));
   };
 
   const gradeLater = (save: string, numbers: number[]) => {
     if (!coach || !settings.grade) return;
-    for (const number of numbers) grade(() => coach.grade(save, number), save);
+    for (const number of numbers) grade(() => coach.grade(save, number), save, [number]);
   };
 
   /** Your action: to this device's engine, or to the host (`expect` guards against a stale click). */
@@ -409,6 +416,7 @@ export function App() {
     coach
       .hint(save)
       .then((h) => {
+        hintedRef.current.add(forAction);
         setHint({ forAction, hint: h });
         audio.play("hint");
       })
@@ -493,7 +501,7 @@ export function App() {
     }).then((snapshot) => {
       if (!snapshot || !coach || !settings.grade) return;
       // The three cards are graded together, as one decision.
-      if (wholeKitty && numbers.length === 3) grade(() => coach.gradeDiscards(snapshot.save, numbers[0]), snapshot.save);
+      if (wholeKitty && numbers.length === 3) grade(() => coach.gradeDiscards(snapshot.save, numbers[0]), snapshot.save, numbers);
       else gradeLater(snapshot.save, numbers);
     });
   };

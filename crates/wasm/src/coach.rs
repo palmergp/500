@@ -48,6 +48,9 @@ pub struct GradeView {
     pub deal: usize,
     /// For a card play, which trick of the hand (1–10).
     pub trick: Option<u8>,
+    /// What kind of slip this was, when the choice differs from the coach's ("overbid",
+    /// "draw-trumps", "kitty-trump", ...): the trainer groups these to find recurring leaks.
+    pub pattern: Option<&'static str>,
 }
 
 fn label(action: Action) -> String {
@@ -129,6 +132,7 @@ pub fn grade_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<Gr
         reasons: grade.analysis.reasons,
         deal: game.history().len() + 1,
         trick: (obs.phase == Phase::Playing).then(|| obs.tricks.len() as u8 + 1),
+        pattern: fh_ai::coach::slip_pattern(&obs, chosen, grade.best),
     }))
 }
 
@@ -168,6 +172,7 @@ pub fn grade_discards_for(save: &SaveData, number: usize, seat: Seat) -> Result<
         verdict: grade.verdict.label(),
         loss: grade.loss,
         options: vec![],
+        pattern: (grade.loss > 0.0).then(|| fh_ai::coach::discard_pattern(&grade.chosen, obs.trump())),
         reasons: grade.reasons,
         deal: game.history().len() + 1,
         trick: None,
@@ -269,6 +274,23 @@ mod tests {
         assert_eq!(g.verdict, "best");
     }
 
+    /// A saved position rebuilds as a puzzle, but only at one of South's decisions.
+    #[test]
+    fn saved_positions_rebuild_as_puzzles() {
+        let mut table = Table::new(8, "steady", "steady", "steady").unwrap();
+        while !table.human_to_act() {
+            table.step_bot();
+        }
+        let save = serde_json::to_string(&table.save()).unwrap();
+        let drill = position(&save).unwrap();
+        assert!(drill.view.human_to_act);
+        assert_eq!(drill.view.hand.len(), 10);
+        table.act(0).unwrap();
+        if !table.human_to_act() {
+            assert!(position(&serde_json::to_string(&table.save()).unwrap()).is_err());
+        }
+    }
+
     /// Advice never depends on who the other players are: the same game with different personas
     /// in the other seats gets the same hints and grades.
     #[test]
@@ -365,6 +387,15 @@ mod tests {
 pub struct DrillView {
     pub view: crate::view::View,
     pub save: String,
+}
+
+/// A saved position, rebuilt to replay as a puzzle (your own past mistakes).
+pub fn position(save: &str) -> Result<DrillView, String> {
+    let table = crate::table::Table::restore(&parse(save)?)?;
+    if !table.human_to_act() {
+        return Err("that position isn't South's decision".into());
+    }
+    Ok(drill_view(&table))
 }
 
 fn drill_view(table: &crate::table::Table) -> DrillView {

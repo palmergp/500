@@ -4,15 +4,23 @@
 //!   fh-lab sim  [--games N] [--seed N] [--ns STYLE] [--ew STYLE] [--threads N]
 //!   fh-lab bench [--deals N]   (double-dummy solver speed)
 //!   fh-lab duel  [--a BOT] [--b BOT] [--deals N] [--seed N] [--threads N]   (duplicate match)
+//!   fh-lab levels  [--deals N]   (how high to bid, by seat)
+//!   fh-lab honesty [--deals N]   (are the coach's percentages right?)
+//!   fh-lab audit [--deals N]     (are the coach's grades fair and its hints steady?)
+//!   fh-lab declarer [--deals N]  (the kitty and the first lead, solved)
 //!
 //! STYLE is a persona: steady, rookie, rock, gambler (or random).
 
+mod audit;
 mod bench;
 mod calibrate;
 mod coach;
 mod dataset;
+mod declarer;
 mod habits;
+mod honesty;
 mod leads;
+mod levels;
 mod duel;
 mod sim;
 mod terminal;
@@ -58,6 +66,26 @@ fn main() {
         "leads" => leads::run(
             flag(&flags, "deals", 400),
             flag(&flags, "seed", 120_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "levels" => levels::run(
+            flag(&flags, "deals", 2000),
+            flag(&flags, "seed", 300_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "audit" => audit::run(
+            flag(&flags, "deals", 150),
+            flag(&flags, "seed", 500_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "declarer" => declarer::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 600_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "honesty" => honesty::run(
+            flag(&flags, "deals", 300),
+            flag(&flags, "seed", 400_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "bench" => bench::run(flag(&flags, "deals", 200), flag(&flags, "seed", 1)),

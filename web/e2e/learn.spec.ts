@@ -82,3 +82,73 @@ test("the counting quiz and void markers during play", async ({ page }, info) =>
   }
   expect(answered).toBe(true);
 });
+
+test("your patterns: recurring slips, without decisions made after a hint", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass on desktop");
+  test.setTimeout(240_000);
+  const { freshStart, takeTurn } = await import("./helpers");
+  await freshStart(page);
+  // A record with two kinds of slip; overbidding cost more.
+  await page.evaluate(() => {
+    const game = (id: string, patterns: Record<string, { slips: number; loss: number }>) => ({
+      id, date: "2026-10-18", finished: true, won: false, decisions: 20,
+      verdicts: { best: 12, good: 4, inaccuracy: 2, mistake: 1, blunder: 1 }, loss: 200, lossByPhase: {}, decisionsByPhase: {}, hinted: 3, patterns,
+    });
+    localStorage.setItem("fh500.progress", JSON.stringify({
+      games: [game("a", { overbid: { slips: 2, loss: 180 }, overtake: { slips: 1, loss: 30 } }), game("b", { overtake: { slips: 2, loss: 50 } })],
+      quiz: { asked: 0, correct: 0 }, bidding: { asked: 0, correct: 0 }, puzzles: { asked: 0, correct: 0 },
+    }));
+  });
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Learn/ }).click();
+  const learn = page.getByRole("dialog", { name: "Learn" });
+  await learn.getByRole("tab", { name: "Progress" }).click();
+  const leaks = learn.locator(".leaks > li");
+  await expect(leaks).toHaveCount(2);
+  await expect(leaks.first()).toContainText("Bidding too high");
+  await expect(leaks.nth(1)).toContainText("Overtaking your partner");
+  await expect(learn.getByText(/leaving out 6 decisions made after a hint/)).toBeVisible();
+  await page.screenshot({ path: "test-results/learn-8-patterns.png", fullPage: true });
+  await leaks.first().getByRole("button", { name: /^Lesson:/ }).click();
+  await expect(learn.getByRole("heading", { name: /3\. Counting your hand/ })).toBeVisible();
+  await learn.getByRole("button", { name: "Close" }).click();
+
+  // A decision made after a hint is marked, and kept out of the record.
+  await page.evaluate(() => localStorage.removeItem("fh500.progress"));
+  await page.getByRole("button", { name: /^Play solo/ }).click();
+  await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Deal" }).click();
+  for (let i = 0; i < 400 && !(await page.locator(".hint-button:not([disabled])").count()); i++) await page.waitForTimeout(100);
+  await page.locator(".hint-button").click();
+  await expect(page.getByRole("note", { name: "Coach's hint" })).toBeVisible({ timeout: 30_000 });
+  await takeTurn(page);
+  await expect(page.getByRole("status", { name: "Coach's grade" })).toBeVisible({ timeout: 30_000 });
+  const stored = await page.evaluate(() => ({
+    grades: JSON.parse(localStorage.getItem("fh500.grades") ?? "[]") as { hinted?: boolean }[],
+    progress: JSON.parse(localStorage.getItem("fh500.progress") ?? "{}") as { games?: { decisions: number; hinted?: number }[] },
+  }));
+  expect(stored.grades[0]?.hinted).toBe(true);
+  const record = stored.progress.games?.at(-1);
+  expect(record?.hinted).toBe(1);
+  expect(record?.decisions).toBe(0);
+});
+
+test("your mistakes come back as puzzles", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass on desktop");
+  const { startGame } = await import("./helpers");
+  await startGame(page);
+  // Wait for our first call, and keep that position as if it had been a mistake.
+  await page.locator(".bidding-box").waitFor({ timeout: 30_000 });
+  await page.evaluate(() => {
+    const save = localStorage.getItem("fh500.save")!;
+    localStorage.setItem(
+      "fh500.mistakes",
+      JSON.stringify([{ save, phase: "bidding", chosenLabel: "9♦", bestLabel: "8♦", verdict: "blunder", date: "2026-10-18" }]),
+    );
+  });
+  await page.getByRole("button", { name: "Learn" }).click();
+  const learn = page.getByRole("dialog", { name: "Learn" });
+  await learn.getByRole("tab", { name: "Your mistakes" }).click();
+  await expect(learn.getByText(/You played 9♦, graded a blunder/)).toBeVisible();
+  await learn.locator(".bidding-box .call.pass:not([disabled]), .bidding-box .call:not([disabled])").first().click();
+  await expect(learn.getByRole("button", { name: "Next mistake" })).toBeVisible({ timeout: 30_000 });
+  await page.screenshot({ path: "test-results/learn-9-mistakes.png" });
+});

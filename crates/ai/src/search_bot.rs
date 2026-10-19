@@ -112,6 +112,11 @@ pub struct SearchConfig {
     /// Aggression of the rule bot used when search bidding is off. +0.7 won the lab's sweep
     /// (docs/lab/README.md, finding 6).
     pub rule_aggression: f32,
+    /// Make mentions and 6-calls (lab variants turn this off to measure what they're worth).
+    pub signal_calls: bool,
+    /// Notice who has shown out of a suit when imagining the hidden cards (lab variants turn
+    /// this off to measure what counting is worth).
+    pub track_voids: bool,
 }
 
 impl SearchConfig {
@@ -138,6 +143,8 @@ impl SearchConfig {
         // worth the time.
         search_discards: false,
         rule_aggression: 0.7,
+        signal_calls: true,
+        track_voids: true,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -214,7 +221,7 @@ impl SearchBot {
         let (declarer, contract) = obs.contract.expect("playing without a contract");
         let trump = contract.trump();
         let trick = obs.current_trick.clone().expect("playing phase has a trick");
-        let belief = Belief::new_with(obs, self.config.inference, self.config.inference && self.config.signals);
+        let belief = Belief::new_full(obs, self.config.inference, self.config.inference && self.config.signals, self.config.track_voids);
         let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
         let won_so_far = obs.tricks_won[declarer.team().index()];
 
@@ -595,6 +602,17 @@ impl Bot for SearchBot {
     fn choose(&mut self, obs: &Observation, legal: &[Action]) -> Action {
         if legal.len() == 1 {
             return legal[0];
+        }
+        if !self.config.signal_calls && obs.phase == Phase::Bidding {
+            // A lab variant that never mentions or calls 6: those become passes.
+            let plain: Vec<Action> = legal.iter().filter(|a| !matches!(a, Action::Call(Call::Mention(_) | Call::Six(_)))).copied().collect();
+            if plain.len() < legal.len() {
+                let mut variant = SearchConfig { signal_calls: true, ..self.config };
+                std::mem::swap(&mut self.config, &mut variant);
+                let action = self.choose(obs, &plain);
+                std::mem::swap(&mut self.config, &mut variant);
+                return action;
+            }
         }
         match obs.phase {
             Phase::Bidding if self.config.neural_bidding => match crate::models::bid_model() {

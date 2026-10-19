@@ -82,6 +82,18 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { signals: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (no signals)", config, seed)));
         }
+        "oracle-nocalls" => {
+            let config = SearchConfig { signal_calls: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (no mentions or 6-calls)", config, seed)));
+        }
+        "oracle-noinference" => {
+            let config = SearchConfig { inference: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (ignores what calls show)", config, seed)));
+        }
+        "oracle-novoids" => {
+            let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));
+        }
         "counter-search-kitty" => {
             let config = SearchConfig { search_discards: true, ..SearchConfig::COUNTER };
             return Some(Box::new(SearchBot::new("Counter (searched kitty)", config, seed)));

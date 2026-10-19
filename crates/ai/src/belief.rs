@@ -45,6 +45,12 @@ impl Belief {
 
     /// As [`Belief::new`], choosing separately whether to read discard signals.
     pub fn new_with(obs: &Observation, inference: bool, read_signals: bool) -> Belief {
+        Belief::new_full(obs, inference, read_signals, true)
+    }
+
+    /// As [`Belief::new_with`]; with `track_voids` off, shown-out suits aren't used (a player who
+    /// doesn't keep count). Signals are still read.
+    pub fn new_full(obs: &Observation, inference: bool, read_signals: bool, track_voids: bool) -> Belief {
         let me = obs.seat;
         let trump = obs.trump();
         let played = obs.played();
@@ -54,6 +60,8 @@ impl Belief {
 
         let mut played_by = [CardSet::EMPTY; 4];
         let mut void = [[false; 4]; 4];
+        // Shown-out suits, even when not tracked as voids: a first throw-off is still a signal.
+        let mut shown = [[false; 4]; 4];
         let mut signals: [Option<(Suit, Suit)>; 4] = [None; 4];
         for trick in obs.tricks.iter().chain(obs.current_trick.iter()) {
             let led = trick.led_suit();
@@ -61,8 +69,11 @@ impl Belief {
                 played_by[seat.index()].insert(card);
                 if let Some(led) = led {
                     if seat != trick.leader() && effective_suit(card, trump) != Some(led) {
-                        let first = !void[seat.index()].iter().any(|&v| v);
-                        void[seat.index()][led.index()] = true;
+                        let first = !shown[seat.index()].iter().any(|&v| v);
+                        shown[seat.index()][led.index()] = true;
+                        if track_voids {
+                            void[seat.index()][led.index()] = true;
+                        }
                         if first && read_signals && seat != me && !fh_core::rules::is_trump(card, trump) && !card.is_joker() {
                             signals[seat.index()] = effective_suit(card, trump).map(|s| (s, led));
                         }

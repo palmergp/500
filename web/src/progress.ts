@@ -14,6 +14,10 @@ export interface GameRecord {
   loss: number;
   lossByPhase: Partial<Record<Phase, number>>;
   decisionsByPhase: Partial<Record<Phase, number>>;
+  /** Decisions made after a hint: graded, but left out of everything above and below. */
+  hinted?: number;
+  /** Slips (inaccuracies or worse) by kind, for finding recurring leaks. */
+  patterns?: Record<string, { slips: number; loss: number }>;
 }
 
 export interface Score {
@@ -48,9 +52,18 @@ function save(progress: Progress) {
   }
 }
 
-/** Updates the record for game `id` from its grades. */
-export function recordGrades(id: string, grades: GradeView[], finished = false, won: boolean | null = null) {
+/** Updates the record for game `id` from its grades. Decisions made after a hint don't count: the
+ * hint shaped the choice, so it says nothing about how you play. */
+export function recordGrades(id: string, all: GradeView[], finished = false, won: boolean | null = null) {
   const progress = loadProgress();
+  const grades = all.filter((g) => !g.hinted);
+  const patterns: Record<string, { slips: number; loss: number }> = {};
+  for (const g of grades) {
+    if (!g.pattern || g.verdict === "best" || g.verdict === "good") continue;
+    const p = (patterns[g.pattern] ??= { slips: 0, loss: 0 });
+    p.slips++;
+    p.loss += g.loss;
+  }
   const verdicts: Record<Verdict, number> = { best: 0, good: 0, inaccuracy: 0, mistake: 0, blunder: 0 };
   const lossByPhase: Partial<Record<Phase, number>> = {};
   const decisionsByPhase: Partial<Record<Phase, number>> = {};
@@ -70,6 +83,8 @@ export function recordGrades(id: string, grades: GradeView[], finished = false, 
     loss: grades.reduce((s, g) => s + g.loss, 0),
     lossByPhase,
     decisionsByPhase,
+    hinted: all.length - grades.length,
+    patterns,
   };
   progress.games = [...progress.games.filter((g) => g.id !== id), record].slice(-200);
   save(progress);
@@ -80,6 +95,22 @@ export function recordScore(kind: "quiz" | "bidding" | "puzzles", correct: boole
   progress[kind].asked++;
   if (correct) progress[kind].correct++;
   save(progress);
+}
+
+/** Your costliest recurring slips over the last `games` games, worst first. */
+export function leaks(progress: Progress, games = 20): { pattern: string; slips: number; loss: number }[] {
+  const totals: Record<string, { slips: number; loss: number }> = {};
+  for (const game of progress.games.slice(-games)) {
+    for (const [pattern, p] of Object.entries(game.patterns ?? {})) {
+      const t = (totals[pattern] ??= { slips: 0, loss: 0 });
+      t.slips += p.slips;
+      t.loss += p.loss;
+    }
+  }
+  return Object.entries(totals)
+    .map(([pattern, t]) => ({ pattern, ...t }))
+    .filter((l) => l.slips >= 2)
+    .sort((a, b) => b.loss - a.loss);
 }
 
 export function resetProgress() {

@@ -210,3 +210,25 @@ fn bots_decide_only_from_what_they_can_see() {
     }
     assert!(leads >= 10, "checked {leads} opening leads");
 }
+
+/// The lab's "no mentions or 6-calls" variant really never signals in the auction.
+#[test]
+fn the_no_calls_variant_never_signals() {
+    use fh_core::{Action, Call, Game, Phase, Rules};
+    let signals = |persona: &str| {
+        let mut count = 0;
+        for seed in 0..60u64 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bot = fh_ai::make_bot(persona, seed).unwrap();
+            while game.phase() == Phase::Bidding && game.history().is_empty() {
+                let seat = game.to_act().unwrap();
+                let action = bot.choose(&game.observe(seat), &game.legal_actions());
+                count += usize::from(matches!(action, Action::Call(Call::Mention(_) | Call::Six(_))));
+                game.apply(action).unwrap();
+            }
+        }
+        count
+    };
+    assert!(signals("oracle") > 0, "the Oracle signals sometimes");
+    assert_eq!(signals("oracle-nocalls"), 0);
+}

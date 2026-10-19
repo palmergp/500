@@ -2090,3 +2090,27 @@ button.danger {
 .decision-deal h3 {
   margin-top: 14px;
 }
+
+/* ---- Your patterns (recurring leaks) -------------------------------------------------------- */
+
+.leaks {
+  padding-left: 1.2em;
+  display: grid;
+  gap: 10px;
+}
+.leak-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  align-items: baseline;
+}
+.leaks p {
+  margin: 4px 0 6px;
+}
+.hinted-tag {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 25%, transparent);
+}

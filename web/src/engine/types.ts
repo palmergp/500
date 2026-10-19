@@ -148,6 +148,10 @@ export interface GradeView {
   deal: number;
   /** For a card play, which trick of the hand (1–10). */
   trick: number | null;
+  /** What kind of slip this was, when the choice differs from the coach's (see learn/patterns.ts). */
+  pattern: string | null;
+  /** Set by the app: you asked for a hint on this decision, so it doesn't count toward your patterns. */
+  hinted?: boolean;
 }
 
 export interface TraceView {

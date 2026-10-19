@@ -110,6 +110,12 @@ pub fn drill_bidding(seed: u32) -> Result<JsValue, JsError> {
     to_js(&coach::drill_bidding(seed as u64).map_err(js_err)?)
 }
 
+/// A saved position (one of your past mistakes) as a puzzle: { view, save }.
+#[wasm_bindgen(js_name = coachPosition)]
+pub fn coach_position(save: &str) -> Result<JsValue, JsError> {
+    to_js(&coach::position(save).map_err(js_err)?)
+}
+
 /// A card-play puzzle: { view, save } at a South decision with one clearly best play.
 #[wasm_bindgen(js_name = drillPlay)]
 pub fn drill_play(seed: u32) -> Result<JsValue, JsError> {

@@ -14,7 +14,8 @@ export type Request =
   | { id: number; op: "trace"; save: string; number: number }
   | { id: number; op: "expert"; save: string; number: number }
   | { id: number; op: "drillBidding"; seed: number }
-  | { id: number; op: "drillPlay"; seed: number };
+  | { id: number; op: "drillPlay"; seed: number }
+  | { id: number; op: "position"; save: string };
 
 export type Response = { id: number; ok: true; result: unknown } | { id: number; ok: false; error: string };
 

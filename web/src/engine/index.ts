@@ -119,6 +119,11 @@ export class CoachClient extends WorkerClient implements Coach {
     return this.call("drillBidding", { seed }) as Promise<DrillView>;
   }
 
+  /** A saved position (one of your past mistakes), to replay as a puzzle. */
+  position(save: string): Promise<DrillView> {
+    return this.call("position", { save }) as Promise<DrillView>;
+  }
+
   /** A card-play puzzle: a position with one clearly best play. */
   drillPlay(seed: number): Promise<DrillView> {
     return this.call("drillPlay", { seed }) as Promise<DrillView>;

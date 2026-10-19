@@ -652,6 +652,75 @@ fn discard_reasons(obs: &Observation, plan: &[Card], chosen: Option<Action>) -> 
     reasons
 }
 
+// ---- Patterns: what kind of slip a decision was -------------------------------------------------
+
+/// What kind of decision `chosen` was, when it differs from the coach's `best`: a short id the
+/// trainer groups by to find a player's recurring leaks ("overbid", "draw-trumps", ...). `None`
+/// when the two are the same.
+pub fn slip_pattern(obs: &Observation, chosen: Action, best: Action) -> Option<&'static str> {
+    if chosen == best {
+        return None;
+    }
+    match (chosen, best) {
+        (Action::Call(mine), Action::Call(better)) => Some(match (mine, better) {
+            (Call::Bid(m), Call::Bid(b)) if m.level > b.level => "overbid",
+            (Call::Bid(m), Call::Bid(b)) if m.level < b.level => "underbid",
+            (Call::Bid(_), Call::Bid(_)) => "strain",
+            // A bid where the coach would pass or signal, or the other way round.
+            (Call::Bid(_), _) => "overbid",
+            (_, Call::Bid(_)) => "underbid",
+            (Call::Pass, Call::Six(_) | Call::Mention(_)) => "missed-signal",
+            _ => "signal",
+        }),
+        (Action::Play(mine), Action::Play(better)) => Some(play_pattern(obs, mine.card, better.card)),
+        (Action::Discard(card), _) => Some(discard_pattern(&[card], obs.trump())),
+        _ => None,
+    }
+}
+
+/// The pattern for a set of kitty discards that differs from the plan.
+pub fn discard_pattern(chosen: &[Card], trump: Option<fh_core::Suit>) -> &'static str {
+    if chosen.iter().any(|&c| is_trump(c, trump) || c.is_joker()) {
+        "kitty-trump"
+    } else if chosen.iter().any(|c| c.rank() == fh_core::cards::ACE) {
+        "kitty-ace"
+    } else {
+        "kitty"
+    }
+}
+
+fn play_pattern(obs: &Observation, mine: Card, better: Card) -> &'static str {
+    let trump = obs.trump();
+    let declaring = obs.declarer().is_some_and(|d| d.team() == obs.seat.team());
+    let trumpish = |c: Card| is_trump(c, trump) || c.is_joker();
+    let trick = obs.current_trick.clone().unwrap_or_else(|| Trick::new(obs.seat));
+    let Some(led) = trick.led_suit() else {
+        // Leading.
+        return match (declaring, trumpish(mine), trumpish(better)) {
+            (true, false, true) => "draw-trumps",
+            (true, true, false) => "trumps-early",
+            (true, _, _) => "declarer-lead",
+            (false, _, _) => "defense-lead",
+        };
+    };
+    let strength = |c: Card| fh_core::trick::trick_strength(c, led, trump);
+    let top = trick.winning_card(trump).map_or(0, strength);
+    let partner_winning = trick.winner(trump) == Some(obs.seat.partner());
+    let (wins_mine, wins_better) = (strength(mine) > top, strength(better) > top);
+    let follows = |c: Card| fh_core::effective_suit(c, trump) == Some(led);
+    if partner_winning && wins_mine && !wins_better {
+        "overtake"
+    } else if !wins_mine && wins_better {
+        "missed-win"
+    } else if wins_mine && !wins_better {
+        "spent-winner"
+    } else if !follows(mine) && !follows(better) && !trumpish(mine) && !trumpish(better) {
+        "throw-off"
+    } else {
+        "follow"
+    }
+}
+
 // ---- Hindsight: the double-dummy trace ------------------------------------------------------
 
 /// One card played, judged with every card visible.
@@ -724,6 +793,39 @@ pub fn expert_replay(mut game: fh_core::Game, players: [&str; 4], seat: Seat, se
 mod tests {
     use super::*;
     use fh_core::{Game, Rules};
+
+    /// Slips are tagged by kind, so the trainer can find a player's recurring leaks.
+    #[test]
+    fn slips_are_tagged_by_kind() {
+        let bid = |level, strain| Action::Call(Call::Bid(Contract::new(level, strain)));
+        let start = Game::new(Rules::default(), 4);
+        let obs = start.observe(start.to_act().unwrap());
+        assert_eq!(slip_pattern(&obs, bid(9, Strain::Diamonds), bid(8, Strain::Diamonds)), Some("overbid"));
+        assert_eq!(slip_pattern(&obs, Action::Call(Call::Pass), bid(7, Strain::Hearts)), Some("underbid"));
+        assert_eq!(slip_pattern(&obs, bid(7, Strain::Spades), bid(7, Strain::NoTrumps)), Some("strain"));
+        assert_eq!(slip_pattern(&obs, Action::Call(Call::Pass), Action::Call(Call::Six(Strain::Hearts))), Some("missed-signal"));
+        assert_eq!(slip_pattern(&obs, bid(8, Strain::Diamonds), bid(8, Strain::Diamonds)), None);
+
+        // The declarer's opening lead: a side suit instead of a trump, and the reverse.
+        let south = CardSet::parse("Joker JD QD 9D 7D 4D KS QS TS 5S").unwrap();
+        let kitty = CardSet::parse("4H 5H 5C").unwrap();
+        let rest: Vec<Card> = CardSet::pack().minus(south).minus(kitty).iter().collect();
+        let hand = |i: usize| rest[i * 10..i * 10 + 10].iter().copied().collect::<CardSet>();
+        let mut game = Game::from_deal(Rules::default(), 1, Seat::SOUTH, [south, hand(0), hand(1), hand(2)], kitty);
+        for _ in 0..3 {
+            game.apply(Action::Call(Call::Pass)).unwrap();
+        }
+        game.apply(bid(8, Strain::Diamonds)).unwrap();
+        for card in kitty.iter() {
+            game.apply(Action::Discard(card)).unwrap();
+        }
+        let obs = game.observe(Seat::SOUTH);
+        let play = |c: &str| Action::Play(Play::card(Card::parse(c).unwrap()));
+        assert_eq!(slip_pattern(&obs, play("5S"), play("JD")), Some("draw-trumps"));
+        assert_eq!(slip_pattern(&obs, play("JD"), play("KS")), Some("trumps-early"));
+        assert_eq!(discard_pattern(&[Card::JOKER], obs.trump()), "kitty-trump");
+        assert_eq!(discard_pattern(&[Card::parse("AS").unwrap()], obs.trump()), "kitty-ace");
+    }
 
     /// Bidding a level too high is explained by the swing: little to gain, much to lose.
     #[test]

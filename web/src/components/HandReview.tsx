@@ -134,6 +134,11 @@ export function DecisionList({ grades }: { grades: GradeView[] }) {
                   <strong>{g.phase === "discarding" && g.chosenLabel.includes(" ") ? `Put back ${g.chosenLabel}` : g.chosenLabel}</strong>
                   {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · better: {g.bestLabel}</>}
                   {g.loss >= 1 && <span className="loss"> (−{Math.round(g.loss)})</span>}
+                  {g.hinted && (
+                    <span className="hinted-tag" title="You asked for a hint on this decision, so it doesn't count toward your patterns">
+                      after a hint
+                    </span>
+                  )}
                 </summary>
                 {g.reasons.length > 0 ? (
                   <ul>

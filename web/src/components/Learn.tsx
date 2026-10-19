@@ -2,14 +2,16 @@ import { useEffect, useRef, useState } from "react";
 import type { ActionView, CardView, CoachClient, DrillView, GradeView } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { LESSONS, type Lesson } from "../learn/lessons";
-import { loadProgress, recordScore, resetProgress, type Progress } from "../progress";
+import { leaks, loadProgress, recordScore, resetProgress, type Progress } from "../progress";
+import { PATTERNS } from "../learn/patterns";
+import { loadMistakes, solveMistake, type Mistake } from "../mistakes";
 import { BiddingBox } from "./BiddingBox";
 import { Card } from "./Card";
 import { VerdictChip } from "./Coach";
 import { Dialog } from "./Dialog";
 import { TableView } from "./TableView";
 
-type Tab = "lessons" | "bidding" | "puzzles" | "progress";
+type Tab = "lessons" | "bidding" | "puzzles" | "mistakes" | "progress";
 
 const DONE_KEY = "fh500.lessonsDone";
 
@@ -36,10 +38,13 @@ function randomSeed() {
 /** Lessons, drills and progress. */
 export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("lessons");
+  /** A lesson to open, from a pattern on the Progress tab. */
+  const [lesson, setLesson] = useState<string | null>(null);
   const tabs: [Tab, string][] = [
     ["lessons", "Lessons"],
     ["bidding", "Bidding trainer"],
     ["puzzles", "Play puzzles"],
+    ["mistakes", "Your mistakes"],
     ["progress", "Progress"],
   ];
   return (
@@ -51,19 +56,27 @@ export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: 
           </button>
         ))}
       </div>
-      {tab === "lessons" && <Lessons />}
+      {tab === "lessons" && <Lessons key={lesson ?? ""} initial={lesson} />}
       {tab === "bidding" && <BiddingTrainer coach={coach} />}
       {tab === "puzzles" && <Puzzles coach={coach} />}
-      {tab === "progress" && <ProgressView />}
+      {tab === "mistakes" && <MyMistakes coach={coach} />}
+      {tab === "progress" && (
+        <ProgressView
+          onLesson={(id) => {
+            setLesson(id);
+            setTab("lessons");
+          }}
+        />
+      )}
     </Dialog>
   );
 }
 
 // ---- Lessons --------------------------------------------------------------------------------
 
-function Lessons() {
+function Lessons({ initial }: { initial?: string | null }) {
   const [done, setDone] = useState<string[]>(loadDone);
-  const [open, setOpen] = useState<Lesson | null>(null);
+  const [open, setOpen] = useState<Lesson | null>(() => LESSONS.find((l) => l.id === initial) ?? null);
   if (open) {
     return (
       <LessonView
@@ -335,12 +348,117 @@ function Puzzles({ coach }: { coach: CoachClient | null }) {
   );
 }
 
+// ---- Your own mistakes, replayed ------------------------------------------------------------
+
+/** Positions from your games where you made a mistake or a blunder, to try again. A good answer
+ * clears the puzzle; a miss keeps it for later. */
+function MyMistakes({ coach }: { coach: CoachClient | null }) {
+  const [list, setList] = useState<Mistake[]>(() => loadMistakes().reverse());
+  const [index, setIndex] = useState(0);
+  const [drill, setDrill] = useState<DrillView | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [grade, setGrade] = useState<GradeView | null>(null);
+  const [jokerLeads, setJokerLeads] = useState<ActionView[] | null>(null);
+  const current = list[index] ?? null;
+  useEffect(() => {
+    setDrill(null);
+    setError(null);
+    if (!coach || !current) return;
+    coach.position(current.save).then(setDrill, (e: unknown) => setError(String(e)));
+  }, [coach, current]);
+  if (!coach) return <p>The coach is still starting.</p>;
+  if (list.length === 0) {
+    return (
+      <p>
+        No mistakes saved yet. When the coach grades one of your bids or cards in a game on this device a mistake or a blunder (and you hadn't
+        asked for a hint), the position is kept here so you can try it again.
+      </p>
+    );
+  }
+  if (!current) {
+    return (
+      <div>
+        <p>That's all of them for now.</p>
+        <button type="button" className="primary" onClick={() => { setList(loadMistakes().reverse()); setIndex(0); }}>
+          Start again with the ones left ({loadMistakes().length})
+        </button>
+      </div>
+    );
+  }
+  if (error) return <p>Couldn't rebuild that position: {error}</p>;
+  if (!drill) return <p className="waiting-text">Setting up the position…</p>;
+  const view = drill.view;
+  const choose = (i: number) => {
+    if (grade) return;
+    setJokerLeads(null);
+    gradeDrill(coach, drill, i).then((g) => {
+      if (!g) return;
+      setGrade(g);
+      recordScore("puzzles", g.verdict === "best" || g.verdict === "good");
+      if (g.verdict === "best" || g.verdict === "good") solveMistake(current.save);
+    });
+  };
+  const next = () => {
+    setGrade(null);
+    setIndex((i) => i + 1);
+  };
+  const clickCard = (card: CardView) => {
+    if (grade) return;
+    const plays = view.legal.filter((a) => a.card === card.id);
+    if (plays.length === 1) choose(plays[0].index);
+    else if (plays.length > 1) setJokerLeads(plays);
+  };
+  const legal = new Set(view.legal.map((a) => a.card));
+  return (
+    <div className={`drill${current.phase === "playing" ? " puzzle" : ""}`}>
+      <p>
+        From your game on {current.date} ({index + 1} of {list.length}). You played <strong>{current.chosenLabel}</strong>, graded a{" "}
+        {current.verdict}. What's the better choice?
+      </p>
+      {current.phase === "bidding" ? (
+        <>
+          <p className="auction-line">
+            {view.calls.length === 0 ? <span>You speak first.</span> : view.calls.map((c, i) => <span key={i}>{SEAT_NAMES[c.seat]}: <strong>{c.label}</strong></span>)}
+          </p>
+          <HandRow cards={view.hand} label="Your hand" />
+          {grade ? (
+            <DrillResult grade={grade} nextLabel="Next mistake" onNext={next} />
+          ) : (
+            <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={choose} />
+          )}
+        </>
+      ) : (
+        <TableView view={view} trick={view.trick} trumpsUnseen={view.trumpsUnseen} showVoids>
+          {jokerLeads && (
+            <div className="joker-choice">
+              Lead the Joker and name a suit:
+              {jokerLeads.map((a) => (
+                <button key={a.index} type="button" className="call" onClick={() => choose(a.index)}>
+                  {SUIT_SYMBOL[a.namedSuit!]}
+                </button>
+              ))}
+            </div>
+          )}
+          {grade && <DrillResult grade={grade} nextLabel="Next mistake" onNext={next} />}
+          <div className="hand" aria-label="Your hand">
+            {view.hand.map((card) => (
+              <Card key={card.id} card={card} playable={!grade && legal.has(card.id)} onClick={!grade && legal.has(card.id) ? () => clickCard(card) : undefined} />
+            ))}
+          </div>
+        </TableView>
+      )}
+    </div>
+  );
+}
+
 // ---- Progress -------------------------------------------------------------------------------
 
 const VERDICTS = ["best", "good", "inaccuracy", "mistake", "blunder"] as const;
 
-function ProgressView() {
+function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
   const [progress, setProgress] = useState<Progress>(loadProgress);
+  const myLeaks = leaks(progress).slice(0, 3);
+  const hinted = progress.games.reduce((s, g) => s + (g.hinted ?? 0), 0);
   const games = progress.games.filter((g) => g.decisions > 0);
   const decisions = games.reduce((s, g) => s + g.decisions, 0);
   const totals = VERDICTS.map((v) => games.reduce((s, g) => s + g.verdicts[v], 0));
@@ -373,6 +491,42 @@ function ProgressView() {
           <span className="stat-label">play puzzles ({progress.puzzles.asked})</span>
         </div>
       </div>
+
+      <h4>Your patterns</h4>
+      {myLeaks.length === 0 ? (
+        <p className="note">
+          Play a few more graded hands: your most costly recurring slips will show here, with what to practice. Decisions made after you ask for a
+          hint don't count, since the hint shaped them.
+        </p>
+      ) : (
+        <>
+          <p className="note">
+            Your costliest recurring slips over your last 20 games{hinted ? `, leaving out ${hinted} decisions made after a hint` : ""}.
+          </p>
+          <ol className="leaks">
+            {myLeaks.map((l) => {
+              const p = PATTERNS[l.pattern];
+              const lessonTitle = LESSONS.find((x) => x.id === p?.lesson)?.title;
+              return (
+                <li key={l.pattern}>
+                  <div className="leak-head">
+                    <strong>{p?.title ?? l.pattern}</strong>
+                    <span className="loss">
+                      {l.slips} times, about {Math.round(l.loss)} points in all
+                    </span>
+                  </div>
+                  {p && <p>{p.advice}</p>}
+                  {p && lessonTitle && (
+                    <button type="button" onClick={() => onLesson(p.lesson)}>
+                      Lesson: {lessonTitle}
+                    </button>
+                  )}
+                </li>
+              );
+            })}
+          </ol>
+        </>
+      )}
 
       {decisions > 0 && (
         <>
