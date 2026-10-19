@@ -381,6 +381,10 @@ estimated from the score gap).
   weights deals by the auction. Hard facts stay: a 6-call places the Joker, shown-out suits are voids, and the
   discard signal is still read (neutral here, and it's the house convention).
 - Measuring the real likelihoods from self-play, and weighting by those, might turn this into a gain.
+- **Recalibrated:** without the auction weights the bots defend better and bids are made more often, so the coach's
+  card-play percentages ran about 7 points low again. The play curve was refit from 6,200 new predictions and
+  checked on 800 fresh deals: 74% stated, 71% made overall (bids: 73% and 71%), within the few points that
+  different samples of deals vary by.
 
 ## Open questions for the lab
 

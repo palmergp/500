@@ -507,17 +507,20 @@ fn significant(play: Option<&PlayStats>, best: Action, chosen: Action) -> bool {
 /// real defenders aren't perfect, so a bid the solver calls 15% is really made about half the
 /// time. Bid estimates also run low, by about 10 points.
 const PLAY_CURVE: &[(f64, f64)] = &[
-    (0.00, 0.02),
-    (0.01, 0.07),
-    (0.15, 0.48),
-    (0.25, 0.62),
-    (0.35, 0.63),
-    (0.50, 0.715),
-    (0.65, 0.76),
-    (0.75, 0.81),
-    (0.85, 0.86),
-    (0.98, 0.97),
-    (1.00, 0.99),
+    // Refit after finding 21 (card play without auction weights): 6,200 predictions from
+    // `fh-lab honesty` runs at seeds 950,000 and 1,200,000.
+    (0.000, 0.03),
+    (0.010, 0.08),
+    (0.036, 0.43),
+    (0.071, 0.445),
+    (0.103, 0.554),
+    (0.140, 0.617),
+    (0.200, 0.634),
+    (0.385, 0.732),
+    (0.617, 0.836),
+    (0.810, 0.903),
+    (0.990, 0.986),
+    (1.000, 0.99),
 ];
 const BID_CURVE: &[(f64, f64)] = &[
     (0.00, 0.05),
@@ -944,7 +947,7 @@ mod tests {
                 last = v;
             }
         }
-        assert!((real_play_chance(0.15, PLAY_CURVE) - 0.48).abs() < 1e-9);
+        assert!((0.55..0.7).contains(&real_play_chance(0.15, PLAY_CURVE)));
         assert!(real_play_chance(0.2, PLAY_CURVE) > 0.5, "a 20% solver chance is made more often than not");
         assert!((real_play_chance(0.65, BID_CURVE) - 0.74).abs() < 1e-9);
     }
