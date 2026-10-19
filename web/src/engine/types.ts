@@ -150,8 +150,16 @@ export interface GradeView {
   trick: number | null;
   /** What kind of slip this was, when the choice differs from the coach's (see learn/patterns.ts). */
   pattern: string | null;
+  /** What `loss` measures: points, or (near the end of a game, and in short games) the chance to win the
+   * game in tenths of a percent. */
+  units?: "points" | "win";
   /** Set by the app: you asked for a hint on this decision, so it doesn't count toward your patterns. */
   hinted?: boolean;
+}
+
+/** A grade's cost, in its own units: "37 pts", or "3.7% to win" near the end of a game. */
+export function lossText(g: { loss: number; units?: "points" | "win" }): string {
+  return g.units === "win" ? `${(g.loss / 10).toFixed(1)}% to win` : `${Math.round(g.loss)} pts`;
 }
 
 export interface TraceView {

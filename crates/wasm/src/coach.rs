@@ -51,6 +51,9 @@ pub struct GradeView {
     /// What kind of slip this was, when the choice differs from the coach's ("overbid",
     /// "draw-trumps", "kitty-trump", ...): the trainer groups these to find recurring leaks.
     pub pattern: Option<&'static str>,
+    /// What `loss` measures: "points", or "win" (tenths of a percent of the chance to win the game,
+    /// near the end of a game or in a short game).
+    pub units: &'static str,
 }
 
 fn label(action: Action) -> String {
@@ -66,6 +69,13 @@ fn options_view(options: &[OptionEval], legal: &[Action]) -> Vec<OptionView> {
             Some(OptionView { index, label: label(o.action), ev: o.ev, makes: o.makes })
         })
         .collect()
+}
+
+fn units_label(units: fh_ai::coach::Units) -> &'static str {
+    match units {
+        fh_ai::coach::Units::Points => "points",
+        fh_ai::coach::Units::WinChance => "win",
+    }
 }
 
 fn parse(save: &str) -> Result<SaveData, String> {
@@ -133,6 +143,7 @@ pub fn grade_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<Gr
         deal: game.history().len() + 1,
         trick: (obs.phase == Phase::Playing).then(|| obs.tricks.len() as u8 + 1),
         pattern: fh_ai::coach::slip_pattern(&obs, chosen, grade.best),
+        units: units_label(grade.analysis.units),
     }))
 }
 
@@ -173,6 +184,7 @@ pub fn grade_discards_for(save: &SaveData, number: usize, seat: Seat) -> Result<
         loss: grade.loss,
         options: vec![],
         pattern: (grade.loss > 0.0).then(|| fh_ai::coach::discard_pattern(&grade.chosen, obs.trump())),
+        units: units_label(fh_ai::coach::Units::of(&obs)),
         reasons: grade.reasons,
         deal: game.history().len() + 1,
         trick: None,

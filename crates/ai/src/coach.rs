@@ -10,7 +10,7 @@ use crate::cardplay::{is_boss, trumps};
 use crate::evaluate::has_bower;
 use crate::thumb;
 use crate::rule_bot::{heuristic_discards, RuleBot, Style};
-use crate::search_bot::{PlayStat, PlayStats, SearchBot, SearchConfig};
+use crate::search_bot::{Goal, PlayStat, PlayStats, SearchBot, SearchConfig};
 use crate::solver::{Position, Solver};
 use crate::Bot;
 use fh_core::rules::is_trump;
@@ -63,6 +63,48 @@ pub struct OptionEval {
     pub makes: Option<f64>,
 }
 
+/// What the coach's values measure. Near the end of a game (and in a short game) it plays for the
+/// game, not the points (docs/lab/README.md, finding 20): values are then the chance of winning
+/// in tenths of a percent, so 10 is 1% and the grading scale reads them like points.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Units {
+    Points,
+    WinChance,
+}
+
+impl Units {
+    /// The units for a position.
+    pub fn of(obs: &Observation) -> Units {
+        if plays_for_the_game(obs) {
+            Units::WinChance
+        } else {
+            Units::Points
+        }
+    }
+
+    /// "about 12 points" or "about 1.2% of games", for a value difference.
+    pub fn worth(self, diff: f64) -> String {
+        match self {
+            Units::Points => format!("about {diff:.0} points"),
+            Units::WinChance => format!("about {:.1}% of games", diff / 10.0),
+        }
+    }
+
+    /// "A is worth about 12 points more than B" or "A wins the game about 1.2% more often than B".
+    pub fn compare(self, a: &str, b: &str, diff: f64) -> String {
+        match self {
+            Units::Points => format!("{a} is worth about {diff:.0} points more than {b}"),
+            Units::WinChance => format!("{a} wins the game about {:.1}% more often than {b}", diff / 10.0),
+        }
+    }
+}
+
+/// Whether the coach plays for the game rather than for points: a short game, or either side
+/// within 160 of the target.
+pub fn plays_for_the_game(obs: &Observation) -> bool {
+    obs.rules.hand_limit.is_some() || obs.scores.iter().any(|&s| s >= obs.rules.target_score - 160)
+}
+
 #[derive(Clone, Debug)]
 pub struct Analysis {
     /// Options, best first.
@@ -78,6 +120,8 @@ pub struct Analysis {
     /// The hint's note on those close calls ("Close call: K♠ does about as well…"). A grade
     /// says something about the player's own card instead.
     close_note: Option<String>,
+    /// What `options[].ev` measures.
+    pub units: Units,
     /// Card play only: the raw statistics, for paired comparisons.
     play: Option<PlayStats>,
 }
@@ -107,6 +151,8 @@ pub struct DiscardGrade {
 pub struct Coach {
     search: SearchBot,
     rules_bot: RuleBot,
+    /// The units of the analysis under way (for the wording of its reasons).
+    units: Units,
 }
 
 impl Coach {
@@ -117,6 +163,7 @@ impl Coach {
         Coach {
             search: SearchBot::new("Coach", config, seed),
             rules_bot: RuleBot::new("Coach", Style { aggression: SearchConfig::COUNTER.rule_aggression, ..Style::STEADY }, seed),
+            units: Units::Points,
         }
     }
 
@@ -129,11 +176,20 @@ impl Coach {
 
     /// As [`Coach::analyze`], leaving the close-call note out of the reasons.
     fn analyze_options(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
+        let units = if plays_for_the_game(obs) { Units::WinChance } else { Units::Points };
+        self.search.set_goal(if units == Units::WinChance { Goal::WinChance } else { Goal::Points });
+        self.units = units;
+        let mut analysis = self.analyze_by_phase(obs, legal, chosen);
+        analysis.units = units;
+        analysis
+    }
+
+    fn analyze_by_phase(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
         match obs.phase {
             Phase::Playing => self.analyze_play(obs, legal, chosen),
             Phase::Bidding => self.analyze_call(obs, legal, chosen),
             Phase::Discarding => self.analyze_discard(obs, legal, chosen),
-            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, close: vec![], close_note: None, play: None },
+            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, close: vec![], close_note: None, units: Units::Points, play: None },
         }
     }
 
@@ -212,7 +268,7 @@ impl Coach {
             .collect();
         let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
         let close_note = (!close.is_empty()).then(|| close_call_reason(&result, best, &close));
-        Analysis { options, best, reasons, worlds: result.worlds, close, close_note, play: Some(result) }
+        Analysis { options, best, reasons, worlds: result.worlds, close, close_note, units: Units::Points, play: Some(result) }
     }
 
     // ---- Bidding -----------------------------------------------------------------------------
@@ -261,7 +317,7 @@ impl Coach {
         options.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.insert(0, first);
         let reasons = call_reasons(obs, recommended, chosen, &options, high);
-        Analysis { best: recommended, options, reasons, worlds: worlds.len(), close: vec![], close_note: None, play: None }
+        Analysis { best: recommended, options, reasons, worlds: worlds.len(), close: vec![], close_note: None, units: Units::Points, play: None }
     }
 
     /// Bidding analysis with the neural evaluator: the same numbers The Oracle bids by, for every
@@ -288,7 +344,7 @@ impl Coach {
         others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.extend(others.into_iter().take(2));
         let reasons = call_reasons(obs, recommended, chosen, &options, obs.auction.high_bid());
-        Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], close_note: None, play: None }
+        Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], close_note: None, units: Units::Points, play: None }
     }
 
     fn search_rng(&mut self) -> fh_core::Rng {
@@ -312,7 +368,7 @@ impl Coach {
             options.push(OptionEval { action: c, ev: mine_ev, makes: None });
         }
         let reasons = discard_reasons(obs, &plan, chosen);
-        Analysis { options, best, reasons, worlds: 12, close: vec![], close_note: None, play: None }
+        Analysis { options, best, reasons, worlds: 12, close: vec![], close_note: None, units: Units::Points, play: None }
     }
 
     /// Grades a whole discard: `chosen` against the coach's plan, from `obs`, the declarer's
@@ -331,7 +387,7 @@ impl Coach {
             let (plan_ev, chosen_ev) = self.compare_discards(obs, &plan, chosen);
             let loss = (plan_ev - chosen_ev).max(0.0);
             if loss >= 2.0 {
-                reasons.push(format!("The plan averages {loss:.0} points more than your discards across 12 likely deals."));
+                reasons.push(format!("{} across 12 likely deals.", self.units.compare("The plan", "your discards", loss)));
             } else {
                 reasons.push("Your discards do about as well as the plan.".into());
             }
@@ -523,10 +579,8 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
                 pct(side(cs.makes))
             )),
             (Some(c), Some(cs)) if b.ev - cs.ev >= 2.0 => reasons.push(format!(
-                "{} averages {:.0} points more than {} across {worlds} likely deals.",
-                best_play.card,
-                b.ev - cs.ev,
-                c.card
+                "{} across {worlds} likely deals.",
+                Units::of(obs).compare(&best_play.card.to_string(), &c.card.to_string(), b.ev - cs.ev)
             )),
             (None, _) => reasons.push(format!("The bid {goal} in {} of likely deals after this play.", pct(side(b.makes)))),
             _ => {}
@@ -657,7 +711,7 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     if let (Some(c), Some(b)) = (chosen.filter(|&c| c != best), ev(best)) {
         if let Some(o) = ev(c) {
             if b.ev - o.ev >= 5.0 {
-                reasons.push(format!("{} rates about {:.0} points better than {} here.", call_label(best), b.ev - o.ev, call_label(c)));
+                reasons.push(format!("{} here.", Units::of(obs).compare(&call_label(best), &call_label(c), b.ev - o.ev)));
             }
         }
         if hand.contains(Card::JOKER) && !matches!(c, Action::Call(Call::Six(_) | Call::Bid(_))) && matches!(best, Action::Call(Call::Six(_))) {
@@ -838,6 +892,46 @@ pub fn expert_replay(mut game: fh_core::Game, players: [&str; 4], seat: Seat, se
 mod tests {
     use super::*;
     use fh_core::{Game, Rules};
+
+    /// Near the end the coach plays for the game: behind with the opponents near 500, it bids
+    /// light hands, and high enough to reach 500, more often than at the start (finding 20).
+    #[test]
+    fn near_the_end_the_coach_plays_for_the_game() {
+        let (mut early, mut late, mut cases) = ([0, 0], [0, 0], 0);
+        for seed in 0..400u64 {
+            let mut game = Game::with_dealer(Rules::default(), seed, Seat::EAST);
+            let obs = game.observe(Seat::SOUTH);
+            let Some((strain, count)) = [Strain::Spades, Strain::Clubs, Strain::Diamonds]
+                .into_iter()
+                .map(|s| (s, crate::thumb::count(&obs, s).0))
+                .max_by(|a, b| a.1.total_cmp(&b.1))
+            else {
+                continue;
+            };
+            if !(6.5..7.5).contains(&count) {
+                continue;
+            }
+            cases += 1;
+            let legal = game.legal_actions();
+            let tally = |a: &Analysis, t: &mut [usize; 2]| {
+                if let Action::Call(Call::Bid(c)) = a.best {
+                    t[0] += 1;
+                    t[1] += usize::from(c.level >= 8 && c.strain == strain);
+                }
+            };
+            let first = Coach::new(seed).analyze(&obs, &legal, None);
+            assert_eq!(first.units, Units::Points);
+            tally(&first, &mut early);
+            game.set_scores([300, 460]); // South's side behind, the opponents near 500
+            let obs = game.observe(Seat::SOUTH);
+            let end = Coach::new(seed).analyze(&obs, &legal, None);
+            assert_eq!(end.units, Units::WinChance);
+            tally(&end, &mut late);
+        }
+        assert!(cases >= 20, "{cases} light hands");
+        assert!(late[0] > early[0], "bids: {late:?} near the end vs {early:?} at the start, of {cases}");
+        assert!(late[1] > early[1], "8-level bids: {late:?} vs {early:?}");
+    }
 
     /// The real-play curves are increasing, and lift the solver's pessimistic low chances.
     #[test]

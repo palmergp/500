@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import type { Coach, ExpertView, GradeView, HandView, PlayerView, TraceView } from "../engine";
-import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
+import { lossText, SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { Card } from "./Card";
 import { VerdictChip } from "./Coach";
 
@@ -133,7 +133,7 @@ export function DecisionList({ grades }: { grades: GradeView[] }) {
                   <span className="decision-when">{decisionLabel(g)}</span> <VerdictChip verdict={g.verdict} />{" "}
                   <strong>{g.phase === "discarding" && g.chosenLabel.includes(" ") ? `Put back ${g.chosenLabel}` : g.chosenLabel}</strong>
                   {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · better: {g.bestLabel}</>}
-                  {g.loss >= 1 && <span className="loss"> (−{Math.round(g.loss)})</span>}
+                  {g.loss >= 1 && <span className="loss"> (−{lossText(g)})</span>}
                   {g.hinted && (
                     <span className="hinted-tag" title="You asked for a hint on this decision, so it doesn't count toward your patterns">
                       after a hint

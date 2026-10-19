@@ -1,5 +1,5 @@
 import type { CardView, GradeView, HintView, Verdict } from "../engine";
-import { SUIT_SYMBOL } from "../engine";
+import { lossText, SUIT_SYMBOL } from "../engine";
 
 const VERDICT_TEXT: Record<Verdict, string> = {
   best: "Best",
@@ -68,7 +68,7 @@ export function GradeBar({ grade, onUndo, onClose }: { grade: GradeView; onUndo?
           {!fine && (
             <>
               {" "}
-              · better: <strong>{grade.bestLabel}</strong> <span className="loss">(−{Math.round(grade.loss)} pts)</span>
+              · better: <strong>{grade.bestLabel}</strong> <span className="loss">(−{lossText(grade)})</span>
             </>
           )}
         </span>

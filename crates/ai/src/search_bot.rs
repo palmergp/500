@@ -180,6 +180,11 @@ impl SearchBot {
         &self.config
     }
 
+    /// What to optimize from now on: points, or the chance of winning the game.
+    pub fn set_goal(&mut self, goal: Goal) {
+        self.config.goal = goal;
+    }
+
     /// A fresh seed from the bot's random stream, for callers that sample worlds themselves.
     pub fn next_seed(&mut self) -> u64 {
         self.rng.next_u64()

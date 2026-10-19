@@ -28,6 +28,9 @@
 - The coach's card-play analysis takes a closer look (up to 64 more deals) when its best play isn't clearly ahead of
   the next different play, and reports plays it still can't separate as close calls (`Analysis::close`), so a near
   tie never reads as a firm answer. Its significance test weights deals as the averages do (effective sample size).
+- Near the end of a game (either side within 160 of 500) and in short games the coach plays for the game
+  (`plays_for_the_game`, `Units::WinChance`): values are tenths of a percent of the chance to win, and grades
+  carry `units: "win"`. Displayed make chances go through the measured real-play curves (`real_play_chance`).
 - Neural bidding: `fh-lab dataset` writes training data (inputs defined in `crates/ai/src/features.rs`), then
   `train/.venv/Scripts/python train/train_bid.py` writes `crates/ai/models/bid.fhnn`, embedded at build time.
   `train/rules_of_thumb.py` measures the counting rules in `docs/rules-of-thumb.md`.
