@@ -10,7 +10,8 @@
 - `web/`: Vite + React + TypeScript app. `web/src/engine/types.ts` mirrors `crates/wasm/src/view.rs` — keep them in sync.
 - Bots and hints must only use `Game::observe(seat)`, never `Game::hand` of another seat. The coach's advice must
   also never depend on who the other players are (their personas): it reads every player's calls and cards the
-  same way. Tests: `advice_depends_only_on_what_you_can_see` (fh-ai), `advice_ignores_who_the_other_players_are` (fh-wasm).
+  same way. Tests: `advice_depends_only_on_what_you_can_see` (fh-ai), `advice_ignores_who_the_other_players_are` (fh-wasm),
+  and for every bot persona `bots_decide_only_from_what_they_can_see` (fh-ai tests/behavior.rs).
 - Say "bid" to players, never "contract" (the user's table's word); code may keep `contract`.
 - The table must never make the page scroll (`web/e2e/layout.spec.ts`): panels go in the side rail
   (wide screens) or the dock above the middle, and only a panel itself may scroll.

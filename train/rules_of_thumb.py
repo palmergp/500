@@ -117,14 +117,40 @@ def breakeven(value: int):
     return 0.5 + 15 / value
 
 
+def made(tricks, level):
+    """How often a bid of `level` is made in real play. `tricks` are solver tricks less DD_BIAS;
+    real play runs half a trick below the solver on average, so a deal the solver makes with
+    exactly the bid counts as half made (real play takes the solver's count or one fewer, equally
+    often). Counting it as a failure, as an earlier version did, charged a whole trick."""
+    dd = tricks + DD_BIAS
+    return ((dd >= level + 1) + 0.5 * (dd == level)).mean()
+
+
 def threshold(estimate, tricks, level, value):
     """Smallest estimate (in 0.25 steps) from which the contract makes often enough to pay."""
     need = breakeven(value)
     for e in np.arange(4.0, 10.01, 0.25):
         sel = (estimate >= e - 0.25) & (estimate < e + 0.25)
-        if sel.sum() >= 40 and (tricks[sel] >= level).mean() >= need:
-            return e, (tricks[sel] >= level).mean(), sel.sum()
+        if sel.sum() >= 40 and made(tricks[sel], level) >= need:
+            return e, made(tricks[sel], level), sel.sum()
     return None
+
+
+def step_up(estimate, tricks, t, value8):
+    """Points gained on average by bidding 9 instead of 8 in suit `t`, by estimate. Going up adds
+    100 when 9 is made; taking exactly 8 turns +value8 into -(value8 + 100); fewer costs 100."""
+    rows = []
+    for e in np.arange(8.0, 11.01, 0.5):
+        sel = (estimate >= e - 0.25) & (estimate < e + 0.25)
+        if sel.sum() < 30:
+            continue
+        dd = tricks[sel] + DD_BIAS
+        gain = 0.0
+        for real in (dd, dd - 1):  # equally likely, as in made()
+            exactly8 = real == 8
+            gain += 0.5 * np.where(real >= 9, 100, np.where(exactly8, -(2 * value8 + 100), -100)).mean()
+        rows.append((e, made(tricks[sel], 9), gain, sel.sum()))
+    return rows
 
 
 def main():
@@ -149,6 +175,7 @@ def main():
         target.append(y[ok, t].astype(float) - DD_BIAS)
     features = {k: np.concatenate(v) for k, v in rows.items()}
     tricks = np.concatenate(target)
+    suit_of = np.concatenate([np.full((y[:, t] != 255).sum(), t) for t in range(4)])
     names, coef, se, r2, estimate = fit(features, tricks)
     print("## Suit contracts: tricks your side takes as declarer (real-play scale)\n")
     print(f"Starting point (an empty hand, no information): {coef[0]:.2f} tricks.  R² = {r2:.2f}\n")
@@ -168,6 +195,14 @@ def main():
                 print(f"| {label} | {breakeven(value):.0%} | {r[0]:.2f} | {r[1]:.0%} (n={r[2]}) |")
             else:
                 print(f"| {label} | {breakeven(value):.0%} | — | — |")
+
+    print("\nGoing from 8 to 9 (no one bidding against you): points gained by bidding 9\n")
+    print("| Count | " + " | ".join(f"9{s}: made, gain" for s in SUIT) + " |")
+    print("|---|---|---|---|---|")
+    per_suit = [dict((r[0], r) for r in step_up(estimate[suit_of == t], tricks[suit_of == t], t, 240 + 20 * t)) for t in range(4)]
+    for e in sorted(set().union(*per_suit)):
+        cells = [f"{d[e][1]:.0%}, {d[e][2]:+.0f}" if e in d else "—" for d in per_suit]
+        print(f"| {e:.1f} | " + " | ".join(cells) + " |")
 
     # No trumps.
     ok = y[:, 4] != 255

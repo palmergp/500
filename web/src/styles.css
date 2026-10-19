@@ -2063,3 +2063,30 @@ button.danger {
     padding: 6px 10px;
   }
 }
+
+/* ---- Your decisions, during the hand ------------------------------------------------------ */
+
+.info-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.info-buttons:empty {
+  display: none;
+}
+.decision-list {
+  list-style: none;
+  padding-left: 0;
+}
+.decision-list details > summary {
+  cursor: pointer;
+}
+.decision-when {
+  display: inline-block;
+  min-width: 4.6em;
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--panel-ink) 65%, transparent);
+}
+.decision-deal h3 {
+  margin-top: 14px;
+}

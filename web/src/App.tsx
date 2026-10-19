@@ -19,6 +19,7 @@ import { NewGameDialog } from "./components/NewGameDialog";
 import { ScorePad } from "./components/ScorePad";
 import { InfoPanel, TableView } from "./components/TableView";
 import { TricksDialog } from "./components/TricksDialog";
+import { DecisionsDialog } from "./components/DecisionsDialog";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -125,6 +126,9 @@ export function App() {
   const [quizzed, setQuizzed] = useState<number | null>(null);
   const [showLearn, setShowLearn] = useState(false);
   const [showTricks, setShowTricks] = useState<{ focus?: number } | null>(null);
+  const [showDecisions, setShowDecisions] = useState(false);
+  /** Grades the coach is still working out. */
+  const [grading, setGrading] = useState(0);
   const [announcement, setAnnouncement] = useState("");
   /** The main menu, or the table. */
   const [screen, setScreen] = useState<"starting" | "menu" | "table">("starting");
@@ -214,6 +218,7 @@ export function App() {
     setSelected([]);
     setJokerLeads(null);
     setShowTricks(null);
+    setShowDecisions(false);
     setMessage("");
   }, []);
 
@@ -345,7 +350,7 @@ export function App() {
   // At a LAN table, nobody moves until everyone has seen the last hand's result.
   const waitingOnOthers = lan && !!lobby && lobby.waiting.length > 0;
   const paused =
-    !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || lobbyOpen || waitingOnOthers;
+    !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -370,14 +375,18 @@ export function App() {
   };
 
   /** Asks the coach to grade your actions `numbers` (positions in the game's action log). */
+  /** Runs one grading request, counting it while it's out. */
+  const grade = (run: () => Promise<GradeView | null>, save: string) => {
+    setGrading((n) => n + 1);
+    run()
+      .then((g) => keepGrade(save, g))
+      .catch(() => {})
+      .finally(() => setGrading((n) => n - 1));
+  };
+
   const gradeLater = (save: string, numbers: number[]) => {
     if (!coach || !settings.grade) return;
-    for (const number of numbers) {
-      coach
-        .grade(save, number)
-        .then((g) => keepGrade(save, g))
-        .catch(() => {});
-    }
+    for (const number of numbers) grade(() => coach.grade(save, number), save);
   };
 
   /** Your action: to this device's engine, or to the host (`expect` guards against a stale click). */
@@ -484,12 +493,8 @@ export function App() {
     }).then((snapshot) => {
       if (!snapshot || !coach || !settings.grade) return;
       // The three cards are graded together, as one decision.
-      if (wholeKitty && numbers.length === 3) {
-        coach
-          .gradeDiscards(snapshot.save, numbers[0])
-          .then((g) => keepGrade(snapshot.save, g))
-          .catch(() => {});
-      } else gradeLater(snapshot.save, numbers);
+      if (wholeKitty && numbers.length === 3) grade(() => coach.gradeDiscards(snapshot.save, numbers[0]), snapshot.save);
+      else gradeLater(snapshot.save, numbers);
     });
   };
 
@@ -510,6 +515,9 @@ export function App() {
 
   const trick = held ?? view?.trick ?? null;
   const openTricks = (focus?: number) => setShowTricks({ focus });
+  const deal = view ? view.history.length + 1 : 0;
+  const dealGrades = grades.filter((g) => g.deal === deal).length;
+  const openDecisions = settings.grade ? () => setShowDecisions(true) : undefined;
   const trumpsUnseen = view && settings.trumpCounter && !quizActive ? view.trumpsUnseen : null;
 
   // Coach panels: in the side rail on wide screens, above the middle of the table otherwise.
@@ -651,6 +659,8 @@ export function App() {
                   showVoids={settings.voids && !quizActive}
                   holding={!!held}
                   onTricks={openTricks}
+                  onDecisions={openDecisions}
+                  decisions={dealGrades}
                   infoInCorner={!wide}
                   middle={middle}
                   dock={wide ? undefined : (coachPanels ?? undefined)}
@@ -695,7 +705,7 @@ export function App() {
                 </TableView>
                 {wide && (
                   <aside className="rail" aria-label="Bidding and coach">
-                    <InfoPanel view={view} trumpsUnseen={trumpsUnseen} onTricks={() => openTricks()} />
+                    <InfoPanel view={view} trumpsUnseen={trumpsUnseen} onTricks={() => openTricks()} decisions={dealGrades} onDecisions={openDecisions} />
                     {coachPanels}
                   </aside>
                 )}
@@ -757,6 +767,7 @@ export function App() {
       {showTricks && view && (
         <TricksDialog tricks={view.tricks} players={view.players} focus={showTricks.focus} onClose={() => setShowTricks(null)} />
       )}
+      {showDecisions && view && <DecisionsDialog grades={grades} deal={deal} pending={grading} onClose={() => setShowDecisions(false)} />}
       {showScores && view && (
         <Dialog title="Score pad" wide onClose={() => setShowScores(false)}>
           <ScorePad history={view.history} players={view.players} onReview={(h) => { setShowScores(false); setReview(h); }} />

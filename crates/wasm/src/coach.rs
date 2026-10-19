@@ -46,6 +46,8 @@ pub struct GradeView {
     pub options: Vec<OptionView>,
     /// Which deal this decision belonged to (1-based, counting passed-out deals).
     pub deal: usize,
+    /// For a card play, which trick of the hand (1–10).
+    pub trick: Option<u8>,
 }
 
 fn label(action: Action) -> String {
@@ -126,6 +128,7 @@ pub fn grade_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<Gr
         options: options_view(&grade.analysis.options, &legal),
         reasons: grade.analysis.reasons,
         deal: game.history().len() + 1,
+        trick: (obs.phase == Phase::Playing).then(|| obs.tricks.len() as u8 + 1),
     }))
 }
 
@@ -167,6 +170,7 @@ pub fn grade_discards_for(save: &SaveData, number: usize, seat: Seat) -> Result<
         options: vec![],
         reasons: grade.reasons,
         deal: game.history().len() + 1,
+        trick: None,
     }))
 }
 

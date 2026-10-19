@@ -166,3 +166,47 @@ fn first_throw_off_signals_the_strongest_side_suit() {
 }
 
 
+
+/// No bot can see hidden cards: two deals that look the same from South's seat (West's and East's
+/// hands swapped) get the same decisions from every persona, through the auction, the kitty and
+/// the opening lead.
+#[test]
+fn bots_decide_only_from_what_they_can_see() {
+    use fh_core::{Action, Call, Card, CardSet, Game, Phase, Rng, Rules, Seat};
+    let mut leads = 0;
+    for persona in fh_ai::PERSONAS.iter() {
+        for seed in 0..8u64 {
+            let mut cards: Vec<Card> = CardSet::pack().iter().collect();
+            Rng::new(seed).shuffle(&mut cards);
+            let set = |range: std::ops::Range<usize>| cards[range].iter().copied().collect::<CardSet>();
+            let (south, west, north, east, kitty) = (set(0..10), set(10..20), set(20..30), set(30..40), set(40..43));
+            let mut a = Game::from_deal(Rules::default(), 1, Seat::EAST, [south, west, north, east], kitty);
+            let mut b = Game::from_deal(Rules::default(), 1, Seat::EAST, [south, east, north, west], kitty);
+            let mut bot_a = fh_ai::make_bot(persona.id, seed).unwrap();
+            let mut bot_b = fh_ai::make_bot(persona.id, seed).unwrap();
+            // South acts by the bot in both games; everyone else passes, so the public story stays
+            // the same. Stop after South's first card of the play (or once the deal is thrown in).
+            while a.history().is_empty() {
+                let seat = a.to_act().unwrap();
+                let action = if seat == Seat::SOUTH {
+                    let (oa, ob) = (a.observe(seat), b.observe(seat));
+                    assert_eq!(oa, ob, "{}: South's view is the same in both deals", persona.id);
+                    let (ca, cb) = (bot_a.choose(&oa, &a.legal_actions()), bot_b.choose(&ob, &b.legal_actions()));
+                    assert_eq!(ca, cb, "{} (seed {seed}) decided differently on the same view", persona.id);
+                    if oa.phase == Phase::Playing {
+                        leads += 1;
+                        break;
+                    }
+                    ca
+                } else if a.phase() == Phase::Bidding {
+                    Action::Call(Call::Pass)
+                } else {
+                    break; // someone else is playing: their hands differ by design
+                };
+                a.apply(action).unwrap();
+                b.apply(action).unwrap();
+            }
+        }
+    }
+    assert!(leads >= 10, "checked {leads} opening leads");
+}

@@ -19,7 +19,8 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    - trump ace ¾, king ⅔, queen ½, each other trump ½;
    - side ace ⅔, guarded side king ⅕, void ⅕;
    - then **add 3** for partner and the kitty.
-2. **Bid 7 when the count reaches about 7¼, and 8 at about 8¼.**
+2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and to 9 only at about 10.** Each extra
+   level adds just 100 points, but falling one trick short costs both bids' values.
 3. **Bid a little more than feels safe.** Timid bidding loses games under these rules.
 4. **Adjust for the auction:**
    - partner's 6-call +¾, partner's mention of your suit +0.6, partner's bid of it +2¼;
@@ -87,11 +88,31 @@ Then **add 3** for your partner and the kitty. That total is roughly how many tr
 - **The two jacks are worth more than the ace of trumps.**
 - **Voids help less than you'd think** (⅕ of a trick), because you need spare trumps to use them.
 
-### 2. Bid 7 when your count reaches about 7¼, and 8 at about 8¼
+### 2. Bid 7 at a count of about 7; go up to 8 at about 8½, and to 9 only at about 10
 
-At that point the bid is made about 60% of the time. That's what the house scoring needs to pay off, given that defenders score 10 a trick either way. A 7-level bid needs to be made about 60% of the time, and an 8 about 56%.
+**When a bid beats passing.** A 7-level bid needs to be made about 60% of the time to pay, given that defenders
+score 10 a trick either way. That happens from a count of about **7** (6¾ in clubs, diamonds and hearts, whose bids
+are worth more).
 
-*Source: solver data.* Bids were made 62% of the time at a count of 7¼, and 60% at 8¼.
+**When to go up a level.** With no one bidding against you, the question is usually not "bid or pass?" but "how
+high?". Each extra level adds only 100 points when you make it. But if you then take one trick too few, a plus
+becomes a minus: with 8 tricks, 8♦ scores +280 and 9♦ scores −380, a swing of 660. So go up a level only when
+you'd make the higher bid about **80%** of the time:
+
+| Your count | Bid (no one competing) | Made at that count |
+|---|---|---|
+| under about 7 | pass, mention or 6 | |
+| about 7 to 8 | 7 | 7: 65–85% |
+| about 8½ to 9½ | 8 | 8: 78–92% |
+| about 10 or more | 9 | 9: about 80–85% |
+
+At a count of 9½ a 9 bid is made about 70% of the time, and still scores about 70 points less than 8 on average.
+Competition changes this: when an opponent may outbid your 8, a higher bid can be worth it to keep the contract.
+
+*Source: solver data, 64,000 bidding decisions (`train/rules_of_thumb.py`).* Real play runs about half a trick
+below the solver, so a deal the solver makes with exactly the bid counts as half made. An earlier version of this
+rule counted those deals as failures, charging a whole trick, and said "7 at 7¼, 8 at 8¼": half a trick too
+cautious for the 7 level.
 
 ### 3. Bid a little more than feels safe
 

@@ -146,6 +146,8 @@ export interface GradeView {
   reasons: string[];
   options: OptionView[];
   deal: number;
+  /** For a card play, which trick of the hand (1–10). */
+  trick: number | null;
 }
 
 export interface TraceView {

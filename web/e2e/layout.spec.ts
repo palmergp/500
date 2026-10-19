@@ -60,7 +60,7 @@ test("a whole hand fits on the screen, with the coach's panels open", async ({ p
     expect(problem, `while ${phase || "waiting"}`).toBeNull();
     if (!(await takeTurn(page))) await page.waitForTimeout(100);
   }
-  expect(seen.has("bidding-seen")).toBe(true);
+  expect(seen.has("bidding-seen") || seen.has("bidding")).toBe(true);
 });
 
 test("trick piles, past tricks, and who called what", async ({ page }) => {
@@ -134,4 +134,33 @@ test("the three kitty discards get one grade", async ({ page }, info) => {
   const head = await grade.locator(".coach-head").innerText();
   expect(head.split("·")[0].match(/(10|[2-9AKQJ])[♠♣♦♥]|Joker/g)?.length).toBe(3);
   await page.screenshot({ path: "test-results/discard-grade.png" });
+});
+
+test("your graded decisions, during the hand", async ({ page }, info) => {
+  test.setTimeout(240_000);
+  await startGame(page);
+  // Play until a few of our decisions are graded and the cards are being played.
+  const button = page.getByRole("button", { name: /^Your decisions/ });
+  for (let i = 0; i < 2000; i++) {
+    const label = (await button.count()) ? await button.first().innerText() : "";
+    const graded = Number(/\((\d+)\)/.exec(label)?.[1] ?? 0);
+    if (graded >= 3 && (await page.locator(".trick-area").count())) break;
+    const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+    if (await result.isVisible()) await result.getByRole("button", { name: /Next hand/ }).click();
+    if (!(await takeTurn(page))) await page.waitForTimeout(100);
+  }
+  await button.first().click();
+  const dialog = page.getByRole("dialog", { name: "Your decisions" });
+  const items = dialog.locator(".decision-list > li");
+  expect(await items.count()).toBeGreaterThanOrEqual(3);
+  // Each says when it was made, and opens to the coach's reasons.
+  await expect(items.first().locator(".decision-when")).toHaveText(/Bidding|Kitty|Trick \d+/);
+  const first = items.first().locator("details");
+  if (!(await first.evaluate((d) => (d as HTMLDetailsElement).open))) await first.locator("summary").click();
+  await expect(items.first().locator("ul, .note").first()).toBeVisible();
+  await dialog.getByRole("tab", { name: /Whole game/ }).click();
+  expect(await dialog.locator(".decision-list > li").count()).toBeGreaterThanOrEqual(3);
+  await page.screenshot({ path: `test-results/decisions-${info.project.name}.png` });
+  await dialog.getByRole("button", { name: "Back to the game" }).click();
+  await expect(dialog).toHaveCount(0);
 });

@@ -135,7 +135,20 @@ export function gameProgress(view: View): string {
 }
 
 /** The auction so far and the bid being played: kept beside the table, not under any one seat. */
-export function InfoPanel({ view, trumpsUnseen, onTricks }: { view: View; trumpsUnseen?: number | null; onTricks?: () => void }) {
+export function InfoPanel({
+  view,
+  trumpsUnseen,
+  onTricks,
+  decisions,
+  onDecisions,
+}: {
+  view: View;
+  trumpsUnseen?: number | null;
+  onTricks?: () => void;
+  /** How many of your decisions the coach has graded this hand. */
+  decisions?: number;
+  onDecisions?: () => void;
+}) {
   const c = view.contract;
   return (
     <section className="info-panel" aria-label="Bidding">
@@ -178,11 +191,18 @@ export function InfoPanel({ view, trumpsUnseen, onTricks }: { view: View; trumps
           )}
         </div>
       )}
-      {onTricks && view.tricks.length > 0 && view.phase === "playing" && (
-        <button type="button" className="past-tricks-button" onClick={onTricks} title="See every trick played so far this hand">
-          Past tricks ({view.tricks.length})
-        </button>
-      )}
+      <div className="info-buttons">
+        {onTricks && view.tricks.length > 0 && view.phase === "playing" && (
+          <button type="button" className="past-tricks-button" onClick={onTricks} title="See every trick played so far this hand">
+            Past tricks ({view.tricks.length})
+          </button>
+        )}
+        {onDecisions && (
+          <button type="button" className="past-tricks-button" onClick={onDecisions} title="The coach's grades for your bids and plays so far, with its reasons">
+            Your decisions{decisions ? ` (${decisions})` : ""}
+          </button>
+        )}
+      </div>
     </section>
   );
 }
@@ -201,6 +221,9 @@ interface Props {
   holding?: boolean;
   /** Opens the tricks played so far, at the given one. */
   onTricks?: (index?: number) => void;
+  /** Opens your graded decisions; `decisions` is how many this hand. */
+  onDecisions?: () => void;
+  decisions?: number;
   /** Show the bid and auction panel in the table's top corner (when there's no side rail). */
   infoInCorner?: boolean;
   /** Shown in the middle instead of the trick: the bidding box, the discard button. */
@@ -214,7 +237,22 @@ interface Props {
 }
 
 /** The felt: partner and opponents around the trick, your seat and hand below. */
-export function TableView({ view, trick, trumpsUnseen, sweepTo = null, showVoids = false, holding = false, onTricks, infoInCorner, middle, dock, status, children }: Props) {
+export function TableView({
+  view,
+  trick,
+  trumpsUnseen,
+  sweepTo = null,
+  showVoids = false,
+  holding = false,
+  onTricks,
+  onDecisions,
+  decisions,
+  infoInCorner,
+  middle,
+  dock,
+  status,
+  children,
+}: Props) {
   const showTrick = view.phase === "playing" || (trick && trick.plays.length > 0);
   const piles = trickPiles(view, holding);
   const plate = (seat: SeatIndex) => <SeatPlate view={view} seat={seat} showVoids={showVoids} piles={piles[seat]} onTricks={onTricks} />;
@@ -222,7 +260,7 @@ export function TableView({ view, trick, trumpsUnseen, sweepTo = null, showVoids
     <div className="table">
       {infoInCorner && (
         <div className="table-info">
-          <InfoPanel view={view} trumpsUnseen={trumpsUnseen} onTricks={onTricks ? () => onTricks() : undefined} />
+          <InfoPanel view={view} trumpsUnseen={trumpsUnseen} onTricks={onTricks ? () => onTricks() : undefined} decisions={decisions} onDecisions={onDecisions} />
         </div>
       )}
       {plate(2)}

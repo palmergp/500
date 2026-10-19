@@ -75,6 +75,9 @@ pub struct Analysis {
     /// Other options about as good as the best: the sampled deals can't separate them (card
     /// play only). Shown as a close call rather than presenting a near tie as a firm answer.
     pub close: Vec<Action>,
+    /// The hint's note on those close calls ("Close call: K♠ does about as well…"). A grade
+    /// says something about the player's own card instead.
+    close_note: Option<String>,
     /// Card play only: the raw statistics, for paired comparisons.
     play: Option<PlayStats>,
 }
@@ -119,11 +122,18 @@ impl Coach {
 
     /// The best action here and why. `chosen`, if given, is also evaluated so it can be compared.
     pub fn analyze(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
+        let mut analysis = self.analyze_options(obs, legal, chosen);
+        analysis.reasons.extend(analysis.close_note.take());
+        analysis
+    }
+
+    /// As [`Coach::analyze`], leaving the close-call note out of the reasons.
+    fn analyze_options(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
         match obs.phase {
             Phase::Playing => self.analyze_play(obs, legal, chosen),
             Phase::Bidding => self.analyze_call(obs, legal, chosen),
             Phase::Discarding => self.analyze_discard(obs, legal, chosen),
-            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, close: vec![], play: None },
+            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, close: vec![], close_note: None, play: None },
         }
     }
 
@@ -134,7 +144,7 @@ impl Coach {
     /// can't separate the two plays (mean difference under two standard errors), the verdict is
     /// capped at an inaccuracy, since the gap may be noise.
     pub fn grade(&mut self, obs: &Observation, legal: &[Action], chosen: Action) -> Grade {
-        let mut analysis = self.analyze(obs, legal, Some(chosen));
+        let mut analysis = self.analyze_options(obs, legal, Some(chosen));
         let ev = |a: Action, analysis: &Analysis| analysis.options.iter().find(|o| o.action == a).map(|o| o.ev);
         let best_ev = ev(analysis.best, &analysis).unwrap_or(0.0);
         let loss = (best_ev - ev(chosen, &analysis).unwrap_or(best_ev)).max(0.0);
@@ -158,6 +168,10 @@ impl Coach {
         if analysis.close.contains(&chosen) {
             // One of the plays the coach couldn't separate from its choice: not a mistake.
             verdict = verdict.min(Verdict::Good);
+            analysis.reasons.push(format!(
+                "Close call: {chosen} does about as well as {} (the {} likely deals can't separate them).",
+                analysis.best, analysis.worlds
+            ));
         } else if verdict > Verdict::Good && !significant(analysis.play.as_ref(), analysis.best, chosen) {
             verdict = verdict.min(Verdict::Inaccuracy);
             analysis.reasons.push("A close call: the likely deals don't clearly separate these two plays.".into());
@@ -194,11 +208,9 @@ impl Coach {
             .map(|&(a, _)| a)
             .take(3)
             .collect();
-        let mut reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
-        if !close.is_empty() {
-            reasons.push(close_call_reason(&result, best, &close));
-        }
-        Analysis { options, best, reasons, worlds: result.worlds, close, play: Some(result) }
+        let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
+        let close_note = (!close.is_empty()).then(|| close_call_reason(&result, best, &close));
+        Analysis { options, best, reasons, worlds: result.worlds, close, close_note, play: Some(result) }
     }
 
     // ---- Bidding -----------------------------------------------------------------------------
@@ -247,7 +259,7 @@ impl Coach {
         options.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.insert(0, first);
         let reasons = call_reasons(obs, recommended, chosen, &options, high);
-        Analysis { best: recommended, options, reasons, worlds: worlds.len(), close: vec![], play: None }
+        Analysis { best: recommended, options, reasons, worlds: worlds.len(), close: vec![], close_note: None, play: None }
     }
 
     /// Bidding analysis with the neural evaluator: the same numbers The Oracle bids by, for every
@@ -274,7 +286,7 @@ impl Coach {
         others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.extend(others.into_iter().take(2));
         let reasons = call_reasons(obs, recommended, chosen, &options, obs.auction.high_bid());
-        Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], play: None }
+        Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], close_note: None, play: None }
     }
 
     fn search_rng(&mut self) -> fh_core::Rng {
@@ -298,7 +310,7 @@ impl Coach {
             options.push(OptionEval { action: c, ev: mine_ev, makes: None });
         }
         let reasons = discard_reasons(obs, &plan, chosen);
-        Analysis { options, best, reasons, worlds: 12, close: vec![], play: None }
+        Analysis { options, best, reasons, worlds: 12, close: vec![], close_note: None, play: None }
     }
 
     /// Grades a whole discard: `chosen` against the coach's plan, from `obs`, the declarer's
@@ -534,7 +546,7 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     let (total, parts) = thumb::count(obs, focus);
     let shown: Vec<String> = parts.iter().take(6).map(|(l, v)| format!("{l} {}", thumb::fraction(*v))).collect();
     reasons.push(format!("Rule-of-thumb count for {focus}: about {} ({}).", thumb::fraction(total), shown.join(", ")));
-    reasons.push("A 7 bid pays from about 7¼, an 8 from about 8¼.".into());
+    reasons.push("A 7 bid pays from a count of about 7. Go up to 8 at about 8½, and to 9 only at about 10.".into());
     // Suit or no trumps (docs/rules-of-thumb.md, rule 5a).
     let joker = hand.contains(Card::JOKER);
     let aces = fh_core::Suit::ALL.iter().filter(|&&s| hand.contains(Card::new(s, fh_core::cards::ACE))).count();
@@ -581,6 +593,21 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     }
     if obs.auction.must_bid() {
         reasons.push("As dealer on the third deal, you must bid.".into());
+    }
+    // Overbidding by a level: the asymmetry the count alone doesn't show.
+    if let (Some(Action::Call(Call::Bid(mine))), Action::Call(Call::Bid(better))) = (chosen, best) {
+        if mine.level > better.level {
+            reasons.insert(
+                1,
+                format!(
+                    "{mine} adds only {} points over {better} when made, but with exactly {} tricks it scores −{} instead of +{}.",
+                    mine.value() - better.value(),
+                    better.level,
+                    mine.value(),
+                    better.value()
+                ),
+            );
+        }
     }
     if let (Some(c), Some(b)) = (chosen.filter(|&c| c != best), ev(best)) {
         if let Some(o) = ev(c) {
@@ -697,6 +724,17 @@ pub fn expert_replay(mut game: fh_core::Game, players: [&str; 4], seat: Seat, se
 mod tests {
     use super::*;
     use fh_core::{Game, Rules};
+
+    /// Bidding a level too high is explained by the swing: little to gain, much to lose.
+    #[test]
+    fn an_overbid_explains_the_swing() {
+        let game = Game::new(Rules::default(), 4);
+        let obs = game.observe(game.to_act().unwrap());
+        let bid = |level| Action::Call(Call::Bid(Contract::new(level, Strain::Diamonds)));
+        let options = [OptionEval { action: bid(8), ev: 200.0, makes: Some(0.9) }, OptionEval { action: bid(9), ev: 100.0, makes: Some(0.7) }];
+        let reasons = call_reasons(&obs, bid(8), Some(bid(9)), &options, None);
+        assert!(reasons.iter().any(|r| r.contains("9♦ adds only 100 points over 8♦") && r.contains("−380 instead of +280")), "{reasons:?}");
+    }
 
     /// A near tie is reported as one, not presented as a firm answer that flips from run to run.
     /// The position is a user's 8♦ opening lead: Joker J♦ Q♦ 9♦ 7♦ 4♦ K♠ Q♠ 10♠ 5♠. On 600 deals

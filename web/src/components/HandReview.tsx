@@ -36,7 +36,7 @@ export function HandReview({ hand, players, grades, coach, save }: Props) {
         ))}
       </div>
       {tab === "overview" && <Overview hand={hand} players={players} />}
-      {tab === "decisions" && <Decisions grades={grades} />}
+      {tab === "decisions" && <DecisionList grades={grades} />}
       {tab === "tricks" && <Tricks hand={hand} coach={coach} save={save} />}
       {tab === "luck" && <Luck hand={hand} coach={coach} save={save} />}
     </div>
@@ -96,35 +96,58 @@ function Overview({ hand, players }: { hand: HandView; players: PlayerView[] }) 
   );
 }
 
-function Decisions({ grades }: { grades: GradeView[] }) {
+/** When a decision was made: the bidding, the kitty, or which trick. */
+export function decisionLabel(g: GradeView): string {
+  switch (g.phase) {
+    case "bidding":
+      return "Bidding";
+    case "discarding":
+      return "Kitty";
+    case "playing":
+      return g.trick ? `Trick ${g.trick}` : "Play";
+    default:
+      return "";
+  }
+}
+
+/** Graded decisions, each with when it was made and (opened for slips) the coach's reasons. */
+export function DecisionList({ grades }: { grades: GradeView[] }) {
   if (grades.length === 0) {
-    return <p>No graded decisions on this deal. Turn on “Grade my decisions” in the Coach menu to see them.</p>;
+    return <p>No graded decisions yet. Turn on “Grade my decisions” in Settings to see them.</p>;
   }
   const lost = grades.reduce((s, g) => s + g.loss, 0);
   const slips = grades.filter((g) => g.verdict === "inaccuracy" || g.verdict === "mistake" || g.verdict === "blunder");
   return (
     <>
       <p>
-        {grades.length} decisions graded; {slips.length === 0 ? "no slips" : `${slips.length} slip${slips.length > 1 ? "s" : ""}`}, about{" "}
+        {grades.length} decision{grades.length > 1 ? "s" : ""} graded; {slips.length === 0 ? "no slips" : `${slips.length} slip${slips.length > 1 ? "s" : ""}`}, about{" "}
         {Math.round(lost)} expected points given up in all. Grades use only what you could see at the time.
       </p>
       <ol className="decision-list">
-        {grades.map((g) => (
-          <li key={g.actionNumber}>
-            <div>
-              <VerdictChip verdict={g.verdict} /> <strong>{g.chosenLabel}</strong>
-              {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · better: {g.bestLabel}</>}
-              {g.loss >= 1 && <span className="loss"> (−{Math.round(g.loss)})</span>}
-            </div>
-            {g.verdict !== "best" && g.reasons.length > 0 && (
-              <ul>
-                {g.reasons.map((r) => (
-                  <li key={r}>{r}</li>
-                ))}
-              </ul>
-            )}
-          </li>
-        ))}
+        {grades.map((g) => {
+          const slip = slips.includes(g);
+          return (
+            <li key={g.actionNumber}>
+              <details open={slip}>
+                <summary>
+                  <span className="decision-when">{decisionLabel(g)}</span> <VerdictChip verdict={g.verdict} />{" "}
+                  <strong>{g.phase === "discarding" && g.chosenLabel.includes(" ") ? `Put back ${g.chosenLabel}` : g.chosenLabel}</strong>
+                  {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · better: {g.bestLabel}</>}
+                  {g.loss >= 1 && <span className="loss"> (−{Math.round(g.loss)})</span>}
+                </summary>
+                {g.reasons.length > 0 ? (
+                  <ul>
+                    {g.reasons.map((r) => (
+                      <li key={r}>{r}</li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="note">No further notes.</p>
+                )}
+              </details>
+            </li>
+          );
+        })}
       </ol>
     </>
   );
