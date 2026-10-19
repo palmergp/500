@@ -6,9 +6,6 @@ use fh_core::cards::{ACE, JACK, KING, QUEEN};
 use fh_core::rules::is_trump;
 use fh_core::{effective_suit, Call, Card, Observation, Strain, Suit};
 
-/// Where a bid starts to pay (rule 2): about a quarter trick above the level.
-pub const PAYS_FROM_MARGIN: f32 = 0.25;
-
 /// The count for `strain` and its parts, largest first.
 pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
     let mut parts: Vec<(String, f32)> = Vec::new();

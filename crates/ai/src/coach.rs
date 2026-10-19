@@ -739,11 +739,22 @@ fn discard_reasons(obs: &Observation, plan: &[Card], chosen: Option<Action>) -> 
     for suit in fh_core::Suit::ALL {
         let before = obs.hand.iter().filter(|&c| !is_trump(c, trump) && fh_core::effective_suit(c, trump) == Some(suit)).count();
         let left = after.iter().filter(|&c| !is_trump(c, trump) && fh_core::effective_suit(c, trump) == Some(suit)).count();
-        if before > 0 && left == 0 && Some(suit) != trump {
+        // A void helps only in a suit bid, where you can trump it.
+        if before > 0 && left == 0 && trump.is_some() && Some(suit) != trump {
             reasons.push(format!("That leaves you void in {suit}, so you can trump it."));
         }
     }
     if let Some(Action::Discard(card)) = chosen {
+        let suit_cards = |c: Card| obs.hand.iter().filter(|h| h.suit() == c.suit() && !h.is_joker()).count();
+        let king_guard = |c: Card| {
+            !c.is_joker()
+                && obs.hand.contains(Card::new(c.suit().expect("a suited card"), fh_core::cards::KING))
+                && !obs.hand.contains(Card::new(c.suit().expect("a suited card"), fh_core::cards::ACE))
+                && suit_cards(c) == 2
+        };
+        if trump.is_none() && !card.is_joker() && card.rank() != fh_core::cards::ACE && king_guard(card) {
+            reasons.push("In no trumps, keep a king guarded: it stops the opponents' suit (about ⅕ of a trick).".into());
+        }
         if is_trump(card, trump) || card.is_joker() {
             reasons.push("Never put back a trump: each one is a likely trick.".into());
         } else if card.rank() == fh_core::cards::ACE {

@@ -62,7 +62,9 @@ fn merge_pair(t: &mut Pair, s: &Pair) {
     t.second_better += s.second_better;
 }
 
-pub fn run(deals: u64, seed: u64, threads: u64, leads_only: bool) {
+/// `nt`: South declares no trumps instead (a no-trump count of 7 or more): the kitty questions
+/// only, since there are no trumps to lead.
+pub fn run(deals: u64, seed: u64, threads: u64, leads_only: bool, nt: bool) {
     let parts: Vec<DealResult> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|t| {
@@ -70,7 +72,7 @@ pub fn run(deals: u64, seed: u64, threads: u64, leads_only: bool) {
                     let mut out = DealResult::default();
                     let mut d = t;
                     while d < deals {
-                        one(seed + d, &mut out, leads_only);
+                        one(seed + d, &mut out, leads_only, nt);
                         d += threads;
                     }
                     out
@@ -150,16 +152,16 @@ pub fn run(deals: u64, seed: u64, threads: u64, leads_only: bool) {
     }
 }
 
-fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
+fn one(seed: u64, out: &mut DealResult, leads_only: bool, nt: bool) {
     let rules = Rules::default();
     let mut game = Game::with_dealer(rules, seed, Seat::EAST); // South speaks first
     let obs = game.observe(Seat::SOUTH);
-    let Some((strain, count)) = Strain::ALL
+    let best_suit = Strain::ALL
         .into_iter()
         .filter(|s| s.trump().is_some())
         .map(|s| (s, fh_ai::thumb::count(&obs, s).0))
-        .max_by(|a, b| a.1.total_cmp(&b.1))
-    else {
+        .max_by(|a, b| a.1.total_cmp(&b.1));
+    let Some((strain, count)) = (if nt { Some((Strain::NoTrumps, fh_ai::thumb::count(&obs, Strain::NoTrumps).0)) } else { best_suit }) else {
         return;
     };
     if count < 7.0 {
@@ -167,7 +169,8 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
     }
     let level = if count >= 10.0 { 9 } else if count >= 8.5 { 8 } else { 7 };
     let trump = strain.trump();
-    let t = trump.expect("a suit");
+    // The lead study needs a trump suit; in no trumps only the kitty is studied.
+    let t = trump.unwrap_or(Suit::Spades);
     game.apply(Action::Call(Call::Bid(Contract::new(level, strain)))).unwrap();
     for _ in 0..3 {
         game.apply(Action::Call(Call::Pass)).unwrap();
@@ -186,7 +189,8 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
     let side = |suit: Suit, hand: CardSet| hand.iter().filter(|&c| !trumpish(c) && effective_suit(c, trump) == Some(suit)).count();
 
     // ---- The kitty ----------------------------------------------------------------------------
-    let side_cards: Vec<Card> = thirteen.iter().filter(|&c| !trumpish(c)).collect();
+    // In no trumps aces are kept (sure winners), which keeps the number of sets manageable.
+    let side_cards: Vec<Card> = thirteen.iter().filter(|&c| !trumpish(c) && !(nt && c.rank() == ACE)).collect();
     let mut sets: Vec<Vec<Card>> = Vec::new();
     for i in 0..side_cards.len() {
         for j in i + 1..side_cards.len() {
@@ -225,6 +229,44 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
             }
         }
     }
+    // In no trumps: the plan the bots used before the no-trump rule (shortening toward voids, as in a
+    // suit bid), against the current plan.
+    if nt {
+        let old: CardSet = old_suit_style_discards(thirteen).into_iter().collect();
+        if old != plan {
+            if let (Some(x), Some(y)) = (solve(&mut solver, thirteen.minus(plan), Trick::new(Seat::SOUTH)), solve(&mut solver, thirteen.minus(old), Trick::new(Seat::SOUTH))) {
+                let pair = out.kitty.entry("No-trump plan, or the old suit-style plan? (where they differ)".into()).or_default();
+                pair.n += 1.0;
+                pair.first += x as f64;
+                pair.second += y as f64;
+                pair.first_better += f64::from(x > y);
+                pair.second_better += f64::from(y > x);
+            }
+        }
+    }
+    // In no trumps: a plan that never empties a suit (so every suit can still be stopped), against
+    // the usual plan.
+    if nt {
+        let no_void = sets
+            .iter()
+            .filter(|set| set.iter().all(|c| c.rank() != ACE))
+            .min_by_key(|set| (voids_made(set), set.iter().map(|c| c.rank() as u32).sum::<u32>()));
+        if let Some(nv) = no_void {
+            let nv_set: CardSet = nv.iter().copied().collect();
+            if nv_set != plan {
+                if let (Some(x), Some(y)) =
+                    (solve(&mut solver, thirteen.minus(nv_set), Trick::new(Seat::SOUTH)), solve(&mut solver, thirteen.minus(plan), Trick::new(Seat::SOUTH)))
+                {
+                    let pair = out.kitty.entry("No-void plan, or the usual plan? (where they differ)".into()).or_default();
+                    pair.n += 1.0;
+                    pair.first += x as f64;
+                    pair.second += y as f64;
+                    pair.first_better += f64::from(x > y);
+                    pair.second_better += f64::from(y > x);
+                }
+            }
+        }
+    }
     if leads_only {
         sets.clear();
     }
@@ -254,7 +296,7 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
     }
     // One set that puts back the lowest trump with the plan's two lowest side cards.
     let lowest_trump = thirteen.iter().filter(|&c| trumpish(c)).min_by_key(|&c| fh_core::trick::trick_strength(c, t, trump));
-    if let Some(lt) = lowest_trump.filter(|_| !leads_only) {
+    if let Some(lt) = lowest_trump.filter(|_| !leads_only && !nt) {
         let discards: CardSet = std::iter::once(lt).chain(plan_cards.iter().copied().filter(|&c| !trumpish(c)).take(2)).collect();
         if discards.len() == 3 {
             if let Some(tricks) = solve(&mut solver, thirteen.minus(discards), Trick::new(Seat::SOUTH)) {
@@ -289,6 +331,10 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
                 pair.second_better += f64::from(y > x);
             }
         }
+    }
+
+    if nt {
+        return;
     }
 
     // ---- The first lead, after the usual discards ----------------------------------------------
@@ -360,4 +406,33 @@ fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
             }
         }
     }
+}
+
+/// The kitty plan the bots used in no trumps before it had its own rule: the suit-bid heuristic
+/// (keep aces and guarded kings, shorten toward voids), for comparison.
+fn old_suit_style_discards(hand: CardSet) -> Vec<Card> {
+    let value = |card: Card, hand: CardSet| -> i32 {
+        if card.is_joker() {
+            return 1000;
+        }
+        let in_suit = hand.iter().filter(|h| h.suit() == card.suit()).count();
+        let mut v = card.rank() as i32;
+        if card.rank() == ACE {
+            v += 40;
+        } else if card.rank() == fh_core::cards::KING && in_suit >= 2 {
+            v += 15;
+        }
+        if in_suit <= 2 && card.rank() != ACE {
+            v -= 8;
+        }
+        v
+    };
+    let mut hand = hand;
+    let mut out = Vec::new();
+    for _ in 0..3 {
+        let card = hand.iter().min_by_key(|&c| (value(c, hand), c.id())).expect("cards");
+        hand.remove(card);
+        out.push(card);
+    }
+    out
 }

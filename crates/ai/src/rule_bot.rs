@@ -6,7 +6,7 @@
 use crate::cardplay::{cheapest, is_boss, trumps};
 use crate::evaluate::{has_bower, hand_tricks};
 use crate::Bot;
-use fh_core::cards::{ACE, KING};
+use fh_core::cards::{ACE, KING, QUEEN};
 use fh_core::rules::is_trump;
 use fh_core::trick::trick_strength;
 use fh_core::{effective_suit, Action, Call, Card, CardSet, Contract, Observation, Phase, Play, Rng, Strain, Suit};
@@ -240,6 +240,9 @@ pub fn keep_value(card: Card, hand: CardSet, trump: Option<Suit>) -> i32 {
     if is_trump(card, trump) || card.is_joker() {
         return 1000 + card.rank() as i32;
     }
+    if trump.is_none() {
+        return nt_keep_value(card, hand);
+    }
     let suit = effective_suit(card, trump);
     let in_suit = hand.iter().filter(|&h| effective_suit(h, trump) == suit).count();
     let mut value = card.rank() as i32;
@@ -250,6 +253,32 @@ pub fn keep_value(card: Card, hand: CardSet, trump: Option<Suit>) -> i32 {
     }
     if in_suit <= 2 && card.rank() != ACE {
         value -= 8; // shortening a suit toward a void
+    }
+    value
+}
+
+/// In no trumps a void can't be trumped, so there's no reason to make one; what matters is
+/// stoppers and running suits (docs/lab/README.md, finding 23). Keep aces, guarded kings and their
+/// guards, guarded queens and length under an ace; throw low cards from suits with no honours.
+fn nt_keep_value(card: Card, hand: CardSet) -> i32 {
+    let suit = card.suit();
+    let in_suit: Vec<Card> = hand.iter().filter(|c| c.suit() == suit).collect();
+    let has = |rank: u8| in_suit.iter().any(|c| c.rank() == rank);
+    let mut value = card.rank() as i32;
+    match card.rank() {
+        ACE => value += 40,
+        KING if in_suit.len() >= 2 => value += 15,
+        QUEEN if in_suit.len() >= 3 => value += 8,
+        _ => {}
+    }
+    // The small card that guards a king (or one of the two guarding a queen).
+    let guards = |honour: u8, needed: usize| has(honour) && !has(ACE) && card.rank() < honour && in_suit.len() <= needed;
+    if guards(KING, 2) || guards(QUEEN, 3) {
+        value += 12;
+    }
+    // Length under an ace runs once the ace is cashed.
+    if has(ACE) && card.rank() != ACE {
+        value += 6;
     }
     value
 }
@@ -289,6 +318,16 @@ mod tests {
 
     fn rule_bots() -> [Box<dyn Bot>; 4] {
         std::array::from_fn(|_| Box::new(RuleBot::new("Steady", Style::STEADY, 0)) as Box<dyn Bot>)
+    }
+
+    /// In no trumps the kitty plan keeps a guarded king and its guard (stoppers), instead of
+    /// emptying the suit as it would in a suit bid.
+    #[test]
+    fn no_trump_discards_keep_stoppers() {
+        let hand = CardSet::parse("Joker AS KS 9S AH 8H 6H KC 5C 7D 6D 5D 4H").unwrap();
+        let discards: CardSet = heuristic_discards(hand, None, 3).into_iter().collect();
+        assert!(!discards.contains(Card::parse("KC").unwrap()) && !discards.contains(Card::parse("5C").unwrap()), "{discards:?}");
+        assert!(discards.iter().all(|c| c.rank() != ACE && !c.is_joker()));
     }
 
     #[test]

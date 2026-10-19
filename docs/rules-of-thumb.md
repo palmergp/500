@@ -251,6 +251,11 @@ What each part is worth, solved with every card visible over 4,137 deals where t
 
 So don't spend a discard keeping a king guarded: use it to make the void.
 
+**In no trumps it's the other way round.** You can't trump a void, so making one gains nothing (−0.07 tricks,
+even), while a guarded king is a stopper worth keeping: **+0.2 tricks** (better on 23% of deals, worse on 9%).
+Keep your aces, guarded kings and their guards, and the length under an ace; put back low cards from suits with
+no honours (finding 23).
+
 *Source: lab, 600 duplicate deals* (finding 8) *and `fh-lab declarer`* (finding 16).
 
 ---

@@ -417,6 +417,27 @@ at a glance (which cards would win the trick now, who is winning it, unseen card
   points each time.
 - Growing it further would need search on top of the network (or self-play training), not more imitation.
 
+### 23. The kitty in no trumps: keep stoppers, don't hunt voids
+
+*Measured by `fh-lab declarer --nt` over 12,000 deals (1,496 where South declares no trumps from a no-trump count
+of 7 or more).* As finding 16, with aces kept (always right in no trumps).
+
+| Question | Tricks | First better | Second better |
+|---|---|---|---|
+| Make a void, or not? | 8.75 vs 8.82 | 11% | 14% |
+| Keep a guarded king, or not? | 8.89 vs 8.70 | 23% | 9% |
+| The new no-trump plan, or the old suit-style plan? (where they differ, n = 659) | 8.49 vs 8.43 | 20% | 19% |
+| A "never make a void" plan, or the old plan? (n = 762) | 8.34 vs 8.43 | 15% | 27% |
+
+- Voids neither help nor hurt in no trumps (the Joker stops any suit, and an unstopped suit costs little: see
+  finding 13). Guarded kings do help, unlike in a suit bid.
+- The bots and the coach now use a no-trump plan (`nt_keep_value` in `crates/ai/src/rule_bot.rs`): keep aces,
+  guarded kings and their guards, guarded queens and length under an ace; put back low cards from suits with no
+  honours. It's only slightly better than the old plan, but it no longer reasons as if there were trumps. The coach
+  no longer says a no-trump void lets you "trump it".
+- Simply avoiding voids is worse: the cheapest such sets break guarded kings.
+- The plan is still 0.46 tricks short of the best set with hindsight (0.29 in suit bids).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
