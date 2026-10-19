@@ -264,6 +264,9 @@ whether it was.
   `crates/ai/src/coach.rs`). Its choices are unchanged: they rank plays by expected points, and the bias is
   mostly uniform across a decision's options. The curves describe expert play; a casual player's results will
   be a little lower.
+- **Checked on 800 fresh deals** (`fh-lab honesty --seed 900000`): with the curves, the stated chance averaged 73%
+  and 73% were made, for both bids and card play. Each 10% band now matches within its sampling error (the
+  10–50% bands of card play have only 17–50 predictions each).
 
 ### 16. The kitty, solved
 
