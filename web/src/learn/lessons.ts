@@ -186,6 +186,7 @@ export const LESSONS: Lesson[] = [
     body: [
       "Keep every trump and your aces. Use the three discards to shorten your shortest side suits: two discards from a doubleton leave you void, ready to trump that suit.",
       "In the lab, a search that compared discards across likely deals did no better than this simple rule.",
+      "What each part is worth, solved over 4,000 deals: putting back a trump costs about ¾ of a trick, and putting back an ace about ½; neither was ever right. Making a void gains about ½ a trick, more the more trumps you hold. Keeping a king guarded makes no difference, so spend the discards on the void.",
     ],
     quiz: [
       {
@@ -193,6 +194,12 @@ export const LESSONS: Lesson[] = [
         options: ["A♠ and two small clubs", "Both cards of a club doubleton and a small diamond", "Three small trumps"],
         answer: 1,
         explain: "Void the doubleton and keep aces and trumps.",
+      },
+      {
+        q: "You could keep K♣ guarded or put back both clubs to make a void. Which gains more?",
+        options: ["Keep the king guarded", "Make the void", "No difference"],
+        answer: 1,
+        explain: "The void gains about ½ a trick on average; keeping the king guarded makes no difference.",
       },
     ],
   },
@@ -205,6 +212,7 @@ export const LESSONS: Lesson[] = [
       "## Should the bidder always lead trump?",
       "• With five or more trumps, yes: lead your top trump (the highest still out, other than the Joker). It was the best lead about 72% of the time.",
       "• With four or fewer, cash a side ace first. Opponents rarely trump the first round of a suit.",
+      "• Count your top trumps too (the Joker, both bowers and the ace of trumps). Holding three or four of them, lead trump. Missing two, a side ace or a singleton does about as well. Missing three or four, take your side winners first: leading trump hands them the lead.",
       "• Almost never open with a small trump: it was the best lead only about a quarter of the time, and on average gave up 24–32 points.",
       "## The Joker",
       "Don't lead it first. Holding the Joker, the next-highest trump was a better opening lead (it gave up about 5 points to the best lead, against 9 for the Joker). Keep the Joker to win a trick later and take back the lead when you need it. The expert usually plays it in tricks 3–5.",
@@ -218,10 +226,16 @@ export const LESSONS: Lesson[] = [
     ],
     quiz: [
       {
-        q: "You're declarer in hearts with six trumps (no Joker) and the A♠. Your opening lead?",
+        q: "You're declarer in hearts with six trumps, including both bowers and the A♥ (no Joker), and the A♠. Your opening lead?",
         options: ["The A♠", "Your top trump", "A small trump"],
         answer: 1,
-        explain: "With five or more trumps, the top trump was the best lead about 72% of the time.",
+        explain: "You hold three of the four top trumps: lead the top one. With five or more trumps it was the best lead about 72% of the time.",
+      },
+      {
+        q: "You're declarer with five trumps but none of the Joker, the bowers or the ace of trumps. You hold the A♠. Lead?",
+        options: ["The A♠", "Your top trump", "A small trump"],
+        answer: 0,
+        explain: "Missing all four top trumps, leading trump hands the opponents the lead. Cash the side ace first: it gained about ¼ of a trick.",
       },
       {
         q: "Partner called 6 during the auction and you're declarer. Which lead becomes much better than usual?",

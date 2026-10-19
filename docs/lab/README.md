@@ -265,6 +265,59 @@ whether it was.
   mostly uniform across a decision's options. The curves describe expert play; a casual player's results will
   be a little lower.
 
+### 16. The kitty, solved
+
+*Measured by `fh-lab declarer` over 12,000 deals (4,137 where South declares).* South declared at the level
+the rule of thumb gives. Every way of putting back three side cards (and one that put back the lowest trump)
+was solved with every card visible, and the best set of each kind was compared with the best of the other kind
+on the same deal.
+
+| Question | Tricks | First better | Second better |
+|---|---|---|---|
+| Keep every trump, or put one back? | 8.37 vs 7.67 | 57% | 0% |
+| Keep the aces, or put one back? | 8.41 vs 7.94 | 40% | 0% |
+| Make a void, or not? | 8.29 vs 7.90 | 39% | 5% |
+| Keep a guarded king, or not? | 8.12 vs 8.15 | 16% | 18% |
+
+- The void is worth more with more trumps to ruff with: +0.33 tricks with 5 or fewer, +0.43 with 6, +0.52 with 7+.
+- The coach's usual plan was 0.29 tricks short of the best set with hindsight. The best set uses knowledge of the
+  hidden cards, so not all of that gap can be closed.
+- A guarded king is no reason to keep a suit: the advice to "keep guards" is withdrawn.
+
+### 17. The coach is fair and steady
+
+*Measured by `fh-lab audit` over 150 deals for each South player, with The Oracle in the other seats.*
+
+| South | Card play: Best / Good / Inaccuracy / Mistake / Blunder | Bidding: Mistake / Blunder |
+|---|---|---|
+| The Oracle (expert) | 84% / 9% / 5% / 1% / 0% | 0% / 0% (the coach bids as it does) |
+| Steady | 82% / 10% / 5% / 1% / 2% | 18% / 8% |
+| Rookie | 77% / 11% / 5% / 3% / 3% | 15% / 7% |
+
+- **Fair:** an expert's card play is almost never called a mistake, and never a blunder. A beginner collects
+  about six times as many. The cut-offs aren't too harsh.
+- **Steady:** the hint asked twice from different random starts gave the same card 86% of the time. Another 11–12%
+  differed only between plays each named as a close call, and 2% conflicted.
+- Kitty grades are all "best" here because these bots discard by the coach's own plan: no information.
+
+### 18. The declarer's first lead depends on the top trumps
+
+*Measured by `fh-lab declarer --leads-only` over 12,000 deals (4,137 declared).* After the usual discards,
+every opening lead was solved with every card visible, and each kind of lead was compared with leading the top
+trump on the same deal (finding 12 compared them on sampled deals, without pairing by holding).
+
+| Top trumps missing (of Joker, both bowers, ace) | Side ace | Singleton | K of K-Q | Low side card | Low trump |
+|---|---|---|---|---|---|
+| 0–1 | −0.06 to −0.12 | −0.01 to −0.08 | −0.18 to −0.23 | −0.23 to −0.27 | −0.54 to −0.56 |
+| 2 | +0.05 to +0.08 | +0.08 to +0.11 | +0.03 to +0.04 | −0.11 to −0.15 | −0.14 to −0.17 |
+| 3–4 | +0.02 to +0.27 | +0.09 to +0.37 | +0.16 | −0.17 to +0.06 | −0.01 to +0.13 |
+
+Tricks gained against leading the top trump, ranges across trump lengths (5 or fewer, 6, 7+). The low trump is
+the worst lead whenever you hold the top trumps.
+
+- A "void-first" kitty plan (the most voids, keeping aces) made no difference against the usual plan on deals
+  where they differ: 7.89 against 7.87 tricks (n = 1,852).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

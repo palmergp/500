@@ -86,6 +86,7 @@ fn main() {
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 600_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.contains_key("leads-only"),
         ),
         "honesty" => honesty::run(
             flag(&flags, "deals", 300),

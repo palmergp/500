@@ -47,7 +47,7 @@ export const PATTERNS: Record<string, Pattern> = {
   },
   kitty: {
     title: "Kitty choices",
-    advice: "Aim to empty a short side suit (so you can trump it) and keep guards on your kings.",
+    advice: "Aim to empty a short side suit so you can trump it: worth about half a trick. Keeping a king guarded is worth no more than that, so make the void.",
     lesson: "kitty",
   },
   "draw-trumps": {

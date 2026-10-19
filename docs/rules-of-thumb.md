@@ -45,6 +45,8 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 **Card play**
 
 9. **As declarer with 5+ trumps, open with your top trump; with fewer, cash a side ace.** Rarely lead a small trump, unless partner called 6.
+   Count your top trumps (Joker, both bowers, ace): missing two, it's a toss-up with a side ace; missing three or
+   four, lead a side ace or a singleton first.
     - **In no trumps,** cash side winners and keep the Joker.
 10. **Don't rush the Joker.** The expert usually plays it in tricks 3–5.
 11. **Second hand low,** almost always in no trumps.
@@ -238,7 +240,18 @@ Pulling partner out of their suit into your own nearly always cost points in the
 
 A searched choice of discards, comparing options across sampled deals, did no better than this simple rule: **+0.1 points a hand**, statistically zero.
 
-*Source: lab, 300 duplicate deals* (finding 8).
+What each part is worth, solved with every card visible over 4,137 deals where the bidder takes the kitty:
+
+| Choice | What it costs or gains | Ever better the other way? |
+|---|---|---|
+| Putting back a trump | **−0.7 tricks** | Never |
+| Putting back a side ace | **−0.5 tricks** | Never |
+| Emptying a side suit (making a void) | **+0.4 tricks** (+0.3 with 5 or fewer trumps, +0.5 with 7 or more) | Rarely (5% of deals) |
+| Keeping a guarded king (K with a small card) | No difference (16% better, 18% worse) | Often |
+
+So don't spend a discard keeping a king guarded: use it to make the void.
+
+*Source: lab, 600 duplicate deals* (finding 8) *and `fh-lab declarer`* (finding 16).
 
 ---
 
@@ -263,6 +276,21 @@ Both use the expert's search, which has blind spots of its own, so read them as 
 "Top trump" means the highest trump still out, other than the Joker (see rule 10).
 
 **After the opening lead,** keep drawing trumps gradually while the opponents still have some. About half the expert's leads in tricks 2–3 are trumps, and 60% from trick 4 on.
+
+**Count your top trumps.** Solved with every card visible over 4,137 deals, each lead was compared with leading
+your top trump on the same deal. What mattered most was how many of the four top trumps you hold (the Joker,
+both bowers and the ace of trumps):
+
+| Top trumps you're missing | Lead | Compared with your top trump |
+|---|---|---|
+| 0 or 1 | **Your top trump** | A side ace −0.1 tricks, a low side card −0.25, a low trump −0.55 |
+| 2 | **A toss-up:** top trump, side ace or singleton | Side ace +0.07, singleton +0.1, low trump −0.15 |
+| 3 or 4 | **A side ace or a singleton** first | Side ace up to +0.27, singleton up to +0.37 (with 5 or fewer trumps) |
+
+Drawing trumps pays when you hold the top ones: each round pulls two of theirs. When the top trumps are against
+you, leading trump gives them the lead to attack your side suits. Take your side winners while they're still good.
+
+*Source: `fh-lab declarer`* (`docs/lab/README.md`, finding 18).
 
 **Should the bidder always lead trump?** No:
 

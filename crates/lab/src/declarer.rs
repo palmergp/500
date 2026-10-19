@@ -49,10 +49,20 @@ struct Pair {
 struct DealResult {
     kitty: BTreeMap<String, Pair>,
     leads: BTreeMap<(String, String), Stats>,
+    /// Each kind of lead against the top trump, on deals where both are possible.
+    paired_leads: BTreeMap<(String, String), Pair>,
     deals: usize,
 }
 
-pub fn run(deals: u64, seed: u64, threads: u64) {
+fn merge_pair(t: &mut Pair, s: &Pair) {
+    t.n += s.n;
+    t.first += s.first;
+    t.second += s.second;
+    t.first_better += s.first_better;
+    t.second_better += s.second_better;
+}
+
+pub fn run(deals: u64, seed: u64, threads: u64, leads_only: bool) {
     let parts: Vec<DealResult> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|t| {
@@ -60,7 +70,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
                     let mut out = DealResult::default();
                     let mut d = t;
                     while d < deals {
-                        one(seed + d, &mut out);
+                        one(seed + d, &mut out, leads_only);
                         d += threads;
                     }
                     out
@@ -73,12 +83,10 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
     for part in parts {
         all.deals += part.deals;
         for (k, s) in part.kitty {
-            let t = all.kitty.entry(k).or_default();
-            t.n += s.n;
-            t.first += s.first;
-            t.second += s.second;
-            t.first_better += s.first_better;
-            t.second_better += s.second_better;
+            merge_pair(all.kitty.entry(k).or_default(), &s);
+        }
+        for (k, s) in part.paired_leads {
+            merge_pair(all.paired_leads.entry(k).or_default(), &s);
         }
         for (k, s) in part.leads {
             let t = all.leads.entry(k).or_default();
@@ -104,7 +112,28 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
             100.0 * s.second_better / s.n
         );
     }
-    println!("\n## The first lead, by trump holding: average tricks (made %) for each kind of lead\n");
+    println!("\n## The first lead against leading your top trump, on the same deals: tricks gained (how often better / worse)\n");
+    let pholdings: Vec<String> = all.paired_leads.keys().map(|(h, _)| h.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+    let pkinds: Vec<String> = all.paired_leads.keys().map(|(_, k)| k.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
+    println!("| Holding | {} |", pkinds.join(" | "));
+    println!("|---|{}", "---|".repeat(pkinds.len()));
+    for h in &pholdings {
+        let cells: Vec<String> = pkinds
+            .iter()
+            .map(|k| match all.paired_leads.get(&(h.clone(), k.clone())) {
+                Some(s) if s.n >= 30.0 => format!(
+                    "{:+.2} ({:.0}% / {:.0}%, n={:.0})",
+                    (s.first - s.second) / s.n,
+                    100.0 * s.first_better / s.n,
+                    100.0 * s.second_better / s.n,
+                    s.n
+                ),
+                _ => "—".into(),
+            })
+            .collect();
+        println!("| {h} | {} |", cells.join(" | "));
+    }
+    println!("\n## The first lead, by trump holding, unpaired: average tricks (made %) for each kind of lead\n");
     let holdings: Vec<String> = all.leads.keys().map(|(h, _)| h.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
     let kinds: Vec<String> = all.leads.keys().map(|(_, k)| k.clone()).collect::<std::collections::BTreeSet<_>>().into_iter().collect();
     println!("| Holding | {} |", kinds.join(" | "));
@@ -121,7 +150,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
     }
 }
 
-fn one(seed: u64, out: &mut DealResult) {
+fn one(seed: u64, out: &mut DealResult, leads_only: bool) {
     let rules = Rules::default();
     let mut game = Game::with_dealer(rules, seed, Seat::EAST); // South speaks first
     let obs = game.observe(Seat::SOUTH);
@@ -169,6 +198,36 @@ fn one(seed: u64, out: &mut DealResult) {
     if sets.is_empty() || sets.len() > 120 {
         return;
     }
+    let plan_cards: Vec<Card> = heuristic_discards(thirteen, trump, 3);
+    let plan: CardSet = plan_cards.iter().copied().collect();
+    // A void-first plan: of the sets that keep every ace, the one emptying the most side suits,
+    // then the lowest cards. Compared with the usual plan on the same deal.
+    let voids_made = |set: &[Card]| {
+        let hand = thirteen.minus(set.iter().copied().collect());
+        Suit::ALL.iter().filter(|&&s| Some(s) != trump && side(s, hand) == 0).count()
+    };
+    let void_first = sets
+        .iter()
+        .filter(|set| set.iter().all(|c| c.rank() != ACE))
+        .max_by_key(|set| (voids_made(set), std::cmp::Reverse(set.iter().map(|c| c.rank() as u32).sum::<u32>())));
+    if let Some(vf) = void_first {
+        let vf_set: CardSet = vf.iter().copied().collect();
+        if vf_set != plan {
+            if let (Some(x), Some(y)) =
+                (solve(&mut solver, thirteen.minus(vf_set), Trick::new(Seat::SOUTH)), solve(&mut solver, thirteen.minus(plan), Trick::new(Seat::SOUTH)))
+            {
+                let pair = out.kitty.entry("Void-first plan, or the usual plan? (where they differ)".into()).or_default();
+                pair.n += 1.0;
+                pair.first += x as f64;
+                pair.second += y as f64;
+                pair.first_better += f64::from(x > y);
+                pair.second_better += f64::from(y > x);
+            }
+        }
+    }
+    if leads_only {
+        sets.clear();
+    }
     let voids = |hand: CardSet| Suit::ALL.iter().filter(|&&s| Some(s) != trump && side(s, hand) == 0).count();
     let voids_before = voids(thirteen);
     let guarded_kings = |hand: CardSet| {
@@ -180,7 +239,6 @@ fn one(seed: u64, out: &mut DealResult) {
         let e = best_by.entry(key).or_insert(0);
         *e = (*e).max(tricks);
     };
-    let plan: CardSet = heuristic_discards(thirteen, trump, 3).into_iter().collect();
     let mut plan_tricks = None;
     for set in &sets {
         let discards: CardSet = set.iter().copied().collect();
@@ -196,8 +254,7 @@ fn one(seed: u64, out: &mut DealResult) {
     }
     // One set that puts back the lowest trump with the plan's two lowest side cards.
     let lowest_trump = thirteen.iter().filter(|&c| trumpish(c)).min_by_key(|&c| fh_core::trick::trick_strength(c, t, trump));
-    let plan_cards: Vec<Card> = heuristic_discards(thirteen, trump, 3);
-    if let Some(lt) = lowest_trump {
+    if let Some(lt) = lowest_trump.filter(|_| !leads_only) {
         let discards: CardSet = std::iter::once(lt).chain(plan_cards.iter().copied().filter(|&c| !trumpish(c)).take(2)).collect();
         if discards.len() == 3 {
             if let Some(tricks) = solve(&mut solver, thirteen.minus(discards), Trick::new(Seat::SOUTH)) {
@@ -253,6 +310,7 @@ fn one(seed: u64, out: &mut DealResult) {
         }
     );
     let top_trump = trumps.iter().copied().max_by_key(|&c| fh_core::trick::trick_strength(c, t, trump));
+    let mut by_kind: BTreeMap<&str, u8> = BTreeMap::new();
     let low_trump = trumps.iter().copied().min_by_key(|&c| fh_core::trick::trick_strength(c, t, trump));
     for card in hand.iter() {
         let kind = if trumpish(card) {
@@ -283,6 +341,23 @@ fn one(seed: u64, out: &mut DealResult) {
         rest.remove(card);
         if let Some(tricks) = solve(&mut solver, rest, trick) {
             out.leads.entry((holding.clone(), kind.to_string())).or_default().add(tricks, level);
+            let best = by_kind.entry(kind).or_insert(0);
+            *best = (*best).max(tricks);
+        }
+    }
+    if let Some(&top) = by_kind.get("top trump") {
+        for (&kind, &tricks) in &by_kind {
+            if kind == "top trump" {
+                continue;
+            }
+            for h in [holding.clone(), "all holdings".to_string()] {
+                let pair = out.paired_leads.entry((h, kind.to_string())).or_default();
+                pair.n += 1.0;
+                pair.first += tricks as f64;
+                pair.second += top as f64;
+                pair.first_better += f64::from(tricks > top);
+                pair.second_better += f64::from(top > tricks);
+            }
         }
     }
 }
