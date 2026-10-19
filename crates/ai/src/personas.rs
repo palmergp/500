@@ -8,7 +8,7 @@ pub struct Persona {
     pub blurb: &'static str,
 }
 
-pub const PERSONAS: [Persona; 7] = [
+pub const PERSONAS: [Persona; 8] = [
     Persona {
         id: "steady",
         name: "Steady",
@@ -44,6 +44,11 @@ pub const PERSONAS: [Persona; 7] = [
         name: "The Oracle",
         blurb: "Bids from a neural network trained on tens of thousands of solved deals; plays like The Counter.",
     },
+    Persona {
+        id: "natural",
+        name: "The Natural",
+        blurb: "Plays by instinct: a network that learned card play from the expert's search. Quick, and stronger than the rule players.",
+    },
 ];
 
 pub fn persona(id: &str) -> Option<&'static Persona> {
@@ -68,6 +73,8 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
         "counter" => return Some(Box::new(SearchBot::new("The Counter", SearchConfig::COUNTER, seed))),
         "shark" => return Some(Box::new(SearchBot::new("The Shark", SearchConfig::SHARK, seed))),
         "oracle" => return Some(Box::new(SearchBot::new("The Oracle", SearchConfig::ORACLE, seed))),
+        // The play network, with The Oracle's bidding and kitty (docs/lab/README.md, finding 22).
+        "natural" => return crate::neural_play::NeuralBot::new("The Natural", seed).map(|b| Box::new(b) as Box<dyn Bot>),
         "counter-fast" => return Some(Box::new(SearchBot::new("Counter (fast)", SearchConfig::FAST, seed))),
         // Lab variants that isolate one part of the search bot.
         "search-play" => {
@@ -81,6 +88,12 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
         "oracle-nosignals" => {
             let config = SearchConfig { signals: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (no signals)", config, seed)));
+        }
+        "neural" => return crate::neural_play::NeuralBot::new("Neural play", seed).map(|b| Box::new(b) as Box<dyn Bot>),
+        // The Oracle, skipping its search when the play network is confident (lab: quick-0.8 etc.).
+        quick if quick.starts_with("quick-") => {
+            let p: f32 = quick.strip_prefix("quick-")?.parse().ok()?;
+            return crate::neural_play::NeuralBot::quick("Oracle (quick)", seed, p).map(|b| Box::new(b) as Box<dyn Bot>);
         }
         "oracle-nocalls" => {
             let config = SearchConfig { signal_calls: false, ..SearchConfig::ORACLE };

@@ -34,6 +34,10 @@
 - Neural bidding: `fh-lab dataset` writes training data (inputs defined in `crates/ai/src/features.rs`), then
   `train/.venv/Scripts/python train/train_bid.py` writes `crates/ai/models/bid.fhnn`, embedded at build time.
   `train/rules_of_thumb.py` measures the counting rules in `docs/rules-of-thumb.md`.
+- Neural card play: `fh-lab playdata` (the Oracle's search values for every legal card, inputs in
+  `features::play_features`, cards in role-based slots `features::play_slot`), then
+  `train/.venv/Scripts/python train/train_play.py` writes `crates/ai/models/play.fhnn`; `neural_play.rs` plays with it
+  (persona id `neural`). Changing the inputs means regenerating the data and retraining.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save
   stores the pick. Short games: `Rules::hand_limit` (H25), stored in the save as `hands`.
 - Lessons live in `web/src/learn/lessons.ts`; their numbers come from `docs/rules-of-thumb.md`, so keep them in step.

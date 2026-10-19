@@ -3,6 +3,7 @@
 //!
 //! `b"FHNN"`, u32 layer count, then per layer: u32 inputs, u32 outputs, outputs×inputs f32
 //! weights (row-major), outputs f32 biases. All little-endian. ReLU between layers.
+//! `b"FHNH"` is the same with 16-bit (half-precision) weights and biases, for half the size.
 
 pub struct Mlp {
     layers: Vec<Layer>,
@@ -23,18 +24,27 @@ impl Mlp {
             at += n;
             Ok(slice)
         };
-        if take(4)? != b"FHNN" {
-            return Err("not a model file".into());
-        }
+        let half = match take(4)? {
+            b"FHNN" => false,
+            b"FHNH" => true,
+            _ => return Err("not a model file".into()),
+        };
+        let width = if half { 2 } else { 4 };
         let u32_at = |b: &[u8]| u32::from_le_bytes(b.try_into().unwrap()) as usize;
         let count = u32_at(take(4)?);
         let mut layers = Vec::with_capacity(count);
         for _ in 0..count {
             let inputs = u32_at(take(4)?);
             let outputs = u32_at(take(4)?);
-            let floats = |b: &[u8]| b.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect::<Vec<f32>>();
-            let weights = floats(take(inputs * outputs * 4)?);
-            let bias = floats(take(outputs * 4)?);
+            let floats = |b: &[u8]| -> Vec<f32> {
+                if half {
+                    b.as_chunks::<2>().0.iter().map(|c| f16_to_f32(u16::from_le_bytes(*c))).collect()
+                } else {
+                    b.as_chunks::<4>().0.iter().map(|c| f32::from_le_bytes(*c)).collect()
+                }
+            };
+            let weights = floats(take(inputs * outputs * width)?);
+            let bias = floats(take(outputs * width)?);
             if let Some(prev) = layers.last().map(|l: &Layer| l.outputs) {
                 if prev != inputs {
                     return Err("layer sizes don't chain".into());
@@ -104,5 +114,35 @@ mod tests {
         assert!(Mlp::from_bytes(b"nope").is_err());
         let p = softmax(&[0.0, 0.0]);
         assert!((p[0] - 0.5).abs() < 1e-12);
+    }
+}
+
+/// An IEEE half-precision float, widened.
+fn f16_to_f32(bits: u16) -> f32 {
+    let sign = ((bits >> 15) as u32) << 31;
+    let exponent = ((bits >> 10) & 0x1f) as u32;
+    let mantissa = (bits & 0x3ff) as u32;
+    let value = match exponent {
+        0 if mantissa == 0 => sign,
+        0 => {
+            // Subnormal: normalize it.
+            let shift = mantissa.leading_zeros() - 21;
+            sign | ((113 - shift) << 23) | ((mantissa << shift) & 0x3ff) << 13
+        }
+        0x1f => sign | 0x7f80_0000 | (mantissa << 13),
+        _ => sign | ((exponent + 112) << 23) | (mantissa << 13),
+    };
+    f32::from_bits(value)
+}
+
+#[cfg(test)]
+mod half_tests {
+    use super::f16_to_f32;
+
+    #[test]
+    fn half_precision_widens_exactly() {
+        for (bits, value) in [(0x3c00u16, 1.0f32), (0xc000, -2.0), (0x3800, 0.5), (0x0000, 0.0), (0x7bff, 65504.0), (0x0001, 5.960_464_5e-8)] {
+            assert_eq!(f16_to_f32(bits), value, "{bits:#06x}");
+        }
     }
 }

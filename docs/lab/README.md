@@ -386,6 +386,37 @@ estimated from the score gap).
   checked on 800 fresh deals: 74% stated, 71% made overall (bids: 73% and 71%), within the few points that
   different samples of deals vary by.
 
+### 22. A card-play network: The Natural
+
+*Data from `fh-lab playdata` (the Oracle's search value for every legal card at 600,000 decisions from 20,000
+deals); trained by `train/train_play.py`; played by `crates/ai/src/neural_play.rs`.*
+
+**The network:** 585 inputs (cards by role: trump bowers, ace and so on, not printed suit), plus what a player sees
+at a glance (which cards would win the trick now, who is winning it, unseen cards per suit). Two hidden layers
+(768 and 384), one score per card slot. Stored in 16-bit floats (1.5 MB, no measurable loss).
+
+| | Points given up per decision against the search's best |
+|---|---|
+| Always the highest legal card | 18.4 |
+| First network (523 inputs, 360,000 decisions) | 5.1 |
+| **This network** | **4.5** |
+
+**In play (600 duplicate deals each), with The Oracle's bidding and kitty:**
+
+| Match | Per hand | 95% range |
+|---|---|---|
+| The Natural vs Steady | **+23.4** | +13.0 to +33.9 |
+| The Natural vs The Oracle | **−22.6** | −31.0 to −14.1 |
+
+- A strong intermediate player that's instant: about 1 ms a card natively. In the browser no card took over 50 ms,
+  against up to a second for the search players. It's now a persona, **The Natural**.
+- Imitation stalls well short of the search: more data and richer inputs helped against Steady (+4.6 → +23.4)
+  but not against the Oracle (−23 both times).
+- **Skipping the search when the network is confident doesn't pay:** it's rarely confident, since many
+  positions have several near-equal cards. At 60% confidence it skips only 16% of searches, giving up 1.5
+  points each time.
+- Growing it further would need search on top of the network (or self-play training), not more imitation.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

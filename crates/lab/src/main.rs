@@ -21,6 +21,7 @@ mod habits;
 mod honesty;
 mod leads;
 mod levels;
+mod playdata;
 mod duel;
 mod sim;
 mod terminal;
@@ -76,6 +77,12 @@ fn main() {
                 us: us.parse().expect("--us needs a number"),
                 them: flags.get("them").map_or(0, |t| t.parse().expect("--them needs a number")),
             }),
+        ),
+        "playdata" => playdata::run(
+            flag(&flags, "deals", 1000),
+            flag(&flags, "seed", 2_000_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("out").map_or("train/data/play", |s| s.as_str()),
         ),
         "audit" => audit::run(
             flag(&flags, "deals", 150),

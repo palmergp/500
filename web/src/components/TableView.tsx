@@ -14,6 +14,7 @@ const AVATAR: Record<string, string> = {
   counter: "🧮",
   shark: "🦈",
   oracle: "🔮",
+  natural: "⚡",
 };
 
 function lastCall(calls: CallView[], seat: SeatIndex) {
