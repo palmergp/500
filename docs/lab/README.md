@@ -318,6 +318,24 @@ the worst lead whenever you hold the top trumps.
 - A "void-first" kitty plan (the most voids, keeping aces) made no difference against the usual plan on deals
   where they differ: 7.89 against 7.87 tricks (n = 1,852).
 
+### 19. What counting and signals are worth to an expert
+
+*Measured by `duel`, 600 deals each played both ways: the Oracle against itself with one skill removed.*
+
+| The Oracle without… | The full Oracle gains per hand | 95% range |
+|---|---|---|
+| Tracking who has shown out of a suit | **+12.0** | +5.4 to +18.5 |
+| Mentions and 6-calls (passing instead) | +3.7 | −1.5 to +8.9 |
+| Reading what calls show (no auction inference) | −1.4 | −8.4 to +5.7 |
+
+- **Counting voids is clearly worth it:** bids were made 73% of the time against 68%.
+- **Signal calls:** probably a small gain, not yet separable from noise. The full Oracle declared 52% of hands
+  against 48%, so mentions and 6-calls help a side find its bid.
+- **Reading the auction for card play:** no measurable value for the bots yet. Their play already narrows the
+  hidden cards from what's been played, and the auction adds little on top. (Partner's 6-call still places the
+  Joker exactly, a hard constraint the variant keeps.)
+- Longer matches are queued to separate the last two from noise.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

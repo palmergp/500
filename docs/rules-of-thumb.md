@@ -419,6 +419,11 @@ Two discards from a doubleton leave you void and able to trump.
 - Two players out of a suit means the rest are with the other two, or in the kitty.
 - Combined with the bidding (who called 6, who mentioned what), this slowly places the hidden cards.
 
+**What it's worth: about 12 points a hand.** The expert bot was matched against an identical bot that didn't
+notice who had shown out of a suit, over 600 deals played both ways. Noticing was worth **+12 points a hand**
+(95% range +5 to +19), and made bids 73% of the time against 68%. That's more than any single bidding or lead
+rule measured here.
+
 The game can show who is out of each suit, and a tracker of what's still out. The counting quiz turns those aids off and asks you instead.
 
 ---

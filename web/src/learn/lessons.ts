@@ -298,6 +298,7 @@ export const LESSONS: Lesson[] = [
       "• Count trumps. There are 13 in a red suit and 12 in a black suit, counting the Joker and both bowers. Each round, subtract what falls. When the count of trumps you haven't seen reaches zero, your remaining trumps are winners and your side aces are safe.",
       "• Count each suit. A side suit has 10 or 11 cards (minus the jack if it's the left bower). Watch how many have gone.",
       "• Notice who throws off. The moment a player fails to follow suit, they hold no more of it for the rest of the hand. Two players out of a suit means the rest are with the other two, or in the kitty.",
+      "How much is it worth? In the lab, the expert bot beat an identical bot that didn't notice who was out of a suit by about 12 points a hand, and made its bids 73% of the time against 68%: more than any single bidding or lead rule.",
       "## Put it together",
       "From voids and counts you can slowly place the hidden cards. Example: hearts are trumps, three rounds have gone, West threw off on the second, and you haven't seen J♦ or K♥. Then they're with North or East (or discarded by the declarer), so leading a small trump won't catch them both with West.",
       "## Practice",
