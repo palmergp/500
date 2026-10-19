@@ -302,7 +302,7 @@ export const LESSONS: Lesson[] = [
       "## Put it together",
       "From voids and counts you can slowly place the hidden cards. Example: hearts are trumps, three rounds have gone, West threw off on the second, and you haven't seen J♦ or K♥. Then they're with North or East (or discarded by the declarer), so leading a small trump won't catch them both with West.",
       "## Practice",
-      "Turn on the counting quiz in the Coach menu: during play it asks how many trumps or suit cards are still out, and who is out of a suit, hiding the card tracker while you answer.",
+      "Turn on the counting quiz in Settings: during play it asks how many trumps or suit cards are still out, and who is out of a suit, hiding the card tracker while you answer.",
     ],
     quiz: [
       { q: "Spades are trumps. How many trumps are in the pack?", options: ["10", "12", "13"], answer: 1, explain: "10 spades (5–A) + J♣ (left bower) + Joker = 12." },
@@ -322,6 +322,10 @@ export const LESSONS: Lesson[] = [
       "• Defenders can win the game with their 10 a trick. Near 500, every defensive trick matters, and you can go out on defense.",
       "• If both sides cross 500 on the same hand, the declarers count first and win.",
       "• There's no losing floor: a side can go any distance below zero. So when the opponents are close to 500, an aggressive bid that might go down is often worth it to stop them.",
+      "## How to bid near the end (measured over 6,000 deals at each score)",
+      "• They're near 500 (say 460) and you're not: bid, even with a light hand (a count of about 6½), at the cheapest level that takes you to 500 if you make it. Passing lets them win on defense with four tricks. At 300, that's 8 in spades, clubs or diamonds, or 7 in hearts or no trumps.",
+      "• You're near 500 and they're not: any bid you make wins, so bid 7 (don't climb higher). Over an opponent's bid you can pass: four defensive tricks win too.",
+      "• Both near 500: bid 7 even with a light hand. Any made bid wins, and the declarers count first.",
     ],
     quiz: [
       {
@@ -329,6 +333,12 @@ export const LESSONS: Lesson[] = [
         options: ["Yes, with two defensive tricks", "No, only by bidding"],
         answer: 0,
         explain: "Defensive points count under our rules: two tricks take you to 500.",
+      },
+      {
+        q: "They're at 460, you're at 300, and your diamond count is about 7. What's your bid?",
+        options: ["Pass", "7♦", "8♦"],
+        answer: 2,
+        explain: "8♦ (280) takes you to 580 and wins if you make it; 7♦ wouldn't reach 500. Passing lets them win on defense with four tricks. 8♦ won the game most often.",
       },
     ],
   },

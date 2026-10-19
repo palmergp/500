@@ -428,6 +428,21 @@ The game can show who is out of each suit, and a tracker of what's still out. Th
 
 ---
 
+### 18. Near the end, bid to the score
+
+Each option was played out over 6,000 deals at each score, and valued by your side's chance of winning the game
+(`fh-lab levels --us N --them N`; `docs/lab/README.md`, finding 20).
+
+| Score | Best bid | Why |
+|---|---|---|
+| **They're at 460, you're at 300** | **Bid even a light hand** (count 6½), at the **cheapest level that takes you to 500** if made | Passing lets them win on defense with 4 tricks. Bidding raised your chances from about 32% to 43% at a count of 6½, and from 39% to 66% at 8 |
+| **You're at 460, they're at 300** | **7 is enough**; over an opponent's bid, pass unless strong | Any made bid wins, and so do 4 defensive tricks |
+| **Both at 450** | **Bid 7, even light** | Any made bid wins, and the declarers count first: 52% against 43% for passing at a count of 6½ |
+
+Away from the end, the usual levels (rule 2) apply.
+
+---
+
 ## Myths these numbers correct
 
 - **"Count partner for two tricks."**

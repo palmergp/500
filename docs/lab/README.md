@@ -336,11 +336,31 @@ the worst lead whenever you hold the top trumps.
   Joker exactly, a hard constraint the variant keeps.)
 - Longer matches are queued to separate the last two from noise.
 
+### 20. Bidding to the score
+
+*Measured by `fh-lab levels --us N --them N`, 6,000 deals at each score.* As finding 14, but each option is
+valued by the bidder's side's chance of winning the game (certain when the hand takes someone to 500, otherwise
+estimated from the score gap).
+
+| Count | 300 vs 460: pass / 7 / 8 | 460 vs 300: pass / 7 / 8 | 450 vs 450: pass / 7 / 8 |
+|---|---|---|---|
+| 6½ | 32 / 41 / **43** | 57 / **59** / 54 | 43 / **52** / 46 |
+| 7 | 36 / 46 / **48** | 64 / **66** / 59 | 50 / **59** / 51 |
+| 8 | 39 / 58 / **66** | 73 / **81** / 74 | 58 / **76** / 69 |
+| 9 | 40 / 66 / **86** | 78 / **90** / 89 | 62 / **88** / 87 |
+
+- **Behind, with the opponents near 500:** bid even light hands, and prefer the level that reaches 500 if made
+  (8 here, except in hearts and no trumps, where 7 at 300 already reaches 500).
+- **Ahead, near 500:** 7 is enough. Over an opponent's bid, passing was best up to a count of 7, since four
+  defensive tricks also win.
+- **Both near 500:** bid 7 even light. The declarers count first.
+- 9 and 10 were never best at any of these scores.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
 - **Signals:** what a mention or a 6-call is worth, compared with what it tells the opponents.
 - **Seat position:** what a once-around auction implies for each seat. Partly answered for bid levels (finding 14).
 - **The forced dealer:** strategy on the third deal.
-- **Score-aware bidding:** when defenders can go out on tricks.
+- **Score-aware bidding:** when defenders can go out on tricks. Answered for bid levels (finding 20).
 - **The playbook:** the 30 hypotheses in `docs/research/02-strategy-playbook.md` still need checking under these rules.
