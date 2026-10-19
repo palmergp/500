@@ -87,8 +87,18 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             return Some(Box::new(SearchBot::new("Oracle (no mentions or 6-calls)", config, seed)));
         }
         "oracle-noinference" => {
-            let config = SearchConfig { inference: false, ..SearchConfig::ORACLE };
+            let config = SearchConfig { inference: false, read_signals: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (ignores what calls show)", config, seed)));
+        }
+        "oracle-nobidweights" => {
+            // Reads discard signals but ignores what the auction suggests about hands.
+            let config = SearchConfig { inference: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (ignores the auction)", config, seed)));
+        }
+        "oracle-nosignalread" => {
+            // Weighs the auction but ignores discard signals.
+            let config = SearchConfig { read_signals: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (ignores discard signals)", config, seed)));
         }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };

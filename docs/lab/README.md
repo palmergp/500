@@ -337,7 +337,12 @@ the worst lead whenever you hold the top trumps.
 - **Reading the auction for card play:** no measurable value for the bots yet. Their play already narrows the
   hidden cards from what's been played, and the auction adds little on top. (Partner's 6-call still places the
   Joker exactly, a hard constraint the variant keeps.)
-- Longer matches are queued to separate the last two from noise.
+- **Longer matches** (1,800 more deals each, seed 20,000 apart):
+  - Mentions and 6-calls: **+2.0** (−1.1 to +5.2). Pooled with the first 600 deals, about +2.4 a hand: a small,
+    probably real gain. The full Oracle declared 53% of hands against 47%.
+  - Reading the auction and partner's signals: **−4.8** (−8.6 to −1.0). The bot plays *better* without it.
+    The auction weights in `belief.rs` are rough guesses, so they mislead more than they help. Which part hurts
+    (the auction or the discard signals) is being measured next.
 
 ### 20. Bidding to the score
 

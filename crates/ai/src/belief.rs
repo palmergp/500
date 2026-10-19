@@ -164,7 +164,8 @@ impl Belief {
             .expect("capacities always fit the unknown cards");
         let mut hands = hands;
         hands[self.me.index()] = my_hand;
-        let weight = if self.inference { self.weight(&hands) } else { 1.0 };
+        // Calls weigh in only with `inference`; signals only when read (`signals` is empty otherwise).
+        let weight = self.weight(&hands);
         World { hands, out, weight }
     }
 
@@ -238,7 +239,7 @@ impl Belief {
     /// plausibly supports them; passes with hands that couldn't bid much.
     fn weight(&self, hands: &[CardSet; 4]) -> f64 {
         let mut weight = 1.0;
-        for &(seat, call) in &self.calls {
+        for &(seat, call) in self.calls.iter().filter(|_| self.inference) {
             if seat == self.me {
                 continue;
             }

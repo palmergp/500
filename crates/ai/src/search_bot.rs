@@ -117,6 +117,9 @@ pub struct SearchConfig {
     /// Notice who has shown out of a suit when imagining the hidden cards (lab variants turn
     /// this off to measure what counting is worth).
     pub track_voids: bool,
+    /// Read partner's and opponents' discard signals when imagining the hidden cards (with
+    /// `inference`; lab variants turn it off on its own).
+    pub read_signals: bool,
 }
 
 impl SearchConfig {
@@ -145,6 +148,7 @@ impl SearchConfig {
         rule_aggression: 0.7,
         signal_calls: true,
         track_voids: true,
+        read_signals: true,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -226,7 +230,8 @@ impl SearchBot {
         let (declarer, contract) = obs.contract.expect("playing without a contract");
         let trump = contract.trump();
         let trick = obs.current_trick.clone().expect("playing phase has a trick");
-        let belief = Belief::new_full(obs, self.config.inference, self.config.inference && self.config.signals, self.config.track_voids);
+        let read_signals = self.config.signals && self.config.read_signals;
+        let belief = Belief::new_full(obs, self.config.inference, read_signals, self.config.track_voids);
         let mut solver = Solver::with_limit(trump, WORLD_NODE_LIMIT);
         let won_so_far = obs.tricks_won[declarer.team().index()];
 
