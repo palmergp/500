@@ -12,7 +12,7 @@ export default defineConfig({
     },
     {
       // The LAN host, serving the same build, with a fresh table each run.
-      command: "cargo run --release -p fh-host -- --port 5599 --dist dist --state test-results/lan-table.json --fresh",
+      command: "cargo run --release -p fh-host -- --port 5599 --dist dist --state test-results/lan-table.json --fresh --no-browser",
       url: "http://localhost:5599/api/info",
       reuseExistingServer: true,
       timeout: 600_000,

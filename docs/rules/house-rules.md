@@ -72,6 +72,9 @@ This is the authoritative spec for the rules engine. Each rule has an ID; the te
 - **H23. Winning.** The first team to reach 500 wins, defensive points included. Points are counted at the end of
   the hand, the declarers' first: if both teams reach 500 on the same hand, the declarers win.
 - **H24. No floor.** A team can go any distance below zero without losing.
+- **H25. Short game (optional).** Instead of playing to 500, play a set number of hands (four at our table). Deals
+  that are passed out and redealt don't count. After the last hand the higher score wins, defensive points
+  included; if the scores are tied, play one more hand at a time until they aren't.
 
 ## Assumptions to confirm
 

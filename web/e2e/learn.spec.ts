@@ -55,8 +55,8 @@ test("the counting quiz and void markers during play", async ({ page }, info) =>
   test.setTimeout(240_000);
   const { takeTurn } = await import("./helpers");
   await startGame(page);
-  await page.getByRole("button", { name: "Coach", exact: true }).click();
-  const coachDialog = page.getByRole("dialog", { name: "Coach" });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const coachDialog = page.getByRole("dialog", { name: "Settings" });
   await coachDialog.getByLabel(/Counting quiz/).check();
   await coachDialog.getByRole("button", { name: "Done" }).click();
 

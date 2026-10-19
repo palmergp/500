@@ -1,6 +1,6 @@
-# Starts the game: builds whatever is out of date, starts the host and opens the browser.
+# Starts the game: builds whatever is out of date, then starts the host, which opens the browser.
 # Run it through play.cmd (double-click it, or `play` in a terminal). Arguments go to fh-host,
-# e.g. `play --fresh` or `play --port 5501`; `--no-browser` skips opening the browser.
+# e.g. `play --fresh`, `play --port 5501` or `play --no-browser`.
 
 $ErrorActionPreference = "Stop"
 $root = Split-Path -Parent $PSScriptRoot
@@ -17,14 +17,13 @@ function Step($message) {
     Write-Host "== $message" -ForegroundColor Cyan
 }
 
-# Arguments: --no-browser is ours; the rest go to the host. The port is needed to open the page.
-$openBrowser = $true
-$hostArgs = @()
+# Arguments go to the host (it opens the browser itself unless given --no-browser). The port is
+# needed to check whether it's already running.
+$hostArgs = @($args)
+$openBrowser = -not ($hostArgs -contains "--no-browser")
 $port = 5500
-for ($i = 0; $i -lt $args.Count; $i++) {
-    if ($args[$i] -eq "--no-browser") { $openBrowser = $false; continue }
-    if ($args[$i] -eq "--port" -and $i + 1 -lt $args.Count) { $port = [int]$args[$i + 1] }
-    $hostArgs += $args[$i]
+for ($i = 0; $i -lt $args.Count - 1; $i++) {
+    if ($args[$i] -eq "--port") { $port = [int]$args[$i + 1] }
 }
 $url = "http://localhost:$port/"
 
@@ -79,19 +78,5 @@ if ($LASTEXITCODE -ne 0) { Fail "Building the host failed (see above)." }
 
 Step "Starting the game"
 $exe = Join-Path $root "target\release\fh-host.exe"
-$server = if ($hostArgs.Count -gt 0) {
-    Start-Process -FilePath $exe -ArgumentList $hostArgs -NoNewWindow -PassThru
-} else {
-    Start-Process -FilePath $exe -NoNewWindow -PassThru
-}
-
-# Open the browser once the host answers.
-for ($i = 0; $i -lt 100 -and -not $server.HasExited; $i++) {
-    if (HostRunning) {
-        if ($openBrowser) { Start-Process $url }
-        break
-    }
-    Start-Sleep -Milliseconds 200
-}
-$server.WaitForExit()
-exit $server.ExitCode
+& $exe @hostArgs
+exit $LASTEXITCODE

@@ -17,10 +17,12 @@ pub struct WasmTable(Table);
 
 #[wasm_bindgen]
 impl WasmTable {
-    /// A new game. `west`, `north` (your partner) and `east` are persona ids.
+    /// A new game. `west`, `north` (your partner) and `east` are persona ids, or "any" for a
+    /// random one; `hands` is the length of a short game (0 for a game to 500).
     #[wasm_bindgen(constructor)]
-    pub fn new(seed: u32, west: &str, north: &str, east: &str) -> Result<WasmTable, JsError> {
-        Table::new(seed as u64, west, north, east).map(WasmTable).map_err(|e| JsError::new(&e))
+    pub fn new(seed: u32, west: &str, north: &str, east: &str, hands: u8) -> Result<WasmTable, JsError> {
+        let players = ["human", west, north, east].map(String::from);
+        Table::with_players(seed as u64, players, (hands > 0).then_some(hands)).map(WasmTable).map_err(|e| JsError::new(&e))
     }
 
     /// Rebuilds a game from [`WasmTable::save`] output.
@@ -82,6 +84,12 @@ pub fn coach_hint(save: &str) -> Result<JsValue, JsError> {
 #[wasm_bindgen(js_name = coachGrade)]
 pub fn coach_grade(save: &str, number: u32) -> Result<JsValue, JsError> {
     to_js(&coach::grade(save, number as usize).map_err(js_err)?)
+}
+
+/// The grade for the whole kitty discard starting at action `number` (all three cards together).
+#[wasm_bindgen(js_name = coachGradeDiscards)]
+pub fn coach_grade_discards(save: &str, number: u32) -> Result<JsValue, JsError> {
+    to_js(&coach::grade_discards(save, number as usize).map_err(js_err)?)
 }
 
 /// The double-dummy (all cards visible) trace of deal `number`, or null if it was passed out.

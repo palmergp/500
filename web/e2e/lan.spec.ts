@@ -8,6 +8,7 @@ async function join(browser: Browser, name: string, seat: string): Promise<Page>
   const context = await browser.newContext();
   const page = await context.newPage();
   await page.goto("/");
+  await page.getByRole("button", { name: /^Play with friends/ }).click({ timeout: 20_000 });
   const lobby = page.getByRole("dialog", { name: "Table" });
   await expect(lobby).toBeVisible({ timeout: 20_000 });
   await lobby.getByLabel("Your name").fill(name);

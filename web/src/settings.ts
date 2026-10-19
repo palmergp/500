@@ -4,9 +4,12 @@
 export type Speed = "slow" | "normal" | "fast";
 
 export interface Settings {
+  /** Persona ids for the other seats, or "any" for a random one. */
   west: string;
   north: string;
   east: string;
+  /** A short game's number of hands, or 0 to play to 500. */
+  hands: number;
   speed: Speed;
   /** Grade each of your decisions as you play. */
   grade: boolean;
@@ -32,6 +35,7 @@ export const DEFAULT_SETTINGS: Settings = {
   west: "rock",
   north: "oracle",
   east: "gambler",
+  hands: 0,
   speed: "normal",
   grade: true,
   trumpCounter: true,

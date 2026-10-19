@@ -3,6 +3,7 @@ import type { HostInfo, Lobby as LobbyState, NetClient } from "../net";
 import { SEAT_NAMES } from "../net";
 import type { Speed } from "../settings";
 import { Dialog } from "./Dialog";
+import { LENGTHS } from "./NewGameDialog";
 
 interface Props {
   host: HostInfo;
@@ -84,6 +85,7 @@ export function Lobby({ host, lobby, net, connected, name, onName, onSolo, onClo
                         disabled={you === null}
                         onChange={(e) => net.setBot(i, e.target.value)}
                       >
+                        <option value="any">🎲 Random</option>
                         {lobby.personas.map((p) => (
                           <option key={p.id} value={p.id}>
                             🤖 {p.name}
@@ -121,6 +123,16 @@ export function Lobby({ host, lobby, net, connected, name, onName, onSolo, onClo
                 East &amp; West
               </div>
             </div>
+
+            <fieldset className="lobby-pace" disabled={you === null || playing}>
+              <legend>Game</legend>
+              {LENGTHS.map(({ hands, label, detail }) => (
+                <label key={hands} className="inline" title={detail}>
+                  <input type="radio" name="hands" checked={(lobby.hands ?? 0) === hands} onChange={() => net.setLength(hands)} />
+                  {label}
+                </label>
+              ))}
+            </fieldset>
 
             <fieldset className="lobby-pace" disabled={you === null}>
               <legend>Pace</legend>

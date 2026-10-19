@@ -175,6 +175,7 @@ mod tests {
             tricks: vec![],
             current_trick: None,
             tricks_won: [0, 0],
+            hands_played: 0,
         };
         let (total, parts) = count(&obs, Strain::Hearts);
         // Joker 1.5 + right bower 1.25 + 3 small trumps 1.5 + side ace 0.67 + K♦ singleton 0.125 + 3.

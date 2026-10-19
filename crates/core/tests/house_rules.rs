@@ -432,3 +432,40 @@ fn illegal_actions_are_rejected_without_changing_state() {
     assert_eq!(game.to_act(), Some(Seat::SOUTH));
     assert_eq!(game.hand(Seat::SOUTH), before);
 }
+
+#[test]
+fn h25_short_game_highest_score_after_the_hands_wins_ties_play_on() {
+    use fh_core::game::short_game_winner;
+    assert_eq!(short_game_winner(4, 3, [600, 0]), None, "500 doesn't end a short game");
+    assert_eq!(short_game_winner(4, 4, [-40, -80]), Some(Team::NorthSouth));
+    assert_eq!(short_game_winner(4, 4, [120, 340]), Some(Team::EastWest));
+    assert_eq!(short_game_winner(4, 4, [200, 200]), None, "a tie plays another hand");
+    assert_eq!(short_game_winner(4, 5, [260, 200]), Some(Team::NorthSouth));
+}
+
+#[test]
+fn h25_short_game_plays_four_bid_hands() {
+    // Everyone bids the cheapest legal bid when they can (so few deals pass out) and plays the
+    // first legal card: the game must end after four played hands, or later only on a tie.
+    for seed in 0..30 {
+        let rules = Rules { hand_limit: Some(4), ..Rules::default() };
+        let mut game = Game::new(rules, seed);
+        let mut steps = 0;
+        while game.phase() != Phase::GameOver {
+            let legal = game.legal_actions();
+            let pick = legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(_)))).unwrap_or(&legal[0]);
+            game.apply(*pick).unwrap();
+            steps += 1;
+            assert!(steps < 20_000);
+        }
+        let played: Vec<&HandRecord> = game.history().iter().filter(|h| h.contract.is_some()).collect();
+        assert!(played.len() >= 4, "seed {seed}: {} hands", played.len());
+        let scores = game.scores();
+        assert_ne!(scores[0], scores[1]);
+        assert_eq!(game.winner(), Some(if scores[0] > scores[1] { Team::NorthSouth } else { Team::EastWest }));
+        if played.len() > 4 {
+            assert_eq!(played[played.len() - 2].scores_after[0], played[played.len() - 2].scores_after[1], "extra hands only after a tie");
+        }
+        assert_eq!(game.observe(Seat::SOUTH).hands_played as usize, played.len());
+    }
+}

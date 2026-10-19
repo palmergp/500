@@ -52,6 +52,7 @@ impl Spot {
             tricks: Vec::new(),
             current_trick: Some(trick),
             tricks_won: [0, 0],
+            hands_played: 0,
         }
     }
 

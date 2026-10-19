@@ -21,11 +21,14 @@ test("installs and plays offline", async ({ page, context }, info) => {
 
   // Now go offline and start a fresh game: the page, workers and WebAssembly engine come from the cache.
   await context.setOffline(true);
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("fh500.settings", JSON.stringify({ speed: "fast" }));
+  });
   await page.reload();
+  await page.getByRole("button", { name: /^Play solo/ }).click({ timeout: 20_000 });
   const dialog = page.getByRole("dialog", { name: "New game" });
-  await expect(dialog).toBeVisible({ timeout: 20_000 });
-  await dialog.getByLabel("fast").check();
   await dialog.getByRole("button", { name: "Deal" }).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   // The bots move, so the engine is running.
@@ -42,8 +45,8 @@ test("display options and screen-reader announcements", async ({ page }, info) =
   const { startGame, takeTurn } = await import("./helpers");
   await startGame(page);
   const widthBefore = await page.locator(".hand .card").first().evaluate((el) => el.getBoundingClientRect().width);
-  await page.getByRole("button", { name: "Coach", exact: true }).click();
-  const dialog = page.getByRole("dialog", { name: "Coach" });
+  await page.getByRole("button", { name: "Settings", exact: true }).click();
+  const dialog = page.getByRole("dialog", { name: "Settings" });
   await dialog.getByLabel(/Four-color deck/).check();
   await dialog.getByLabel(/Larger cards/).check();
   await dialog.getByRole("button", { name: "Done" }).click();

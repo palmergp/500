@@ -35,6 +35,29 @@ pub struct PlayStat {
     pub tricks: f64,
 }
 
+impl PlayStats {
+    /// Two looks at the same decision (the same legal plays, in the same order) pooled into one.
+    pub fn merge(self, other: PlayStats) -> PlayStats {
+        let weight = |p: &PlayStats| p.per_world.iter().map(|(w, _)| w).sum::<f64>();
+        let (a, b) = (weight(&self), weight(&other));
+        let total = (a + b).max(1e-12);
+        let stats = self
+            .stats
+            .iter()
+            .zip(&other.stats)
+            .map(|(x, y)| PlayStat {
+                action: x.action,
+                ev: (x.ev * a + y.ev * b) / total,
+                makes: (x.makes * a + y.makes * b) / total,
+                tricks: (x.tricks * a + y.tricks * b) / total,
+            })
+            .collect();
+        let mut per_world = self.per_world;
+        per_world.extend(other.per_world);
+        PlayStats { stats, per_world, worlds: self.worlds + other.worlds, valid: self.valid || other.valid }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct PlayStats {
     pub stats: Vec<PlayStat>,
@@ -170,7 +193,8 @@ impl SearchBot {
             Goal::Points => (change[us] - change[1 - us]) as f64,
             Goal::WinChance => {
                 let after = [obs.scores[0] + change[0], obs.scores[1] + change[1]];
-                1000.0 * win_chance(rules, after, side, obs.seat.team())
+                let hands_left = rules.hand_limit.map(|n| n.saturating_sub(obs.hands_played + 1));
+                1000.0 * win_chance(rules, after, side, obs.seat.team(), hands_left)
             }
         }
     }
@@ -180,6 +204,13 @@ impl SearchBot {
     /// Statistics for each legal play over the same sampled worlds: expected value, the chance
     /// the declarer makes the contract, and the declarer's expected tricks. In `legal` order.
     pub fn play_stats(&mut self, obs: &Observation, legal: &[Action]) -> PlayStats {
+        let (samples, min, budget) = (self.config.play_samples, self.config.min_play_samples, self.config.node_budget);
+        self.play_stats_sampled(obs, legal, samples, min, budget)
+    }
+
+    /// As [`SearchBot::play_stats`], with an explicit number of worlds (at most `samples`, at least
+    /// `min_samples` unless the node budget runs out first).
+    pub fn play_stats_sampled(&mut self, obs: &Observation, legal: &[Action], samples_wanted: usize, min_samples: usize, budget: u64) -> PlayStats {
         let (declarer, contract) = obs.contract.expect("playing without a contract");
         let trump = contract.trump();
         let trick = obs.current_trick.clone().expect("playing phase has a trick");
@@ -191,8 +222,8 @@ impl SearchBot {
         let mut per_world = Vec::new();
         let mut weight_sum = 0.0;
         let mut samples = 0;
-        while samples < self.config.play_samples {
-            if samples >= self.config.min_play_samples && solver.nodes >= self.config.node_budget {
+        while samples < samples_wanted {
+            if samples >= min_samples && solver.nodes >= budget {
                 break;
             }
             let world = belief.sample(&mut self.rng, obs.hand);
@@ -528,7 +559,18 @@ impl SearchBot {
 /// A rough chance that `team` wins the game from scores `after` this hand. Terminal positions
 /// follow the rules (declarers count first); otherwise a logistic curve in the score gap, steeper
 /// as the leader nears the target. The lab will replace this with measured values.
-pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team) -> f64 {
+///
+/// In a short game (H25) `hands_left` is the number of hands still to come after this one: with
+/// none left the higher score wins (a tie plays on, so it is even); otherwise the gap counts for
+/// less the more hands remain.
+pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team, hands_left: Option<u8>) -> f64 {
+    let (us, them) = (after[team.index()] as f64, after[1 - team.index()] as f64);
+    if let Some(left) = hands_left {
+        if left == 0 {
+            return if us > them { 1.0 } else if us < them { 0.0 } else { 0.5 };
+        }
+        return 1.0 / (1.0 + (-(us - them) / (160.0 * (left as f64).sqrt())).exp());
+    }
     let target = rules.target_score;
     let d = declarers.index();
     if after[d] >= target {
@@ -537,7 +579,6 @@ pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team) -
     if after[1 - d] >= target {
         return if team == declarers { 0.0 } else { 1.0 };
     }
-    let (us, them) = (after[team.index()] as f64, after[1 - team.index()] as f64);
     let closeness = 1.0 + (us.max(them).max(0.0) / target as f64);
     1.0 / (1.0 + (-(us - them) * closeness / 250.0).exp())
 }
@@ -622,10 +663,21 @@ mod tests {
     fn win_chance_follows_the_rules_at_the_target() {
         let rules = Rules::default();
         let ns = Team::NorthSouth;
-        assert_eq!(win_chance(&rules, [510, 520], ns, ns), 1.0, "declarers count first");
-        assert_eq!(win_chance(&rules, [480, 500], ns, ns), 0.0, "defenders can win");
-        let even = win_chance(&rules, [200, 200], ns, ns);
+        assert_eq!(win_chance(&rules, [510, 520], ns, ns, None), 1.0, "declarers count first");
+        assert_eq!(win_chance(&rules, [480, 500], ns, ns, None), 0.0, "defenders can win");
+        let even = win_chance(&rules, [200, 200], ns, ns, None);
         assert!((even - 0.5).abs() < 1e-9);
-        assert!(win_chance(&rules, [400, 100], ns, ns) > 0.8);
+        assert!(win_chance(&rules, [400, 100], ns, ns, None) > 0.8);
+    }
+
+    #[test]
+    fn win_chance_in_a_short_game_counts_the_hands_left() {
+        let rules = Rules { hand_limit: Some(4), ..Rules::default() };
+        let ns = Team::NorthSouth;
+        assert_eq!(win_chance(&rules, [30, 20], ns, ns, Some(0)), 1.0, "last hand: ahead wins");
+        assert_eq!(win_chance(&rules, [30, 30], ns, ns, Some(0)), 0.5, "a tie plays on");
+        let late = win_chance(&rules, [200, 0], ns, ns, Some(1));
+        let early = win_chance(&rules, [200, 0], ns, ns, Some(3));
+        assert!(late > early && early > 0.5);
     }
 }

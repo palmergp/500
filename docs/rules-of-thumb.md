@@ -34,7 +34,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    - **Length or strength?**
      - In a suit, a top trump (the Joker or a bower) is worth more than an extra small trump: about ¾ against ¼–½ of a trick.
      - In no trumps, a long suit counts only if the ace heads it.
-6. **Compete for the contract.** The neural bidder declares twice as often as the rule-based expert and scores 12 points a hand more.
+6. **Compete for the bid.** The neural bidder declares twice as often as the rule-based expert and scores 12 points a hand more.
 7. **Trust partner's bid.** Raise it or pass; don't pull partner into your suit.
 
 **Kitty**
@@ -89,9 +89,9 @@ Then **add 3** for your partner and the kitty. That total is roughly how many tr
 
 ### 2. Bid 7 when your count reaches about 7¼, and 8 at about 8¼
 
-At that point the contract makes about 60% of the time. That's what the house scoring needs to pay off, given that defenders score 10 a trick either way. A just-made 7-level contract needs about 60%, and an 8 about 56%.
+At that point the bid is made about 60% of the time. That's what the house scoring needs to pay off, given that defenders score 10 a trick either way. A 7-level bid needs to be made about 60% of the time, and an 8 about 56%.
 
-*Source: solver data.* Contracts made 62% of the time at a count of 7¼, and 60% at 8¼.
+*Source: solver data.* Bids were made 62% of the time at a count of 7¼, and 60% at 8¼.
 
 ### 3. Bid a little more than feels safe
 
@@ -106,7 +106,7 @@ A bot that adds about **0.7 tricks** to a careful estimate wins **57%** of games
 
 Add these to your count for the strain you're considering:
 
-| What happened | Suit contract | No trumps |
+| What happened | Suit bid | No trumps |
 |---|---|---|
 | Partner called 6 (they hold the Joker) | **+¾** | **+1** |
 | Partner mentioned this strain | **+0.6** | **+0.7** |
@@ -160,7 +160,7 @@ Then **add 3⅓**. The bidding thresholds are the same as in rule 2.
 
 ### 5b. Length or strength?
 
-**In a suit contract, top trumps beat length.** Average tricks for your side, by trumps held and how many of the top three (Joker, right bower, left bower) you hold:
+**In a suit bid, top trumps beat length.** Average tricks for your side, by trumps held and how many of the top three (Joker, right bower, left bower) you hold:
 
 | Trumps | none | 1 | 2 | all 3 |
 |---|---|---|---|---|
@@ -186,7 +186,7 @@ Then **add 3⅓**. The bidding thresholds are the same as in rule 2.
 
 With 10-card hands and the Joker against you, long suits rarely run. Count the Joker and your aces, not your length.
 
-### 6. Compete for the contract: the neural bidder's lesson
+### 6. Compete for the bid: the neural bidder's lesson
 
 The Oracle bids from a neural network trained on 112,000 solved bidding decisions.
 
@@ -228,7 +228,7 @@ Both use the expert's search, which has blind spots of its own, so read them as 
 
 ### 9. As declarer, lead a top trump with five or more; with fewer, cash a side ace
 
-*Opening leads in suit contracts:*
+*Opening leads in suit bids:*
 
 | You hold | Best opening lead | Then | Worst |
 |---|---|---|---|
@@ -260,7 +260,7 @@ Leading small toward partner's Joker draws the opponents' trumps without spendin
 
 ### 10. Don't rush the Joker as declarer
 
-In suit contracts the declarer's Joker is played:
+In suit bids the declarer's Joker is played:
 
 | Tricks | Share |
 |---|---|
@@ -282,9 +282,9 @@ The lead analysis agrees. Holding the Joker as declarer:
 
 When following suit second, the expert plays low:
 
-| Contract | Plays low |
+| Bid | Plays low |
 |---|---|
-| Suit contracts | **64%** |
+| Suit bids | **64%** |
 | No trumps | **94%** |
 
 Save your high cards for when they capture something.
@@ -301,7 +301,7 @@ When you can't follow suit:
 
 ### 13. As a defender, lead a side ace if you have one, and never a low trump
 
-The defenders' first lead in a suit contract:
+The defenders' first lead in a suit bid:
 
 | Lead | Best | Cost |
 |---|---|---|

@@ -17,8 +17,8 @@ interface CardProps {
   selected?: boolean;
   fromKitty?: boolean;
   small?: boolean;
-  /** The coach's suggestion. */
-  hinted?: boolean;
+  /** The coach's suggestion, or "close": about as good as it (a close call). */
+  hinted?: boolean | "close";
   /** Position in a fanned hand, for the arc and the deal-in animation. */
   fan?: { index: number; count: number };
 }
@@ -38,7 +38,7 @@ export function Card({ card, onClick, playable, selected, fromKitty, small, hint
     selected ? "selected" : "",
     small ? "small" : "",
     card.trump ? "trump" : "",
-    hinted ? "hinted" : "",
+    hinted === "close" ? "also-good" : hinted ? "hinted" : "",
     fan ? "fanned" : "",
     face ? "face" : "",
   ];

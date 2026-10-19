@@ -20,7 +20,7 @@ export function ScorePad({ history, players, onReview }: Props) {
       <thead>
         <tr>
           <th>#</th>
-          <th>Contract</th>
+          <th>Bid</th>
           <th>Tricks</th>
           <th>You &amp; {players[2]?.name}</th>
           <th>

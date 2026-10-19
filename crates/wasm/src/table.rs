@@ -18,6 +18,25 @@ pub struct SaveData {
     /// Persona ids for South, West, North, East; "human" for a seat a person plays.
     pub players: [String; 4],
     pub log: Vec<u16>,
+    /// A short game of this many hands (H25); absent for a game to 500.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hands: Option<u8>,
+}
+
+/// The rules for a game to 500, or a short game of `hands` hands (H25).
+pub fn rules_for(hands: Option<u8>) -> Rules {
+    Rules { hand_limit: hands, ..Rules::default() }
+}
+
+/// "any" picks a persona at random (from the seed and seat, so a replay picks the same one).
+const ANY: &str = "any";
+
+fn resolve_persona(id: &str, seed: u64, seat: Seat) -> String {
+    if id != ANY {
+        return id.to_string();
+    }
+    let mut rng = fh_core::Rng::new(seed ^ 0xA11_0E5 ^ ((seat.index() as u64) << 40));
+    fh_ai::PERSONAS[rng.below(fh_ai::PERSONAS.len())].id.to_string()
 }
 
 pub struct Table {
@@ -26,32 +45,37 @@ pub struct Table {
     players: [String; 4],
     bots: [Option<Box<dyn Bot>>; 4],
     log: Vec<u16>,
+    hands: Option<u8>,
 }
 
 impl Table {
-    /// `west`, `north` (your partner) and `east` are persona ids.
+    /// `west`, `north` (your partner) and `east` are persona ids (or "any" for a random one), for
+    /// a game to 500.
     pub fn new(seed: u64, west: &str, north: &str, east: &str) -> Result<Table, String> {
-        let players = ["human".to_string(), west.to_string(), north.to_string(), east.to_string()];
-        Table::build(seed, players)
+        Table::with_players(seed, ["human", west, north, east].map(String::from), None)
     }
 
-    /// A new game with `players` by seat (South, West, North, East): persona ids, or "human".
-    pub fn with_players(seed: u64, players: [String; 4]) -> Result<Table, String> {
-        Table::build(seed, players)
+    /// A new game with `players` by seat (South, West, North, East): persona ids, "any" for a
+    /// random persona, or "human". `hands` makes it a short game (H25).
+    pub fn with_players(seed: u64, players: [String; 4], hands: Option<u8>) -> Result<Table, String> {
+        let players = std::array::from_fn(|i| resolve_persona(&players[i], seed, Seat::new(i)));
+        Table::build(seed, players, hands)
     }
 
-    fn build(seed: u64, players: [String; 4]) -> Result<Table, String> {
+    fn build(seed: u64, players: [String; 4], hands: Option<u8>) -> Result<Table, String> {
         let mut bots: [Option<Box<dyn Bot>>; 4] = Default::default();
         for seat in Seat::ALL {
             bots[seat.index()] = make_bot(&players[seat.index()], seed, seat)?;
         }
-        Ok(Table { game: Game::new(Rules::default(), seed), seed, players, bots, log: Vec::new() })
+        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands })
     }
 
-    /// Puts a person ("human") or a bot persona in `seat`, mid-game if need be.
+    /// Puts a person ("human") or a bot persona ("any" for a random one) in `seat`, mid-game if
+    /// need be.
     pub fn set_player(&mut self, seat: Seat, id: &str) -> Result<(), String> {
-        self.bots[seat.index()] = make_bot(id, self.seed, seat)?;
-        self.players[seat.index()] = id.to_string();
+        let id = resolve_persona(id, self.seed ^ self.log.len() as u64, seat);
+        self.bots[seat.index()] = make_bot(&id, self.seed, seat)?;
+        self.players[seat.index()] = id;
         Ok(())
     }
 
@@ -144,14 +168,14 @@ impl Table {
     }
 
     pub fn save(&self) -> SaveData {
-        SaveData { version: 1, seed: self.seed, players: self.players.clone(), log: self.log.clone() }
+        SaveData { version: 1, seed: self.seed, players: self.players.clone(), log: self.log.clone(), hands: self.hands }
     }
 
     pub fn restore(save: &SaveData) -> Result<Table, String> {
         if save.version != 1 {
             return Err(format!("unsupported save version {}", save.version));
         }
-        let mut table = Table::build(save.seed, save.players.clone())?;
+        let mut table = Table::build(save.seed, save.players.clone(), save.hands)?;
         for &index in &save.log {
             if table.game.phase() == Phase::GameOver {
                 return Err("save continues past the end of the game".into());
@@ -173,7 +197,7 @@ fn make_bot(id: &str, seed: u64, seat: Seat) -> Result<Option<Box<dyn Bot>>, Str
 
 /// The game after the first `actions` actions of a save (no bots needed).
 pub fn replay(save: &SaveData, actions: usize) -> Result<Game, String> {
-    let mut game = Game::new(Rules::default(), save.seed);
+    let mut game = Game::new(rules_for(save.hands), save.seed);
     for &index in save.log.iter().take(actions) {
         let legal = game.legal_actions();
         let action = *legal.get(index as usize).ok_or("save does not match the game")?;
@@ -185,7 +209,7 @@ pub fn replay(save: &SaveData, actions: usize) -> Result<Game, String> {
 /// The game at the start of deal `number` (1-based, counting passed-out deals), and the number
 /// of actions taken to get there.
 pub fn replay_to_deal(save: &SaveData, number: usize) -> Result<(Game, usize), String> {
-    let mut game = Game::new(Rules::default(), save.seed);
+    let mut game = Game::new(rules_for(save.hands), save.seed);
     for (i, &index) in save.log.iter().enumerate() {
         if game.history().len() + 1 >= number {
             return Ok((game, i));
@@ -259,6 +283,23 @@ mod tests {
         while !table.human_to_act() && table.step_bot().is_some() {}
         assert!(table.human_to_act());
         assert!(table.act(999).is_err());
+    }
+
+    #[test]
+    fn short_games_and_random_players_survive_a_save() {
+        let players = ["human", "any", "any", "any"].map(String::from);
+        let mut table = Table::with_players(5, players, Some(4)).unwrap();
+        assert!(table.players().iter().all(|p| p == "human" || fh_ai::persona(p).is_some()), "{:?}", table.players());
+        auto_play(&mut table);
+        let view = table.view();
+        assert_eq!(view.hand_limit, Some(4));
+        assert!(view.hands_played >= 4);
+        let restored = Table::restore(&serde_json::from_str(&serde_json::to_string(&table.save()).unwrap()).unwrap()).unwrap();
+        assert_eq!(restored.players(), table.players());
+        assert_eq!(restored.game().history().len(), table.game().history().len());
+        // Old saves (no `hands`) are games to 500.
+        let old: SaveData = serde_json::from_str(r#"{"version":1,"seed":3,"players":["human","steady","steady","steady"],"log":[]}"#).unwrap();
+        assert_eq!(Table::restore(&old).unwrap().view().hand_limit, None);
     }
 
     #[test]

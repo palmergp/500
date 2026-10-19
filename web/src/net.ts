@@ -27,6 +27,8 @@ export interface Lobby {
   playing: boolean;
   over: boolean;
   pace: Speed;
+  /** A short game's number of hands, or null for a game to 500. */
+  hands: number | null;
   /** People the table waits on to continue after a hand. */
   waiting: string[];
   personas: Persona[];
@@ -37,7 +39,8 @@ export const SEAT_NAMES = ["South", "West", "North", "East"];
 /** The host's details, or null when the app wasn't loaded from a host. */
 export async function detectHost(): Promise<HostInfo | null> {
   try {
-    const response = await fetch("./api/info", { cache: "no-store" });
+    // Never hold up the menu: no answer in a couple of seconds means no host.
+    const response = await fetch("./api/info", { cache: "no-store", signal: AbortSignal.timeout(2500) });
     if (!response.ok) return null;
     const info = (await response.json()) as HostInfo;
     return info.app === "fh-host" ? info : null;
@@ -205,6 +208,11 @@ export class NetClient implements Coach {
     this.send({ type: "setPace", pace });
   }
 
+  /** A short game of `hands` hands, or 0 for a game to 500. */
+  setLength(hands: number) {
+    this.send({ type: "setLength", hands });
+  }
+
   start() {
     this.send({ type: "start" });
   }
@@ -230,6 +238,10 @@ export class NetClient implements Coach {
 
   grade(_save: string, number: number): Promise<GradeView | null> {
     return this.request({ type: "grade", number });
+  }
+
+  gradeDiscards(_save: string, number: number): Promise<GradeView | null> {
+    return this.request({ type: "gradeDiscards", number });
   }
 
   trace(_save: string, number: number): Promise<TraceView | null> {

@@ -6,10 +6,13 @@ import type { DrillView, ExpertView, GradeView, HintView, Persona, TraceView } f
 export * from "./types";
 export type { Snapshot } from "./protocol";
 
+/** Who plays the other seats (persona ids, or "any" for a random one) and the game's length. */
 export interface Seating {
   west: string;
   north: string;
   east: string;
+  /** A short game's number of hands, or 0 for a game to 500. */
+  hands: number;
 }
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
@@ -31,6 +34,13 @@ class WorkerClient {
       if (reply.ok) waiting.resolve(reply.result);
       else waiting.reject(new Error(reply.error));
     };
+    // A worker that can't load (say, offline before the engine was cached) fails every request,
+    // so the page says so rather than waiting forever.
+    this.worker.onerror = (event) => {
+      event.preventDefault();
+      for (const waiting of this.pending.values()) waiting.reject(new Error(event.message || "the engine failed to load"));
+      this.pending.clear();
+    };
   }
 
   protected call<O extends Op>(op: O, args: Args<O>): Promise<unknown> {
@@ -49,7 +59,8 @@ export class Engine extends WorkerClient {
   }
 
   create(seed: number, seating: Seating): Promise<Snapshot> {
-    return this.call("create", { seed, ...seating }) as Promise<Snapshot>;
+    const { west, north, east, hands } = seating;
+    return this.call("create", { seed, west, north, east, hands }) as Promise<Snapshot>;
   }
 
   /** Rebuilds a saved game; rejects if the save is unreadable. */
@@ -72,6 +83,8 @@ export class Engine extends WorkerClient {
 export interface Coach {
   hint(save: string): Promise<HintView>;
   grade(save: string, number: number): Promise<GradeView | null>;
+  /** The whole kitty discard starting at action `number`, graded as one decision. */
+  gradeDiscards(save: string, number: number): Promise<GradeView | null>;
   trace(save: string, number: number): Promise<TraceView | null>;
   expert(save: string, number: number): Promise<ExpertView>;
 }
@@ -85,6 +98,10 @@ export class CoachClient extends WorkerClient implements Coach {
   /** The grade for action `number` of the game, or null if there was no real choice. */
   grade(save: string, number: number): Promise<GradeView | null> {
     return this.call("grade", { save, number }) as Promise<GradeView | null>;
+  }
+
+  gradeDiscards(save: string, number: number): Promise<GradeView | null> {
+    return this.call("gradeDiscards", { save, number }) as Promise<GradeView | null>;
   }
 
   /** The all-cards-visible trace of deal `number`, or null if it was passed out. */

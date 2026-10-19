@@ -4,7 +4,7 @@
 use crate::table::{replay, replay_to_deal, SaveData, HUMAN};
 use crate::view::card_view;
 use fh_ai::coach::{dd_trace, expert_replay, Coach, Grade, OptionEval};
-use fh_core::{Action, Phase, Seat};
+use fh_core::{Action, Card, Phase, Seat};
 use serde::Serialize;
 
 #[derive(Serialize)]
@@ -26,6 +26,8 @@ pub struct HintView {
     pub reasons: Vec<String>,
     pub options: Vec<OptionView>,
     pub worlds: usize,
+    /// Indices (in `view.legal`) of plays about as good as the best: a close call.
+    pub close: Vec<usize>,
 }
 
 #[derive(Serialize)]
@@ -86,6 +88,7 @@ pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
         options: options_view(&analysis.options, &legal),
         reasons: analysis.reasons,
         worlds: analysis.worlds,
+        close: analysis.close.iter().filter_map(|a| legal.iter().position(|l| l == a)).collect(),
     })
 }
 
@@ -122,6 +125,47 @@ pub fn grade_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<Gr
         loss: grade.loss,
         options: options_view(&grade.analysis.options, &legal),
         reasons: grade.analysis.reasons,
+        deal: game.history().len() + 1,
+    }))
+}
+
+/// Grades the whole kitty discard that starts at action `number` (South's).
+pub fn grade_discards(save: &str, number: usize) -> Result<Option<GradeView>, String> {
+    grade_discards_for(&parse(save)?, number, HUMAN)
+}
+
+/// Grades the three discards `seat` made starting at action `number`, as one decision. The grade
+/// carries the first discard's action number.
+pub fn grade_discards_for(save: &SaveData, number: usize, seat: Seat) -> Result<Option<GradeView>, String> {
+    let mut game = replay(save, number)?;
+    if game.to_act() != Some(seat) || game.phase() != Phase::Discarding {
+        return Err("those weren't your discards".into());
+    }
+    let obs = game.observe(seat);
+    if obs.discards.is_some_and(|d| !d.is_empty()) {
+        return Err("grade the discards from the first one".into());
+    }
+    let mut chosen: Vec<Card> = Vec::new();
+    for &index in save.log.iter().skip(number).take(3) {
+        let legal = game.legal_actions();
+        let Some(&Action::Discard(card)) = legal.get(index as usize) else { break };
+        chosen.push(card);
+        game.apply(Action::Discard(card)).map_err(|e| e.to_string())?;
+    }
+    if chosen.len() < 3 {
+        return Err("the discards aren't finished".into());
+    }
+    let grade = Coach::new(save.seed ^ number as u64).grade_discard_set(&obs, &chosen);
+    let text = |cards: &[Card]| cards.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" ");
+    Ok(Some(GradeView {
+        action_number: number,
+        phase: "discarding",
+        chosen_label: text(&grade.chosen),
+        best_label: text(&grade.plan),
+        verdict: grade.verdict.label(),
+        loss: grade.loss,
+        options: vec![],
+        reasons: grade.reasons,
         deal: game.history().len() + 1,
     }))
 }
@@ -219,6 +263,65 @@ mod tests {
         save.log.push(h.best as u16);
         let g = grade(&serde_json::to_string(&save).unwrap(), number).unwrap().unwrap();
         assert_eq!(g.verdict, "best");
+    }
+
+    /// Advice never depends on who the other players are: the same game with different personas
+    /// in the other seats gets the same hints and grades.
+    #[test]
+    fn advice_ignores_who_the_other_players_are() {
+        let mut table = Table::new(12, "steady", "steady", "steady").unwrap();
+        let (mut checked, mut plays) = (0, 0);
+        for _ in 0..400 {
+            if table.game().phase() == Phase::GameOver || plays >= 2 {
+                break;
+            }
+            if !table.human_to_act() {
+                table.step_bot();
+                continue;
+            }
+            let save = table.save();
+            plays += usize::from(table.game().phase() == Phase::Playing && table.game().legal_actions().len() > 1);
+            let mut others = save.clone();
+            others.players = ["human", "gambler", "rookie", "shark"].map(String::from);
+            let hint = |s: &SaveData| serde_json::to_string(&hint_for(s, HUMAN).unwrap()).unwrap();
+            assert_eq!(hint(&save), hint(&others), "hint at action {}", save.log.len());
+            table.act(0).unwrap();
+            let (mut done, mut done_others) = (table.save(), table.save());
+            done_others.players = others.players.clone();
+            done.log.truncate(save.log.len() + 1);
+            done_others.log.truncate(save.log.len() + 1);
+            let grade = |s: &SaveData| serde_json::to_string(&grade_for(s, save.log.len(), HUMAN).unwrap()).unwrap();
+            assert_eq!(grade(&done), grade(&done_others), "grade at action {}", save.log.len());
+            checked += 1;
+        }
+        assert!(checked >= 3 && plays >= 2, "{checked} decisions, {plays} card plays");
+    }
+
+    #[test]
+    fn the_three_discards_are_graded_together() {
+        // South bids 10NT if it can, so it wins the bid, then puts back its first three cards.
+        let mut table = Table::new(4, "rock", "rock", "rock").unwrap();
+        while table.game().phase() != Phase::Discarding {
+            if table.human_to_act() {
+                let legal = table.game().legal_actions();
+                let top = legal.iter().rposition(|a| matches!(a, Action::Call(fh_core::Call::Bid(_)))).unwrap_or(0);
+                table.act(top).unwrap();
+            } else {
+                table.step_bot();
+            }
+        }
+        assert_eq!(table.game().to_act(), Some(HUMAN));
+        let first = table.action_count();
+        for _ in 0..3 {
+            table.act(0).unwrap();
+        }
+        let save = serde_json::to_string(&table.save()).unwrap();
+        let grade = grade_discards(&save, first).unwrap().expect("a grade");
+        assert_eq!(grade.action_number, first);
+        assert_eq!(grade.chosen_label.split(' ').count(), 3);
+        assert_eq!(grade.best_label.split(' ').count(), 3);
+        assert!(!grade.reasons.is_empty());
+        assert!(grade_discards(&save, first + 1).is_err(), "only from the first discard");
     }
 
     #[test]

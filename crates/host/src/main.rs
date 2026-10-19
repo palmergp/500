@@ -1,15 +1,19 @@
-//! fh-host: hosts a game of 500 on your local network. Run it on one computer, then everyone at
-//! the table opens the address it prints (or scans its QR code) on their phone or laptop, over
-//! the same wifi. The host serves the web app, keeps the one true copy of the game and runs the
-//! bots and the coach; browsers only ever see their own cards.
+//! fh-host: runs the game of 500 on this computer, and hosts it for friends on the same wifi.
+//! It serves the web app, keeps the one true copy of the game and runs the bots and the coach;
+//! browsers only ever see their own cards. It opens the game in your browser when it starts.
 //!
 //!     cargo run --release -p fh-host            (after `npm run build` in web/)
 //!     fh-host --port 5500 --dist web/dist --state fh-host-table.json
+//!
+//! Built with `--features embed`, the web app is inside the program, so the one file runs on any
+//! Windows PC (`make-app.cmd` builds it as `app/500.exe`).
 
 mod room;
 
-use std::net::{IpAddr, Ipv4Addr, UdpSocket};
+use std::io::{Read, Write};
+use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream, UdpSocket};
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
@@ -24,33 +28,42 @@ use room::RoomHandle;
 use tower_http::services::{ServeDir, ServeFile};
 
 const USAGE: &str = "\
-fh-host: host a game of 500 for friends on the same wifi
+fh-host: play 500 here, and host it for friends on the same wifi
 
-Usage: fh-host [--port N] [--dist DIR] [--state FILE | --fresh]
+Usage: fh-host [--port N] [--dist DIR] [--state FILE | --fresh] [--no-browser]
 
   --port N      port to listen on (default 5500)
-  --dist DIR    the built web app (default: web/dist, found from here or next to the program)
-  --state FILE  where the table is kept between runs (default fh-host-table.json)
+  --dist DIR    the built web app (default: built in, or web/dist found from here)
+  --state FILE  where the table is kept between runs
   --fresh       start with an empty table, ignoring any saved one
+  --no-browser  don't open the game in the browser
 ";
 
+const DEFAULT_PORT: u16 = 5500;
+
+/// The web app built into the program.
+#[cfg(feature = "embed")]
+static EMBEDDED: include_dir::Dir<'static> = include_dir::include_dir!("$CARGO_MANIFEST_DIR/../../web/dist");
+
 struct Options {
-    port: u16,
+    port: Option<u16>,
     dist: Option<PathBuf>,
-    state: PathBuf,
+    state: Option<PathBuf>,
     fresh: bool,
+    browser: bool,
 }
 
 fn parse_args() -> Result<Options, String> {
-    let mut options = Options { port: 5500, dist: None, state: PathBuf::from("fh-host-table.json"), fresh: false };
+    let mut options = Options { port: None, dist: None, state: None, fresh: false, browser: true };
     let mut args = std::env::args().skip(1);
     while let Some(arg) = args.next() {
         let mut value = || args.next().ok_or_else(|| format!("{arg} needs a value"));
         match arg.as_str() {
-            "--port" => options.port = value()?.parse().map_err(|_| "--port needs a number")?,
+            "--port" => options.port = Some(value()?.parse().map_err(|_| "--port needs a number")?),
             "--dist" => options.dist = Some(PathBuf::from(value()?)),
-            "--state" => options.state = PathBuf::from(value()?),
+            "--state" => options.state = Some(PathBuf::from(value()?)),
             "--fresh" => options.fresh = true,
+            "--no-browser" => options.browser = false,
             "-h" | "--help" => {
                 print!("{USAGE}");
                 std::process::exit(0);
@@ -59,6 +72,43 @@ fn parse_args() -> Result<Options, String> {
         }
     }
     Ok(options)
+}
+
+/// Says what went wrong and stops. A program started by double-clicking closes its window at
+/// once, so the built-in version waits for Enter first.
+fn fail(message: &str) -> ! {
+    eprintln!("\n{message}");
+    if cfg!(feature = "embed") {
+        eprintln!("\nPress Enter to close this window.");
+        let _ = std::io::stdin().read_line(&mut String::new());
+    }
+    std::process::exit(1);
+}
+
+/// Where the web app comes from: a folder on disk, or the copy built into the program.
+enum Files {
+    Disk(PathBuf),
+    #[cfg(feature = "embed")]
+    Embedded,
+}
+
+impl Files {
+    /// The folder the app is served from, if it isn't built in.
+    fn folder(&self) -> Option<&Path> {
+        match self {
+            Files::Disk(dist) => Some(dist),
+            #[cfg(feature = "embed")]
+            Files::Embedded => None,
+        }
+    }
+}
+
+fn find_files(given: Option<PathBuf>) -> Result<Files, String> {
+    #[cfg(feature = "embed")]
+    if given.is_none() {
+        return Ok(Files::Embedded);
+    }
+    find_dist(given).map(Files::Disk)
 }
 
 /// The built web app: the given directory, else web/dist from here or from the program's folder.
@@ -83,6 +133,21 @@ fn find_dist(given: Option<PathBuf>) -> Result<PathBuf, String> {
     })
 }
 
+/// Where the table is kept between runs: next to the project for a developer's copy, in the
+/// user's own app-data folder for the single-file program (which may sit anywhere, even a
+/// read-only download folder).
+fn default_state() -> PathBuf {
+    if cfg!(feature = "embed") {
+        if let Some(base) = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("HOME")) {
+            let dir = PathBuf::from(base).join("500");
+            if std::fs::create_dir_all(&dir).is_ok() {
+                return dir.join("table.json");
+            }
+        }
+    }
+    PathBuf::from("fh-host-table.json")
+}
+
 /// This computer's address on the local network. Connecting a UDP socket sends nothing; it only
 /// asks the OS which interface would be used.
 fn local_ip() -> IpAddr {
@@ -97,6 +162,34 @@ fn local_ip() -> IpAddr {
         .unwrap_or(IpAddr::V4(Ipv4Addr::LOCALHOST))
 }
 
+/// Whether this game is already running on `port` (someone double-clicked it twice).
+fn already_running(port: u16) -> bool {
+    let address = SocketAddr::from((Ipv4Addr::LOCALHOST, port));
+    let Ok(mut stream) = TcpStream::connect_timeout(&address, Duration::from_secs(1)) else { return false };
+    let _ = stream.set_read_timeout(Some(Duration::from_secs(2)));
+    if stream.write_all(b"GET /api/info HTTP/1.0\r\nHost: localhost\r\n\r\n").is_err() {
+        return false;
+    }
+    let mut reply = String::new();
+    let _ = stream.read_to_string(&mut reply);
+    reply.contains("\"fh-host\"")
+}
+
+/// Opens `url` in the default browser.
+fn open_browser(url: &str) {
+    let result = if cfg!(windows) {
+        // The empty "" is start's window title, so the URL isn't taken for one.
+        std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn()
+    } else if cfg!(target_os = "macos") {
+        std::process::Command::new("open").arg(url).spawn()
+    } else {
+        std::process::Command::new("xdg-open").arg(url).spawn()
+    };
+    if result.is_err() {
+        println!("Open {url} in your browser to play.");
+    }
+}
+
 #[derive(Clone)]
 struct AppState {
     room: RoomHandle,
@@ -105,47 +198,76 @@ struct AppState {
 
 #[tokio::main]
 async fn main() {
-    let options = parse_args().unwrap_or_else(|e| {
-        eprintln!("{e}");
-        std::process::exit(2);
-    });
-    let dist = find_dist(options.dist).unwrap_or_else(|e| {
-        eprintln!("{e}");
-        std::process::exit(1);
-    });
-    if options.fresh {
-        let _ = std::fs::remove_file(&options.state);
+    let options = parse_args().unwrap_or_else(|e| fail(&e));
+    let files = find_files(options.dist).unwrap_or_else(|e| fail(&e));
+
+    // Port 5500 unless told otherwise. If the game is already running there, just show it. If
+    // something else has the port, try the next few (a chosen port is used or nothing).
+    let ports: Vec<u16> = match options.port {
+        Some(port) => vec![port],
+        None => (DEFAULT_PORT..DEFAULT_PORT + 10).collect(),
+    };
+    let mut bound = None;
+    for &port in &ports {
+        if already_running(port) {
+            let local = format!("http://localhost:{port}/");
+            if options.browser {
+                println!("500 is already running: opening it in your browser.");
+                open_browser(&local);
+            } else {
+                println!("500 is already running at {local}");
+            }
+            std::thread::sleep(Duration::from_secs(2));
+            return;
+        }
+        if let Ok(listener) = tokio::net::TcpListener::bind((Ipv4Addr::UNSPECIFIED, port)).await {
+            bound = Some((listener, port));
+            break;
+        }
     }
-    let (room, resumed) = room::spawn(Some(options.state.clone()));
-    let url = format!("http://{}:{}/", local_ip(), options.port);
+    let Some((listener, port)) = bound else {
+        fail(&format!("Can't start: port {} is in use by another program. Try --port 5600.", ports[0]))
+    };
+
+    let state_path = options.state.unwrap_or_else(default_state);
+    if options.fresh {
+        let _ = std::fs::remove_file(&state_path);
+    }
+    let (room, resumed) = room::spawn(Some(state_path.clone()));
+    let url = format!("http://{}:{}/", local_ip(), port);
+    let local = format!("http://localhost:{port}/");
     let state = AppState { room, url: url.clone() };
 
-    let app = Router::new()
-        .route("/api/info", get(info))
-        .route("/api/qr.svg", get(qr_svg))
-        .route("/ws", get(upgrade))
-        .fallback_service(ServeDir::new(&dist).fallback(ServeFile::new(dist.join("index.html"))))
-        .with_state(state);
-
-    let listener = match tokio::net::TcpListener::bind((Ipv4Addr::UNSPECIFIED, options.port)).await {
-        Ok(listener) => listener,
-        Err(e) => {
-            eprintln!("can't listen on port {}: {e}\nIs the host already running? Try --port 5501.", options.port);
-            std::process::exit(1);
-        }
+    let app = Router::new().route("/api/info", get(info)).route("/api/qr.svg", get(qr_svg)).route("/ws", get(upgrade));
+    let app = match &files {
+        Files::Disk(dist) => app.fallback_service(ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html")))),
+        #[cfg(feature = "embed")]
+        Files::Embedded => app.fallback(embedded),
     };
-    println!("500 is hosting a table on your network.\n");
+    let app = app.with_state(state);
+
+    println!("500 is running.\n");
+    if options.browser {
+        println!("  Your browser should open the game. If it doesn't, open {local}");
+    } else {
+        println!("  Open {local} in your browser to play.");
+    }
+    println!("  Keep this window open while you play, and close it when you're done.");
+    if let Some(game) = &resumed {
+        println!("  Your table has {game}.");
+    }
+    println!("\nTo play with friends on the same wifi, they open {url}");
+    println!("on their phone or laptop, or scan this code:");
     if let Ok(code) = QrCode::new(url.as_bytes()) {
         println!("{}", code.render::<unicode::Dense1x2>().quiet_zone(true).build());
     }
-    println!("  On this computer:   http://localhost:{}/", options.port);
-    println!("  Everyone else:      {url}   (same wifi; scan the code above)\n");
-    match resumed {
-        Some(game) => println!("Picked up {game} from {}.", options.state.display()),
-        None => println!("Serving the app from {}.", dist.display()),
+    if let Some(dist) = files.folder() {
+        println!("Serving the app from {}.", dist.display());
     }
-    println!("If friends can't connect, allow fh-host through the firewall for private networks.");
-    println!("Press Ctrl+C to stop; the table is kept for next time.\n");
+    println!("If friends can't connect, allow this program through the Windows firewall for private networks.");
+    if options.browser {
+        open_browser(&local);
+    }
 
     let shutdown = async {
         let _ = tokio::signal::ctrl_c().await;
@@ -153,6 +275,19 @@ async fn main() {
     if let Err(e) = axum::serve(listener, app).with_graceful_shutdown(shutdown).await {
         eprintln!("server error: {e}");
     }
+}
+
+/// Serves the built-in web app. Paths without a file extension get the app itself.
+#[cfg(feature = "embed")]
+async fn embedded(uri: axum::http::Uri) -> Response {
+    let path = uri.path().trim_start_matches('/');
+    let path = if path.is_empty() { "index.html" } else { path };
+    let file = EMBEDDED.get_file(path).or_else(|| if path.contains('.') { None } else { EMBEDDED.get_file("index.html") });
+    let Some(file) = file else { return axum::http::StatusCode::NOT_FOUND.into_response() };
+    let mime = mime_guess::from_path(file.path()).first_or_octet_stream().to_string();
+    // Built assets have content hashes in their names, so they never change.
+    let cache = if path.starts_with("assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
+    ([(header::CONTENT_TYPE, mime), (header::CACHE_CONTROL, cache.to_string())], file.contents()).into_response()
 }
 
 /// Lets the web app know it was loaded from a host, and the address to share.

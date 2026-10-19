@@ -807,6 +807,18 @@ button:focus-visible {
 .card.hinted {
   box-shadow: 0 0 0 3px var(--gold), 0 0 14px 4px rgba(242, 193, 78, 0.7) !important;
 }
+.card.also-good {
+  box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.85), 0 0 0 5px rgba(242, 193, 78, 0.25) !important;
+}
+.close-call {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  font-weight: 600;
+  padding: 1px 7px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--gold) 30%, transparent);
+  vertical-align: middle;
+}
 .call.hinted {
   outline: 3px solid var(--gold);
   outline-offset: 1px;
@@ -1459,5 +1471,595 @@ button.danger {
   .lobby .join img {
     width: 96px;
     height: 96px;
+  }
+}
+
+/* ---- One screen, no scrolling: the table fills the window -------------------------------- */
+
+.app.at-table {
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
+}
+:root {
+  /* Cards size to the window's width and height, so the table always fits. */
+  --card-w: clamp(38px, min(8.6vw, 10.5dvh), 74px);
+}
+.big-cards {
+  --card-w: clamp(46px, min(11vw, 13dvh), 96px);
+}
+.topbar {
+  flex-wrap: nowrap;
+  flex: none;
+}
+.topbar nav {
+  flex-wrap: nowrap;
+  gap: 6px;
+}
+.nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  white-space: nowrap;
+}
+.play-area {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 18px;
+  justify-content: center;
+  padding: 0 12px;
+  width: 100%;
+  max-width: 1480px;
+  margin: 0 auto;
+}
+.play-area > .table {
+  flex: 1;
+  min-height: 0;
+  max-width: 1100px;
+  margin: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas:
+    "info  north  ."
+    "west  center east"
+    "south south  south";
+}
+@media (min-width: 900px) {
+  .play-area > .table {
+    margin: 14px 0 18px;
+  }
+}
+.table-info {
+  grid-area: info;
+  align-self: start;
+  min-width: 0;
+}
+.center {
+  min-height: 0;
+  justify-content: stretch;
+}
+.dock {
+  flex: none;
+  width: min(560px, 100%);
+  max-height: 55%;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+  justify-items: center;
+}
+.center-main {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: auto;
+}
+.rail {
+  flex: none;
+  width: 300px;
+  margin: 14px 0 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+}
+.rail .coach-panel {
+  width: 100%;
+}
+.south {
+  gap: 4px;
+}
+.south-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  justify-content: center;
+}
+.south-bar .status-row {
+  flex: 0 1 auto;
+}
+.hand {
+  padding-top: 10px;
+}
+
+/* The bidding box sizes itself to the room it has. */
+.bidding-box {
+  gap: 3px;
+  padding: 8px;
+}
+.call {
+  min-height: clamp(26px, 4.4dvh, 36px);
+  padding: 2px 4px;
+}
+.call.pass {
+  margin-top: 2px;
+}
+
+/* ---- Seats: whose turn it is, and what each player called ------------------------------- */
+
+.seat {
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+.seat.to-act {
+  border-color: var(--gold);
+  animation: seat-glow 1.3s ease-in-out infinite alternate;
+}
+@keyframes seat-glow {
+  from {
+    box-shadow: 0 0 0 2px rgba(242, 193, 78, 0.35), 0 0 10px rgba(242, 193, 78, 0.35);
+  }
+  to {
+    box-shadow: 0 0 0 3px rgba(242, 193, 78, 0.7), 0 0 26px rgba(242, 193, 78, 0.75);
+  }
+}
+.seat.just-called {
+  animation: seat-called 1.4s ease-out;
+}
+@keyframes seat-called {
+  0% {
+    box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.9), 0 0 30px rgba(255, 255, 255, 0.7);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.seat .turn {
+  margin-left: 6px;
+  color: var(--gold);
+  font-weight: 700;
+}
+.seat-south {
+  flex: none;
+}
+.bubble {
+  font-size: 0.95rem;
+  padding: 3px 10px;
+  border-radius: 10px;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.35);
+  border: 2px solid transparent;
+}
+.bubble.pass {
+  background: #d9d4c7;
+  color: #3a3a3a;
+}
+.bubble.mention {
+  background: #cfe3f5;
+  color: #123a5c;
+}
+.bubble.six {
+  background: #e6d6f2;
+  color: #4a1f6b;
+}
+.bubble.bid {
+  background: var(--gold);
+  color: #2a2000;
+}
+.bubble.latest {
+  border-color: #fff;
+  animation: bubble-pop 0.45s cubic-bezier(0.2, 1.6, 0.4, 1);
+}
+@keyframes bubble-pop {
+  from {
+    opacity: 0;
+    scale: 0.4;
+  }
+}
+.seat-west .bubble {
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+.seat-east .bubble {
+  top: 50%;
+  left: auto;
+  right: calc(100% + 8px);
+  transform: translateY(-50%);
+}
+.seat-south .bubble {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+
+/* ---- Trick piles: one per trick, in front of the player who keeps that side's tricks ----- */
+
+.piles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+  min-height: 22px;
+}
+.seat-east .piles {
+  justify-content: flex-end;
+}
+.pile {
+  width: 16px;
+  height: 22px;
+  padding: 0;
+  border-radius: 3px;
+  border: 1px solid #f4efe4;
+  background: repeating-linear-gradient(45deg, #7a1f2b 0 3px, #962a38 3px 6px);
+  box-shadow:
+    1px 1px 0 #5a1720,
+    2px 2px 0 #f4efe4,
+    3px 3px 0 #5a1720;
+  animation: pile-in 0.35s ease-out;
+}
+.pile.crossed {
+  width: 22px;
+  height: 16px;
+}
+.pile:hover:not(:disabled) {
+  outline: 2px solid var(--gold);
+}
+.pile:disabled {
+  opacity: 1;
+  cursor: default;
+}
+@keyframes pile-in {
+  from {
+    opacity: 0;
+    transform: translateY(-14px) scale(1.3);
+  }
+}
+
+/* ---- Bid and auction panel: beside the table, not under any one seat --------------------- */
+
+.info-panel {
+  background: rgba(0, 0, 0, 0.24);
+  border: 1px solid var(--felt-line);
+  border-radius: 12px;
+  padding: 8px 12px;
+  font-size: 0.88rem;
+  display: grid;
+  gap: 6px;
+}
+.info-game {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--gold);
+}
+.info-panel .auction {
+  background: none;
+  border: none;
+  padding: 0;
+  min-width: 0;
+}
+.info-panel .auction ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.info-panel .auction-row {
+  gap: 8px;
+}
+.info-panel .auction-row.latest {
+  font-weight: 700;
+}
+.info-panel .auction-row strong.pass {
+  color: var(--ink-dim);
+  font-weight: 500;
+}
+.info-panel .contract {
+  font-size: inherit;
+  color: var(--ink);
+  display: grid;
+  gap: 2px;
+}
+.info-panel .trump-count {
+  margin: 0;
+  justify-self: start;
+}
+.contract-tricks {
+  color: var(--ink-dim);
+}
+.contract-tricks b {
+  color: var(--ink);
+}
+.past-tricks-button {
+  justify-self: start;
+  font-size: 0.8rem;
+  padding: 3px 10px;
+}
+.table-info .info-panel {
+  font-size: 0.78rem;
+  padding: 6px 8px;
+}
+
+/* ---- Past tricks ------------------------------------------------------------------------- */
+
+.past-tricks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 10px;
+  --card-w: 46px;
+}
+.past-tricks li {
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 8px;
+}
+.past-tricks li.focused {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 30%, transparent);
+}
+.past-trick-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  font-size: 0.85rem;
+  margin-bottom: 6px;
+}
+.past-trick-head .won.ours {
+  color: var(--accent);
+  font-weight: 600;
+}
+.past-trick-head .won.theirs {
+  color: var(--danger);
+  font-weight: 600;
+}
+.past-trick-cards {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.past-trick-cards figure {
+  margin: 0;
+  display: grid;
+  justify-items: center;
+  gap: 2px;
+  font-size: 0.72rem;
+}
+.past-trick-cards figure.winner .card {
+  box-shadow: 0 0 0 3px var(--gold);
+}
+
+/* ---- What you need to act, in the middle of the table ------------------------------------ */
+
+.joker-choice,
+.discard-bar {
+  flex-direction: column;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--felt-line);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+.joker-choice > div {
+  display: flex;
+  gap: 6px;
+}
+.discard-bar p {
+  margin: 0;
+}
+
+/* ---- Main menu --------------------------------------------------------------------------- */
+
+.main-menu {
+  flex: 1;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  min-height: 100dvh;
+}
+.menu-card {
+  width: min(420px, 100%);
+  text-align: center;
+}
+.menu-card h1 {
+  margin: 0;
+  font-size: clamp(3.5rem, 14vw, 5.5rem);
+  color: var(--gold);
+  letter-spacing: 0.04em;
+  text-shadow: 0 4px 18px rgba(0, 0, 0, 0.45);
+  line-height: 1;
+}
+.menu-suits {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  font-size: 1.6rem;
+  color: var(--ink);
+  margin-top: 6px;
+}
+.menu-suits .red {
+  color: #ff8a8a;
+}
+.menu-tag {
+  color: var(--ink-dim);
+  margin: 10px 0 22px;
+}
+.menu-buttons {
+  display: grid;
+  gap: 10px;
+}
+.menu-buttons button {
+  display: grid;
+  gap: 2px;
+  padding: 12px 16px;
+  font-size: 1.1rem;
+  font-weight: 700;
+  border-radius: 12px;
+  text-align: left;
+}
+.menu-buttons button small {
+  font-size: 0.82rem;
+  font-weight: 400;
+  opacity: 0.8;
+}
+.settings h3 {
+  margin: 6px 0 -4px;
+}
+
+/* ---- Small screens ------------------------------------------------------------------------- */
+
+@media (max-width: 760px) {
+  .nav-label {
+    display: none;
+  }
+  .nav-button {
+    padding: 4px 8px;
+  }
+}
+@media (max-width: 640px) {
+  .play-area {
+    padding: 0;
+  }
+  .topbar {
+    gap: 8px;
+    padding: 6px 8px;
+  }
+  .topbar nav {
+    gap: 4px;
+  }
+  .topbar nav button {
+    padding: 4px 6px;
+  }
+  .table-info .info-panel {
+    font-size: 0.68rem;
+    padding: 4px 6px;
+    gap: 3px;
+  }
+  .table-info .auction ol {
+    display: none;
+  }
+  .past-tricks-button {
+    font-size: 0.7rem;
+    padding: 2px 6px;
+  }
+  .bubble {
+    font-size: 0.85rem;
+    padding: 2px 7px;
+  }
+  .seat-west .bubble,
+  .seat-east .bubble {
+    top: calc(100% + 4px);
+    transform: none;
+  }
+  .seat-west .bubble {
+    left: 0;
+  }
+  .seat-east .bubble {
+    right: 0;
+  }
+  .south-bar {
+    gap: 6px;
+  }
+  .seat-south .seat-sub {
+    display: none;
+  }
+}
+
+/* Puzzles in Learn draw the table inside a dialog. */
+.puzzle .table {
+  grid-template-areas:
+    ".     north  ."
+    "west  center east"
+    "south south  south";
+}
+.puzzle .center {
+  min-height: 180px;
+}
+
+/* The middle only scrolls itself (never the page) if a bidding box can't fit; tricks may overflow. */
+.center-main:not(:has(.bidding-box)) {
+  overflow: visible;
+}
+
+/* ---- Phones: the other three players across the top, a bid strip, then the whole width ----- */
+
+@media (max-width: 640px) {
+  .play-area > .table {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-rows: auto auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "west  north  east"
+      "info  info   info"
+      "center center center"
+      "south south  south";
+    gap: 6px;
+  }
+  .play-area > .table .seat-west,
+  .play-area > .table .seat-east,
+  .play-area > .table .seat-north {
+    align-self: stretch;
+    justify-self: stretch;
+  }
+  .play-area > .table .seat-north {
+    text-align: center;
+  }
+  .play-area > .table .seat-north .seat-name {
+    justify-content: center;
+  }
+  .play-area > .table .seat-north .piles {
+    justify-content: center;
+  }
+  .table-info .info-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 10px;
+    font-size: 0.74rem;
+    padding: 4px 8px;
+  }
+  .table-info .info-panel .contract {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 10px;
+  }
+  .table-info .info-game {
+    font-size: 0.68rem;
+  }
+  /* Calls sit inside each player's plate, so nothing covers the middle. */
+  .play-area .bubble,
+  .play-area .seat-west .bubble,
+  .play-area .seat-east .bubble,
+  .play-area .seat-south .bubble {
+    position: static;
+    transform: none;
+    display: inline-block;
+    margin-top: 4px;
+  }
+  .play-area .seat-south .bubble {
+    margin: 0 0 0 6px;
+  }
+  .play-area .seat-south {
+    display: flex;
+    align-items: center;
+  }
+  .dock {
+    max-height: 42%;
+  }
+  .dock .coach-panel {
+    font-size: 0.8rem;
+    padding: 6px 10px;
   }
 }

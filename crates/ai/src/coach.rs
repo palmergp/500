@@ -72,6 +72,9 @@ pub struct Analysis {
     pub reasons: Vec<String>,
     /// Sampled worlds behind the numbers.
     pub worlds: usize,
+    /// Other options about as good as the best: the sampled deals can't separate them (card
+    /// play only). Shown as a close call rather than presenting a near tie as a firm answer.
+    pub close: Vec<Action>,
     /// Card play only: the raw statistics, for paired comparisons.
     play: Option<PlayStats>,
 }
@@ -84,6 +87,18 @@ pub struct Grade {
     pub loss: f64,
     pub verdict: Verdict,
     pub analysis: Analysis,
+}
+
+/// The grade for a whole kitty discard (all three cards at once).
+#[derive(Clone, Debug)]
+pub struct DiscardGrade {
+    pub chosen: Vec<Card>,
+    /// The coach's plan.
+    pub plan: Vec<Card>,
+    /// Expected points the discards gave up versus the plan (never negative).
+    pub loss: f64,
+    pub verdict: Verdict,
+    pub reasons: Vec<String>,
 }
 
 pub struct Coach {
@@ -108,7 +123,7 @@ impl Coach {
             Phase::Playing => self.analyze_play(obs, legal, chosen),
             Phase::Bidding => self.analyze_call(obs, legal, chosen),
             Phase::Discarding => self.analyze_discard(obs, legal, chosen),
-            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, play: None },
+            Phase::GameOver => Analysis { options: vec![], best: legal[0], reasons: vec![], worlds: 0, close: vec![], play: None },
         }
     }
 
@@ -140,7 +155,10 @@ impl Coach {
             return Grade { chosen, best: chosen, loss: 0.0, verdict: Verdict::Best, analysis };
         }
         let mut verdict = if chosen == analysis.best { Verdict::Best } else { Verdict::from_loss(loss, obs.phase == Phase::Bidding) };
-        if verdict > Verdict::Good && !significant(analysis.play.as_ref(), analysis.best, chosen) {
+        if analysis.close.contains(&chosen) {
+            // One of the plays the coach couldn't separate from its choice: not a mistake.
+            verdict = verdict.min(Verdict::Good);
+        } else if verdict > Verdict::Good && !significant(analysis.play.as_ref(), analysis.best, chosen) {
             verdict = verdict.min(Verdict::Inaccuracy);
             analysis.reasons.push("A close call: the likely deals don't clearly separate these two plays.".into());
         }
@@ -150,15 +168,37 @@ impl Coach {
     // ---- Card play ---------------------------------------------------------------------------
 
     fn analyze_play(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
-        let result = self.search.play_stats(obs, legal);
+        let mut result = self.search.play_stats(obs, legal);
+        // The first look is quick, and on a couple of dozen deals plays a few percent apart can
+        // swap places. If the best play isn't clearly ahead of the next different play, look at
+        // many more deals before choosing.
+        let first = self.search.evaluate_plays_from(obs, &result);
+        let runner_up = first.iter().skip(1).find(|&&(a, _)| !equivalent(&result, first[0].0, a));
+        if let Some(&(second, _)) = runner_up.filter(|_| result.valid) {
+            if !significant(Some(&result), first[0].0, second) {
+                let more = self.search.play_stats_sampled(obs, legal, CLOSER_LOOK, CLOSER_LOOK_MIN, CLOSER_LOOK_BUDGET);
+                result = result.merge(more);
+            }
+        }
         let ranked = self.search.evaluate_plays_from(obs, &result);
         let best = ranked[0].0;
         let stat = |a: Action| result.stats.iter().find(|s| s.action == a).copied();
         let mut options: Vec<OptionEval> =
             ranked.iter().map(|&(action, ev)| OptionEval { action, ev, makes: stat(action).map(|s| s.makes) }).collect();
         options.dedup_by_key(|o| o.action);
-        let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
-        Analysis { options, best, reasons, worlds: result.worlds, play: Some(result) }
+        // Still too close to call after the closer look: say so, rather than pick one as if sure.
+        let close: Vec<Action> = ranked
+            .iter()
+            .skip(1)
+            .filter(|&&(a, ev)| ranked[0].1 - ev < CLOSE_POINTS && (equivalent(&result, best, a) || !significant(Some(&result), best, a)))
+            .map(|&(a, _)| a)
+            .take(3)
+            .collect();
+        let mut reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
+        if !close.is_empty() {
+            reasons.push(close_call_reason(&result, best, &close));
+        }
+        Analysis { options, best, reasons, worlds: result.worlds, close, play: Some(result) }
     }
 
     // ---- Bidding -----------------------------------------------------------------------------
@@ -207,7 +247,7 @@ impl Coach {
         options.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.insert(0, first);
         let reasons = call_reasons(obs, recommended, chosen, &options, high);
-        Analysis { best: recommended, options, reasons, worlds: worlds.len(), play: None }
+        Analysis { best: recommended, options, reasons, worlds: worlds.len(), close: vec![], play: None }
     }
 
     /// Bidding analysis with the neural evaluator: the same numbers The Oracle bids by, for every
@@ -234,7 +274,7 @@ impl Coach {
         others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
         options.extend(others.into_iter().take(2));
         let reasons = call_reasons(obs, recommended, chosen, &options, obs.auction.high_bid());
-        Analysis { best: recommended, options, reasons, worlds: 0, play: None }
+        Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], play: None }
     }
 
     fn search_rng(&mut self) -> fh_core::Rng {
@@ -258,7 +298,41 @@ impl Coach {
             options.push(OptionEval { action: c, ev: mine_ev, makes: None });
         }
         let reasons = discard_reasons(obs, &plan, chosen);
-        Analysis { options, best, reasons, worlds: 12, play: None }
+        Analysis { options, best, reasons, worlds: 12, close: vec![], play: None }
+    }
+
+    /// Grades a whole discard: `chosen` against the coach's plan, from `obs`, the declarer's
+    /// position before the first discard. Judging the set together counts how the cards work as a
+    /// group (voids, guards) rather than three separate guesses.
+    pub fn grade_discard_set(&mut self, obs: &Observation, chosen: &[Card]) -> DiscardGrade {
+        let trump = obs.trump();
+        let plan = heuristic_discards(obs.hand, trump, chosen.len());
+        let set = |cards: &[Card]| cards.iter().copied().collect::<CardSet>();
+        // The plan, then how yours compares and any cards you shouldn't have let go, then voids.
+        let mut notes = discard_reasons(obs, &plan, None);
+        let mut reasons = vec![notes.remove(0)];
+        let loss = if set(&plan) == set(chosen) {
+            0.0
+        } else {
+            let (plan_ev, chosen_ev) = self.compare_discards(obs, &plan, chosen);
+            let loss = (plan_ev - chosen_ev).max(0.0);
+            if loss >= 2.0 {
+                reasons.push(format!("The plan averages {loss:.0} points more than your discards across 12 likely deals."));
+            } else {
+                reasons.push("Your discards do about as well as the plan.".into());
+            }
+            loss
+        };
+        for &card in chosen {
+            if is_trump(card, trump) || card.is_joker() {
+                reasons.push(format!("You put back {card}, a trump: each trump is a likely trick."));
+            } else if card.rank() == fh_core::cards::ACE {
+                reasons.push(format!("You put back {card}: aces are winners, so keep them."));
+            }
+        }
+        reasons.extend(notes);
+        reasons.truncate(4);
+        DiscardGrade { chosen: chosen.to_vec(), plan, loss, verdict: Verdict::from_loss(loss, false), reasons }
     }
 
     /// Expected points for two sets of discards on the same worlds.
@@ -290,19 +364,68 @@ impl Coach {
     }
 }
 
+/// How many more deals to look at when the first look can't separate the best plays: up to
+/// `CLOSER_LOOK`, stopping after `CLOSER_LOOK_MIN` once the budget is spent (early in a hand,
+/// where each deal takes longest to solve).
+const CLOSER_LOOK: usize = 64;
+const CLOSER_LOOK_MIN: usize = 32;
+/// The node budget for the closer look (about twice the first look's).
+const CLOSER_LOOK_BUDGET: u64 = 16_000_000;
+/// Plays the deals can't separate from the best are reported as close calls, if within this many
+/// points (beyond it, a play that only looks close because its deals vary a lot isn't offered).
+const CLOSE_POINTS: f64 = 30.0;
+
+/// Whether two plays win exactly the same in every sampled deal (touching honors, say, or the
+/// Joker and the right bower when both are winners).
+fn equivalent(play: &PlayStats, a: Action, b: Action) -> bool {
+    let index = |x: Action| play.stats.iter().position(|s| s.action == x);
+    let (Some(i), Some(j)) = (index(a), index(b)) else { return false };
+    play.per_world.iter().all(|(_, u)| (u[i] - u[j]).abs() < 1e-9)
+}
+
+/// "Close call: …" for the hint and the grade.
+fn close_call_reason(play: &PlayStats, best: Action, close: &[Action]) -> String {
+    let (same, near): (Vec<Action>, Vec<Action>) = close.iter().partition(|&&a| equivalent(play, best, a));
+    let list = |actions: &[Action]| {
+        let names: Vec<String> = actions.iter().map(|a| a.to_string()).collect();
+        match names.len() {
+            0 => String::new(),
+            1 => names[0].clone(),
+            n => format!("{} or {}", names[..n - 1].join(", "), names[n - 1]),
+        }
+    };
+    let same_text = format!("{} is the same as {best} here: it wins the same tricks.", list(&same));
+    match (same.is_empty(), near.is_empty()) {
+        (false, true) => same_text,
+        (true, false) => format!("Close call: {} does about as well (the {} likely deals can't separate them).", list(&near), play.worlds),
+        (false, false) => format!(
+            "Close call: {} does about as well (the {} likely deals can't separate them). {same_text}",
+            list(&near),
+            play.worlds
+        ),
+        (true, true) => String::new(),
+    }
+}
+
 /// Whether `best` beats `chosen` by more than two standard errors of the paired, per-world
-/// difference. Decisions without per-world data (bids, discards) count as significant.
+/// difference. The deals carry weights (how well each fits the auction), as the averages do, so
+/// the error uses the effective number of deals, (Σw)² / Σw²: a few heavy deals count as a few.
+/// Decisions without per-world data (bids, discards) count as significant.
 fn significant(play: Option<&PlayStats>, best: Action, chosen: Action) -> bool {
     let Some(play) = play else { return true };
     let index = |a: Action| play.stats.iter().position(|s| s.action == a);
     let (Some(b), Some(c)) = (index(best), index(chosen)) else { return true };
-    let diffs: Vec<f64> = play.per_world.iter().map(|(_, u)| u[b] - u[c]).collect();
-    let n = diffs.len() as f64;
+    let total: f64 = play.per_world.iter().map(|(w, _)| w).sum();
+    let squares: f64 = play.per_world.iter().map(|(w, _)| w * w).sum();
+    if total <= 0.0 {
+        return false;
+    }
+    let n = total * total / squares;
     if n < 3.0 {
         return false;
     }
-    let mean = diffs.iter().sum::<f64>() / n;
-    let var = diffs.iter().map(|d| (d - mean).powi(2)).sum::<f64>() / (n - 1.0);
+    let mean = play.per_world.iter().map(|(w, u)| w * (u[b] - u[c])).sum::<f64>() / total;
+    let var = play.per_world.iter().map(|(w, u)| w * (u[b] - u[c] - mean).powi(2)).sum::<f64>() / total * n / (n - 1.0);
     mean > 2.0 * (var / n).sqrt()
 }
 
@@ -333,10 +456,10 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     // How the contract fares, from the player's side.
     if let Some(b) = best_stat {
         let side = |makes: f64| if declaring { makes } else { 1.0 - makes };
-        let goal = if declaring { "makes" } else { "goes down" };
+        let goal = if declaring { "is made" } else { "goes down" };
         match (chosen_play, chosen_stat) {
             (Some(c), Some(cs)) if (side(b.makes) - side(cs.makes)).abs() >= 0.05 => reasons.push(format!(
-                "With {} the contract {goal} in {} of likely deals; with {}, {}.",
+                "With {} the bid {goal} in {} of likely deals; with {}, {}.",
                 best_play.card,
                 pct(side(b.makes)),
                 c.card,
@@ -348,7 +471,7 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
                 b.ev - cs.ev,
                 c.card
             )),
-            (None, _) => reasons.push(format!("The contract {goal} in {} of likely deals after this play.", pct(side(b.makes)))),
+            (None, _) => reasons.push(format!("The bid {goal} in {} of likely deals after this play.", pct(side(b.makes)))),
             _ => {}
         }
     }
@@ -575,6 +698,62 @@ mod tests {
     use super::*;
     use fh_core::{Game, Rules};
 
+    /// A near tie is reported as one, not presented as a firm answer that flips from run to run.
+    /// The position is a user's 8♦ opening lead: Joker J♦ Q♦ 9♦ 7♦ 4♦ K♠ Q♠ 10♠ 5♠. On 600 deals
+    /// with every card visible, a top trump makes 81%, the K♠ 80% and the 5♠ only 74%.
+    #[test]
+    fn close_calls_are_reported_and_weak_leads_are_not_suggested() {
+        let south = CardSet::parse("Joker JD QD 9D 7D 4D KS QS TS 5S").unwrap();
+        let kitty = CardSet::parse("4H 5H 5C").unwrap();
+        let mut rest: Vec<Card> = CardSet::pack().minus(south).minus(kitty).iter().collect();
+        fh_core::Rng::new(3).shuffle(&mut rest);
+        let hand = |i: usize| rest[i * 10..i * 10 + 10].iter().copied().collect::<CardSet>();
+        let mut game = Game::from_deal(Rules::default(), 1, Seat::SOUTH, [south, hand(0), hand(1), hand(2)], kitty);
+        for _ in 0..3 {
+            game.apply(Action::Call(Call::Pass)).unwrap();
+        }
+        game.apply(Action::Call(Call::Bid(Contract::new(8, Strain::Diamonds)))).unwrap();
+        for card in kitty.iter() {
+            game.apply(Action::Discard(card)).unwrap();
+        }
+        let (obs, legal) = (game.observe(Seat::SOUTH), game.legal_actions());
+        let strong = ["Joker", "J♦", "K♠", "Q♠"];
+        for seed in [11, 18] {
+            let hint = Coach::new(seed).analyze(&obs, &legal, None);
+            assert!(strong.contains(&hint.best.to_string().as_str()), "seed {seed}: {}", hint.best);
+            assert!(hint.worlds > 40, "a close call gets a closer look ({} deals)", hint.worlds);
+            assert!(!hint.close.is_empty(), "the top trump and the K♠ are a near tie");
+            assert!(hint.reasons.iter().any(|r| r.contains("the same as") || r.starts_with("Close call")), "{:?}", hint.reasons);
+        }
+    }
+
+    /// The coach sees only what the player can: two deals that differ only in the hidden cards
+    /// (West's and East's hands swapped, a different kitty) get exactly the same advice.
+    #[test]
+    fn advice_depends_only_on_what_you_can_see() {
+        for seed in 0..6u64 {
+            let mut cards: Vec<Card> = CardSet::pack().iter().collect();
+            fh_core::Rng::new(seed).shuffle(&mut cards);
+            let set = |range: std::ops::Range<usize>| cards[range].iter().copied().collect::<CardSet>();
+            let (south, west, north, east) = (set(0..10), set(10..20), set(20..30), set(30..40));
+            let kitty = set(40..43);
+            // The second deal: West and East swap hands, and North trades three cards with the kitty.
+            let north_b: CardSet = set(23..30).union(kitty);
+            let kitty_b = set(20..23);
+            let a = Game::from_deal(Rules::default(), 1, Seat::EAST, [south, west, north, east], kitty);
+            let b = Game::from_deal(Rules::default(), 1, Seat::EAST, [south, east, north_b, west], kitty_b);
+            assert_eq!(a.to_act(), Some(Seat::SOUTH));
+            let (obs_a, obs_b) = (a.observe(Seat::SOUTH), b.observe(Seat::SOUTH));
+            assert_eq!(obs_a, obs_b, "South's view is the same in both deals");
+            let legal = a.legal_actions();
+            let hint_a = Coach::new(seed).analyze(&obs_a, &legal, None);
+            let hint_b = Coach::new(seed).analyze(&obs_b, &legal, None);
+            assert_eq!(hint_a.best, hint_b.best);
+            assert_eq!(format!("{:?}", hint_a.options), format!("{:?}", hint_b.options));
+            assert_eq!(hint_a.reasons, hint_b.reasons);
+        }
+    }
+
     #[test]
     fn grades_overtaking_partner_as_a_mistake() {
         // East follows to partner's winning A♦ with the K♦ instead of the 6♦.
@@ -602,6 +781,7 @@ mod tests {
             tricks: vec![],
             current_trick: Some(trick.clone()),
             tricks_won: [0, 0],
+            hands_played: 0,
         };
         let legal: Vec<Action> = fh_core::legal_plays(obs.hand, &trick, obs.trump()).into_iter().map(Action::Play).collect();
         let king = Action::Play(Play::card(Card::parse("KD").unwrap()));

@@ -23,7 +23,14 @@ export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => vo
   return (
     <div className="coach-panel" role="note" aria-label="Coach's hint">
       <div className="coach-head">
-        <strong>Coach suggests: {hint.bestLabel}</strong>
+        <strong>
+          Coach suggests: {hint.bestLabel}
+          {hint.close.length > 0 && (
+            <span className="close-call" title="The likely deals can't separate these plays: any of the highlighted cards is fine">
+              close call
+            </span>
+          )}
+        </strong>
         <button type="button" className="icon" aria-label="Close hint" onClick={onClose}>
           ×
         </button>
@@ -42,7 +49,7 @@ export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => vo
           ))}
         </p>
       )}
-      <p className="coach-foot">Based on {hint.worlds} likely layouts of the hidden cards.</p>
+      {hint.worlds > 0 && <p className="coach-foot">Based on {hint.worlds} likely layouts of the hidden cards.</p>}
     </div>
   );
 }
@@ -50,11 +57,14 @@ export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => vo
 /** The grade for your last decision, with the reasons and a way back. */
 export function GradeBar({ grade, onUndo, onClose }: { grade: GradeView; onUndo?: () => void; onClose: () => void }) {
   const fine = grade.verdict === "best" || grade.verdict === "good";
+  // The three kitty discards are graded together, as one decision.
+  const kitty = grade.phase === "discarding" && grade.chosenLabel.includes(" ");
   return (
     <div className={`coach-panel grade ${grade.verdict}`} role="status" aria-label="Coach's grade">
       <div className="coach-head">
         <span>
-          <VerdictChip verdict={grade.verdict} /> {grade.chosenLabel}
+          <VerdictChip verdict={grade.verdict} /> {kitty && "Put back "}
+          {grade.chosenLabel}
           {!fine && (
             <>
               {" "}

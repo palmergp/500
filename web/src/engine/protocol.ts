@@ -4,12 +4,13 @@ import type { EventView, View } from "./types";
 
 export type Request =
   | { id: number; op: "personas" }
-  | { id: number; op: "create"; seed: number; west: string; north: string; east: string }
+  | { id: number; op: "create"; seed: number; west: string; north: string; east: string; hands: number }
   | { id: number; op: "load"; save: string }
   | { id: number; op: "act"; index: number }
   | { id: number; op: "stepBot" }
   | { id: number; op: "hint"; save: string }
   | { id: number; op: "grade"; save: string; number: number }
+  | { id: number; op: "gradeDiscards"; save: string; number: number }
   | { id: number; op: "trace"; save: string; number: number }
   | { id: number; op: "expert"; save: string; number: number }
   | { id: number; op: "drillBidding"; seed: number }

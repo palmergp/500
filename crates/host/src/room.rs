@@ -92,6 +92,8 @@ enum ClientMessage {
     Stand,
     SetBot { seat: usize, persona: String },
     SetPace { pace: String },
+    /// A short game of this many hands (H25), or 0 for a game to 500.
+    SetLength { hands: u8 },
     Start,
     /// `expect` is the action count the client saw, so a stale click can't land on a later turn.
     Act { id: u64, index: usize, expect: usize },
@@ -100,6 +102,8 @@ enum ClientMessage {
     EndGame,
     Hint { id: u64 },
     Grade { id: u64, number: usize },
+    /// The whole kitty discard starting at action `number`, graded as one decision.
+    GradeDiscards { id: u64, number: usize },
     Trace { id: u64, number: usize },
     Expert { id: u64, number: usize },
 }
@@ -111,6 +115,7 @@ impl ClientMessage {
             ClientMessage::Act { id, .. }
             | ClientMessage::Hint { id }
             | ClientMessage::Grade { id, .. }
+            | ClientMessage::GradeDiscards { id, .. }
             | ClientMessage::Trace { id, .. }
             | ClientMessage::Expert { id, .. } => Some(*id),
             _ => None,
@@ -148,6 +153,8 @@ struct Saved {
     game_id: String,
     pace: String,
     waiting: Vec<usize>,
+    #[serde(default)]
+    hands: Option<u8>,
 }
 
 #[derive(Serialize)]
@@ -160,6 +167,8 @@ struct LobbyView<'a> {
     playing: bool,
     over: bool,
     pace: &'a str,
+    /// A short game's number of hands, or null for a game to 500.
+    hands: Option<u8>,
     /// People the table waits on to continue after a hand.
     waiting: Vec<String>,
     personas: Vec<PersonaView>,
@@ -205,6 +214,8 @@ pub struct Room {
     table: Option<Table>,
     game_id: String,
     pace: String,
+    /// A short game's number of hands (H25), or `None` for a game to 500.
+    hands: Option<u8>,
     /// When the bot to act next should move.
     next_bot: Option<Instant>,
     /// Seats the table waits on to continue after a hand.
@@ -221,6 +232,7 @@ impl Room {
             table: None,
             game_id: String::new(),
             pace: "normal".into(),
+            hands: None,
             next_bot: None,
             waiting: Vec::new(),
             state,
@@ -314,7 +326,7 @@ impl Room {
             ClientMessage::SetBot { seat, persona } => {
                 self.seated(conn)?;
                 let seat = seat_at(seat)?;
-                if fh_ai::persona(&persona).is_none() {
+                if !known_bot(&persona) {
                     return Err(format!("unknown player type {persona:?}"));
                 }
                 let state = &mut self.seats[seat.index()];
@@ -340,13 +352,23 @@ impl Room {
                 }
                 self.pace = pace;
             }
+            ClientMessage::SetLength { hands } => {
+                self.seated(conn)?;
+                if self.table.is_some() {
+                    return Err("the game has started".into());
+                }
+                if hands > 20 {
+                    return Err("that's a long game".into());
+                }
+                self.hands = (hands > 0).then_some(hands);
+            }
             ClientMessage::Start => {
                 self.seated(conn)?;
                 if self.table.is_some() {
                     return Err("a game is already on".into());
                 }
                 let players = self.seats.clone().map(|s| if s.person.is_some() { "human".to_string() } else { s.bot });
-                self.table = Some(Table::with_players(random_u64(), players)?);
+                self.table = Some(Table::with_players(random_u64(), players, self.hands)?);
                 self.game_id = format!("lan-{:016x}", random_u64());
                 self.waiting.clear();
                 self.resend_views();
@@ -391,6 +413,9 @@ impl Room {
             ClientMessage::Hint { id } => self.coach(conn, id, |save, seat| coach::hint_for(save, seat).map(to_value))?,
             ClientMessage::Grade { id, number } => {
                 self.coach(conn, id, move |save, seat| coach::grade_for(save, number, seat).map(to_value))?
+            }
+            ClientMessage::GradeDiscards { id, number } => {
+                self.coach(conn, id, move |save, seat| coach::grade_discards_for(save, number, seat).map(to_value))?
             }
             ClientMessage::Trace { id, number } => {
                 self.coach(conn, id, move |save, seat| coach::trace_for(save, number, seat).map(to_value))?
@@ -539,7 +564,8 @@ impl Room {
                 match &state.person {
                     _ if i == viewer.index() => "You".to_string(),
                     Some(person) => person.name.clone(),
-                    None => fh_ai::persona(&state.bot).map_or(state.bot.clone(), |p| p.name.to_string()),
+                    // In a game, the bot actually playing (a random pick is resolved by then).
+                    None => bot_name(self.table.as_ref().map_or(&state.bot, |t| &t.players()[i])),
                 }
             }),
         )
@@ -567,12 +593,13 @@ impl Room {
                 .map(|s| SeatView {
                     person: s.person.as_ref().map(|p| PersonView { name: p.name.clone(), connected: self.present(&p.client) }),
                     bot: s.bot.clone(),
-                    bot_name: fh_ai::persona(&s.bot).map_or(s.bot.clone(), |p| p.name.to_string()),
+                    bot_name: bot_name(&s.bot),
                 })
                 .collect(),
             playing: self.table.is_some(),
             over: self.table.as_ref().is_some_and(|t| t.game().phase() == Phase::GameOver),
             pace: &self.pace,
+            hands: self.hands,
             waiting: self.waiting.iter().filter_map(|s| self.seats[s.index()].person.as_ref().map(|p| p.name.clone())).collect(),
             personas: fh_ai::PERSONAS.iter().map(|p| PersonaView { id: p.id, name: p.name, blurb: p.blurb }).collect(),
         };
@@ -637,6 +664,7 @@ impl Room {
             game_id: self.game_id.clone(),
             pace: self.pace.clone(),
             waiting: self.waiting.iter().map(|s| s.index()).collect(),
+            hands: self.hands,
         };
         let json = serde_json::to_string_pretty(&saved).expect("state serializes");
         let temp = path.with_extension("tmp");
@@ -650,7 +678,7 @@ impl Room {
         let text = std::fs::read_to_string(self.state.as_ref()?).ok()?;
         let saved: Saved = serde_json::from_str(&text).ok()?;
         let seats: [SeatState; 4] = saved.seats.try_into().ok()?;
-        if !seats.iter().all(|s| fh_ai::persona(&s.bot).is_some()) {
+        if !seats.iter().all(|s| known_bot(&s.bot)) {
             return None;
         }
         let table = match &saved.save {
@@ -659,6 +687,7 @@ impl Room {
         };
         self.seats = seats;
         self.pace = saved.pace;
+        self.hands = saved.hands;
         self.game_id = saved.game_id;
         self.waiting = saved.waiting.into_iter().filter_map(|i| seat_at(i).ok()).collect();
         let description = table.as_ref().map(|t| {
@@ -669,6 +698,18 @@ impl Room {
         self.schedule(&[]);
         description
     }
+}
+
+/// A persona id, or "any" for a random one (picked when the bot sits down).
+fn known_bot(id: &str) -> bool {
+    id == "any" || fh_ai::persona(id).is_some()
+}
+
+fn bot_name(id: &str) -> String {
+    if id == "any" {
+        return "Random".into();
+    }
+    fh_ai::persona(id).map_or(id.to_string(), |p| p.name.to_string())
 }
 
 fn to_value<T: Serialize>(value: T) -> Value {
@@ -847,6 +888,28 @@ mod tests {
         // Cat, not seated, can't ask the coach about anyone's hand.
         cat.say(&mut room, json!({ "type": "hint", "id": 8 }));
         assert!(cat.inbox().iter().any(|m| m["type"] == "reply" && m["ok"] == false));
+    }
+
+    #[test]
+    fn a_short_game_with_random_bots() {
+        let mut room = Room::new(None);
+        let mut ann = Client::join(&mut room, 1, "ann", "Ann");
+        ann.say(&mut room, json!({ "type": "sit", "seat": 0 }));
+        for seat in 1..4 {
+            ann.say(&mut room, json!({ "type": "setBot", "seat": seat, "persona": "any" }));
+        }
+        ann.say(&mut room, json!({ "type": "setLength", "hands": 4 }));
+        let l = lobby(&ann.inbox());
+        assert_eq!(l["hands"], 4);
+        assert_eq!(l["seats"][1]["botName"], "Random");
+        ann.say(&mut room, json!({ "type": "start" }));
+        let table = room.table.as_ref().unwrap();
+        assert!(table.players()[1..].iter().all(|p| fh_ai::persona(p).is_some()), "{:?}", table.players());
+        let view = Client::latest_view(&ann.inbox()).unwrap();
+        assert_eq!(view["handLimit"], 4);
+        // The length can't change mid-game.
+        ann.say(&mut room, json!({ "type": "setLength", "hands": 0 }));
+        assert!(ann.inbox().iter().any(|m| m["type"] == "notice"));
     }
 
     #[test]

@@ -50,16 +50,16 @@ export const LESSONS: Lesson[] = [
   {
     id: "auction",
     title: "2. The auction: calls and scoring",
-    summary: "Once-around bidding, mentions, 6-calls, and what contracts are worth.",
+    summary: "Once-around bidding, mentions, 6-calls, and what bids are worth.",
     body: [
       "Each player gets exactly one call, starting left of the dealer; the dealer speaks last.",
       "• Pass.",
       "• Mention a suit (or NT): \"this is my strongest suit, usually with a bower, but I can't bid\". Each mention must outrank the last (♠ < ♣ < ♦ < ♥ < NT).",
-      "• 6 of a strain: \"I hold the Joker, and this is my best suit\". It never becomes the contract.",
+      "• 6 of a strain: \"I hold the Joker, and this is my best suit\". It never becomes the winning bid.",
       "• A bid of 7–10 in a strain. Once anyone calls 6 or bids, mentions and 6-calls close.",
       "If nobody bids 7, the same dealer redeals, up to twice; on the third deal the dealer must bid if nobody else has.",
       "## Scoring",
-      "7♠ 140, 7♣ 160, 7♦ 180, 7♥ 200, 7NT 220, and each level up adds 100 (10♥ is 500). Make it and score the value; fall short and lose it. Defenders always score 10 a trick. Taking all ten tricks scores 250 if the contract is worth less. First side to 500 wins, defensive points included.",
+      "7♠ 140, 7♣ 160, 7♦ 180, 7♥ 200, 7NT 220, and each level up adds 100 (10♥ is 500). Make it and score the value; fall short and lose it. Defenders always score 10 a trick. Taking all ten tricks scores 250 if the bid is worth less. First side to 500 wins, defensive points included.",
     ],
     quiz: [
       { q: "Someone mentioned ♦. Can the next player mention ♣?", options: ["Yes", "No"], answer: 1, explain: "Mentions must outrank the last one: after ♦, only ♥ or NT." },
@@ -68,7 +68,7 @@ export const LESSONS: Lesson[] = [
         q: "Partner called 6♥. What do you know?",
         options: ["They hold the Joker", "They hold six hearts", "They want to play 6♥"],
         answer: 0,
-        explain: "A 6-call says \"I hold the Joker\"; the suit is their best suit. It's never a contract.",
+        explain: "A 6-call says \"I hold the Joker\"; the suit is their best suit. It's never a real bid.",
       },
     ],
   },
@@ -81,7 +81,7 @@ export const LESSONS: Lesson[] = [
       "• Joker 1½ · right bower 1¼ · left bower 1 · trump ace ¾ · trump king ⅔ · trump queen ½ · each other trump ½",
       "• Each side ace ⅔ · each guarded side king ⅕ · each side void ⅕ · each singleton ⅛",
       "• Then add 3 for your partner and the kitty.",
-      "That total is roughly what your side will take as declarer. Bid 7 when it reaches about 7¼, and 8 at about 8¼: at those counts the contract makes about 60% of the time, which is what the scoring needs to pay.",
+      "That total is roughly what your side will take as declarer. Bid 7 when it reaches about 7¼, and 8 at about 8¼: at those counts the bid is made about 60% of the time, which is what the scoring needs to pay.",
       "## Bid a little more than feels safe",
       "Thrown-in deals score nothing, so timid bidding loses. In the lab, a bot that adds about 0.7 tricks to a careful estimate won 57% of its games against the same bot without it.",
       "The coach shows this count, card by card, whenever you ask for a hint or get a grade in the auction.",
@@ -94,7 +94,7 @@ export const LESSONS: Lesson[] = [
         explain: "1½ + 1¼ + 3 × ½ + ⅔ + ⅛ + 3 ≈ 8.0: enough for 7♥, not quite 8♥ (8¼).",
       },
       { q: "What is a side void worth on its own?", options: ["About ⅕ trick", "About 1 trick", "About 2 tricks"], answer: 0, explain: "A void helps only with spare trumps to use it: about ⅕ of a trick, less than a small trump." },
-      { q: "From what count does a 7 bid start to pay?", options: ["6", "7¼", "8½"], answer: 1, explain: "About 7¼: the contract then makes about 60% of the time." },
+      { q: "From what count does a 7 bid start to pay?", options: ["6", "7¼", "8½"], answer: 1, explain: "About 7¼: the bid is then made about 60% of the time." },
     ],
   },
   {
@@ -110,7 +110,7 @@ export const LESSONS: Lesson[] = [
       "• From the 8 level up, lean toward the suit. Even with the Joker, no trumps wins only 44% of the time there.",
       "## Lots of one suit?",
       "Without the Joker, bid it. With the Joker, no trumps is still often better at the 7 level, even with a 6-card suit. You lose only about a third of a trick, and no trumps is worth more points.",
-      "## Length or strength in a suit contract",
+      "## Length or strength in a suit bid",
       "• Top trumps win. Swapping a small trump for the Joker or a bower adds about ¾ of a trick.",
       "• One more small trump adds ½ a trick when you hold none of the top three trumps, but only ¼ once you hold two of them.",
       "• Three trumps that include the Joker and both bowers are worth about as much as seven small trumps.",
@@ -161,7 +161,7 @@ export const LESSONS: Lesson[] = [
       "Holding the Joker but no bid? Call 6: it's worth ¾ of a trick to your partner. Holding a bower in a suit you can't bid? Mention it.",
     ],
     quiz: [
-      { q: "Partner passed. Adjust your count by about…", options: ["+1", "0", "−0.9"], answer: 2, explain: "A pass shows weakness: about −0.9 in a suit contract." },
+      { q: "Partner passed. Adjust your count by about…", options: ["+1", "0", "−0.9"], answer: 2, explain: "A pass shows weakness: about −0.9 in a suit bid." },
       {
         q: "You hold the Joker but your count is only 6½. Best call (if open)?",
         options: ["Pass", "6 in your best suit", "Bid 7 anyway"],
@@ -247,7 +247,7 @@ export const LESSONS: Lesson[] = [
     ],
     quiz: [
       {
-        q: "Defending a suit contract, you hold the A♣. Your first lead?",
+        q: "Defending a suit bid, you hold the A♣. Your first lead?",
         options: ["A low trump", "The A♣", "Partner's mentioned suit"],
         answer: 1,
         explain: "A side ace was the best defensive lead 68% of the time; a low trump was the worst.",

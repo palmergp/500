@@ -3,6 +3,12 @@
 One computer hosts the table; everyone else joins from the browser on their phone, tablet or laptop.
 Everyone needs to be on the same wifi. Nothing goes over the internet.
 
+## A copy for someone else
+
+Run **`make-app.cmd`** to build **`app/500.exe`**: the whole game in one file, about 4 MB. Copy it to another
+Windows PC (a USB stick is easiest) and double-click it there; nothing else needs installing. It works just like
+`play.cmd`: the game opens in the browser, and friends on that wifi can join.
+
 ## Start a table (on the host computer)
 
 1. Double-click **`play.cmd`** in the project folder, or run `play` in a terminal there.
@@ -16,14 +22,14 @@ Leave the window open while you play. Press **Ctrl+C** to stop.
 
 ## Join (everyone, including the host)
 
-- On the host computer, open `http://localhost:5500/`.
+- On the host computer, open `http://localhost:5500/` (`play.cmd` opens it for you).
 - On a phone, scan the QR code, or type the address it shows into the browser.
 
-The **Table** screen opens.
+On the main menu, press **Play with friends**. The **Table** screen opens.
 
 1. Type your name.
 2. Press **Sit here** on a seat. North and South are partners, and so are East and West.
-3. Choose a bot for each empty seat, and choose the pace.
+3. Choose a bot for each empty seat (or 🎲 Random), whether to play to 500 or for 4 hands, and the pace.
 4. Anyone sitting at the table can press **Deal**.
 
 ## During the game

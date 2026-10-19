@@ -91,6 +91,12 @@ export interface View {
   discards: CardView[] | null;
   trick: TrickView | null;
   lastTrick: TrickView | null;
+  /** The tricks finished so far this hand, in order. */
+  tricks: TrickView[];
+  /** A short game's number of hands, or null for a game to 500. */
+  handLimit: number | null;
+  /** Hands bid and played so far this game. */
+  handsPlayed: number;
   tricksWon: [number, number];
   legal: ActionView[];
   players: PlayerView[];
@@ -124,6 +130,8 @@ export interface HintView {
   reasons: string[];
   options: OptionView[];
   worlds: number;
+  /** Indices (in `view.legal`) of plays about as good as the best: a close call. */
+  close: number[];
 }
 
 export type Verdict = "best" | "good" | "inaccuracy" | "mistake" | "blunder";

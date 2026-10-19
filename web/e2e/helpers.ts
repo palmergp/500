@@ -25,15 +25,26 @@ export async function takeTurn(page: Page): Promise<boolean> {
   return tryClick(page.locator(".hand .card.playable").first());
 }
 
-/** Clears any saved game and deals a new one with the given seats at fast speed. */
-export async function startGame(page: Page, seats: { north?: string; west?: string; east?: string } = {}) {
+/** Starts from a clean slate (no saved game, fast bots) at the main menu. */
+export async function freshStart(page: Page, settings: Record<string, unknown> = {}) {
   await page.goto("/");
-  await page.evaluate(() => localStorage.clear());
+  await page.evaluate((extra) => {
+    localStorage.clear();
+    sessionStorage.clear();
+    localStorage.setItem("fh500.settings", JSON.stringify({ speed: "fast", ...extra }));
+  }, settings);
   await page.reload();
+  await page.getByRole("navigation", { name: "Main menu" }).waitFor();
+}
+
+/** Clears any saved game and deals a new one with the given seats at fast speed. */
+export async function startGame(page: Page, seats: { north?: string; west?: string; east?: string; hands?: "4 hands" } = {}) {
+  await freshStart(page);
+  await page.getByRole("button", { name: /^Play solo/ }).click();
   const dialog = page.getByRole("dialog", { name: "New game" });
   if (seats.north) await dialog.getByLabel("Your partner (North)").selectOption(seats.north);
   if (seats.west) await dialog.getByLabel("Left opponent (West)").selectOption(seats.west);
   if (seats.east) await dialog.getByLabel("Right opponent (East)").selectOption(seats.east);
-  await dialog.getByLabel("fast").check();
+  if (seats.hands) await dialog.getByLabel(seats.hands).check();
   await dialog.getByRole("button", { name: "Deal" }).click();
 }

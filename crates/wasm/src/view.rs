@@ -299,6 +299,12 @@ pub struct View {
     pub discards: Option<Vec<CardView>>,
     pub trick: Option<TrickView>,
     pub last_trick: Option<TrickView>,
+    /// The tricks finished so far this hand, in order (cards played are public).
+    pub tricks: Vec<TrickView>,
+    /// A short game's number of hands (H25), or absent for a game to 500.
+    pub hand_limit: Option<u8>,
+    /// Hands bid and played so far this game.
+    pub hands_played: u8,
     pub tricks_won: [u8; 2],
     pub legal: Vec<ActionView>,
     pub players: Vec<PlayerView>,
@@ -363,6 +369,9 @@ impl View {
             discards: obs.discards.map(|d| cards_view(d, trump)),
             trick: obs.current_trick.as_ref().map(|t| trick_view(t, trump, lens)),
             last_trick: obs.tricks.last().map(|t| trick_view(t, trump, lens)),
+            tricks: obs.tricks.iter().map(|t| trick_view(t, trump, lens)).collect(),
+            hand_limit: obs.rules.hand_limit,
+            hands_played: obs.hands_played,
             tricks_won: lens.teams(obs.tricks_won),
             legal: if human_to_act {
                 game.legal_actions().into_iter().enumerate().map(|(i, a)| action_view(i, a)).collect()

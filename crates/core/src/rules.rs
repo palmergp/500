@@ -128,6 +128,9 @@ pub struct Rules {
     pub defender_points_per_trick: i32,
     /// Whether defensive points can take a team to the target (H23). If not, they stop 10 short.
     pub defenders_can_win: bool,
+    /// Short game (H25): play this many hands (deals that are bid and played) instead of playing to
+    /// the target; the higher score wins, and a tie plays on one hand at a time.
+    pub hand_limit: Option<u8>,
 }
 
 impl Default for Rules {
@@ -140,6 +143,7 @@ impl Default for Rules {
             slam_score: 250,
             defender_points_per_trick: 10,
             defenders_can_win: true,
+            hand_limit: None,
         }
     }
 }

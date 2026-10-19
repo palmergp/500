@@ -105,6 +105,8 @@ pub struct Observation {
     pub tricks: Vec<Trick>,
     pub current_trick: Option<Trick>,
     pub tricks_won: [u8; 2],
+    /// Hands bid and played so far this game (passed-out deals don't count).
+    pub hands_played: u8,
 }
 
 impl Observation {
@@ -293,6 +295,11 @@ impl Game {
         }
     }
 
+    /// Hands bid and played so far (passed-out deals don't count).
+    pub fn hands_played(&self) -> u8 {
+        self.history.iter().filter(|h| h.contract.is_some()).count() as u8
+    }
+
     pub fn observe(&self, seat: Seat) -> Observation {
         let is_declarer = self.contract.map(|(s, _)| s) == Some(seat);
         let kitty_taken = self.phase != Phase::Bidding;
@@ -312,6 +319,7 @@ impl Game {
             tricks: self.tricks.clone(),
             current_trick: self.current_trick().cloned(),
             tricks_won: self.tricks_won,
+            hands_played: self.hands_played(),
         }
     }
 
@@ -397,7 +405,11 @@ impl Game {
             score_change: change,
             scores: self.scores,
         });
-        if let Some(winner) = game_winner(&self.rules, self.scores, team) {
+        let winner = match self.rules.hand_limit {
+            Some(limit) => short_game_winner(limit, self.hands_played(), self.scores),
+            None => game_winner(&self.rules, self.scores, team),
+        };
+        if let Some(winner) = winner {
             self.winner = Some(winner);
             self.phase = Phase::GameOver;
             events.push(Event::GameWon { team: winner });
@@ -481,6 +493,18 @@ pub fn score_hand(rules: &Rules, contract: Contract, declarers: Team, tricks_won
         (scores[o] + defence).min(cap) - scores[o]
     };
     change
+}
+
+/// The winner of a short game (H25) after `hands` hands: the higher score once the limit is
+/// reached, or nobody yet if the scores are tied (another hand is played).
+pub fn short_game_winner(limit: u8, hands: u8, scores: [i32; 2]) -> Option<Team> {
+    if hands < limit || scores[0] == scores[1] {
+        None
+    } else if scores[0] > scores[1] {
+        Some(Team::NorthSouth)
+    } else {
+        Some(Team::EastWest)
+    }
 }
 
 /// The winning team after a hand, counting the declarers first (H23).
