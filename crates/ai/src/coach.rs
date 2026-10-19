@@ -156,7 +156,7 @@ impl Coach {
                 return Grade { chosen, best: analysis.best, loss: 0.0, verdict: Verdict::Good, analysis };
             }
             if let Some(play) = analysis.play.as_ref() {
-                let stat = |a: Action| play.stats.iter().find(|s| s.action == a).copied();
+                let stat = |a: Action| play.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: real_play_chance(s.makes, PLAY_CURVE), ..s });
                 analysis.reasons = play_reasons(obs, chosen, None, stat(chosen), None, play.worlds);
             } else if obs.phase == Phase::Bidding {
                 analysis.reasons = call_reasons(obs, chosen, None, &analysis.options, obs.auction.high_bid());
@@ -196,7 +196,9 @@ impl Coach {
         }
         let ranked = self.search.evaluate_plays_from(obs, &result);
         let best = ranked[0].0;
-        let stat = |a: Action| result.stats.iter().find(|s| s.action == a).copied();
+        // What players see is the real-play chance: the sampled deals are solved as if everyone
+        // played perfectly, which understates the declarer's chances (`fh-lab honesty`).
+        let stat = |a: Action| result.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: real_play_chance(s.makes, PLAY_CURVE), ..s });
         let mut options: Vec<OptionEval> =
             ranked.iter().map(|&(action, ev)| OptionEval { action, ev, makes: stat(action).map(|s| s.makes) }).collect();
         options.dedup_by_key(|o| o.action);
@@ -241,7 +243,7 @@ impl Coach {
                     let bias = coach.search.config().dd_bias;
                     let weight: f64 = results.iter().map(|r| r.1).sum();
                     let makes = results.iter().filter(|r| r.0 as f64 - bias >= contract.level as f64).map(|r| r.1).sum::<f64>() / weight.max(1e-9);
-                    OptionEval { action, ev, makes: Some(makes) }
+                    OptionEval { action, ev, makes: Some(real_play_chance(makes, BID_CURVE)) }
                 }
                 _ => OptionEval { action, ev: pass_ev, makes: None },
             }
@@ -272,7 +274,7 @@ impl Coach {
             match action {
                 Action::Call(Call::Bid(c)) => {
                     let (_, ev, makes) = bids.iter().copied().find(|b| b.0 == c).unwrap_or((c, baseline, 0.0));
-                    OptionEval { action, ev, makes: Some(makes) }
+                    OptionEval { action, ev, makes: Some(real_play_chance(makes, BID_CURVE)) }
                 }
                 _ => OptionEval { action, ev: baseline, makes: None },
             }
@@ -442,6 +444,49 @@ fn significant(play: Option<&PlayStats>, best: Action, chosen: Action) -> bool {
 }
 
 // ---- Explanations ---------------------------------------------------------------------------
+
+/// From the coach's raw chance that the bid is made to what actually happens with expert play,
+/// measured by `fh-lab honesty` (2,000 hands, docs/lab/README.md finding 15): pairs of (raw,
+/// real), increasing, interpolated linearly. The solver plays every deal perfectly for both sides;
+/// real defenders aren't perfect, so a bid the solver calls 15% is really made about half the
+/// time. Bid estimates also run low, by about 10 points.
+const PLAY_CURVE: &[(f64, f64)] = &[
+    (0.00, 0.02),
+    (0.01, 0.07),
+    (0.15, 0.48),
+    (0.25, 0.62),
+    (0.35, 0.63),
+    (0.50, 0.715),
+    (0.65, 0.76),
+    (0.75, 0.81),
+    (0.85, 0.86),
+    (0.98, 0.97),
+    (1.00, 0.99),
+];
+const BID_CURVE: &[(f64, f64)] = &[
+    (0.00, 0.05),
+    (0.27, 0.33),
+    (0.36, 0.48),
+    (0.45, 0.59),
+    (0.55, 0.69),
+    (0.65, 0.74),
+    (0.75, 0.83),
+    (0.84, 0.92),
+    (0.91, 0.94),
+    (1.00, 0.97),
+];
+
+/// The real-play chance for a raw chance, on `curve`.
+pub fn real_play_chance(raw: f64, curve: &[(f64, f64)]) -> f64 {
+    let raw = raw.clamp(0.0, 1.0);
+    for w in curve.windows(2) {
+        let ((x0, y0), (x1, y1)) = (w[0], w[1]);
+        if raw <= x1 {
+            return y0 + (y1 - y0) * (raw - x0) / (x1 - x0).max(1e-9);
+        }
+    }
+    curve.last().map_or(raw, |&(_, y)| y)
+}
 
 fn pct(x: f64) -> String {
     format!("{:.0}%", 100.0 * x)
@@ -793,6 +838,22 @@ pub fn expert_replay(mut game: fh_core::Game, players: [&str; 4], seat: Seat, se
 mod tests {
     use super::*;
     use fh_core::{Game, Rules};
+
+    /// The real-play curves are increasing, and lift the solver's pessimistic low chances.
+    #[test]
+    fn real_play_chances_follow_the_measured_curves() {
+        for curve in [PLAY_CURVE, BID_CURVE] {
+            let mut last = -1.0;
+            for i in 0..=100 {
+                let v = real_play_chance(i as f64 / 100.0, curve);
+                assert!(v >= last && (0.0..=1.0).contains(&v));
+                last = v;
+            }
+        }
+        assert!((real_play_chance(0.15, PLAY_CURVE) - 0.48).abs() < 1e-9);
+        assert!(real_play_chance(0.2, PLAY_CURVE) > 0.5, "a 20% solver chance is made more often than not");
+        assert!((real_play_chance(0.65, BID_CURVE) - 0.74).abs() < 1e-9);
+    }
 
     /// Slips are tagged by kind, so the trainer can find a player's recurring leaks.
     #[test]

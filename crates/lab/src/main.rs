@@ -72,6 +72,10 @@ fn main() {
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 300_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("us").map(|us| levels::Score {
+                us: us.parse().expect("--us needs a number"),
+                them: flags.get("them").map_or(0, |t| t.parse().expect("--them needs a number")),
+            }),
         ),
         "audit" => audit::run(
             flag(&flags, "deals", 150),

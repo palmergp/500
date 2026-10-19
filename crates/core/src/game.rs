@@ -230,6 +230,13 @@ impl Game {
     pub fn scores(&self) -> [i32; 2] {
         self.scores
     }
+
+    /// Starts this game from a given score (North-South, East-West), for lab studies of
+    /// end-of-game play. Call it before any hand is scored.
+    pub fn set_scores(&mut self, scores: [i32; 2]) {
+        assert!(self.history.iter().all(|h| h.contract.is_none()), "set the score before any hand is played");
+        self.scores = scores;
+    }
     pub fn winner(&self) -> Option<Team> {
         self.winner
     }

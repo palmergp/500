@@ -108,7 +108,7 @@ fn one(seed: u64, south: &str) -> Tally {
             if phase == 2 {
                 // The hint again, from another random start.
                 let first = Coach::new(seed ^ n).analyze(&obs, &legal, None);
-                let again = Coach::new(seed ^ n ^ 0x5EC0_4D).analyze(&obs, &legal, None);
+                let again = Coach::new(seed ^ n ^ 0x005E_C04D).analyze(&obs, &legal, None);
                 if first.best == again.best {
                     tally.same += 1;
                 } else if first.close.contains(&again.best) || again.close.contains(&first.best) {

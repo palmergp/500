@@ -84,6 +84,7 @@ export const LESSONS: Lesson[] = [
       "That total is roughly what your side will take as declarer. Bid 7 when it reaches about 7 (6¾ in a red suit or clubs): the bid is then made about 60% of the time, which is what the scoring needs to pay.",
       "## How high?",
       "Each extra level adds only 100 points, but one trick short turns a plus into a minus: with 8 tricks, 8♦ scores +280 and 9♦ scores −380. So with no one bidding against you, go up a level only when you'd make it about 80% of the time: 8 from a count of about 8½, and 9 only from about 10.",
+      "Competition doesn't change it: played out over 20,000 deals, a higher bid to keep the bid away from players still to call never made 9 pay below a count of 10. And over an opponent's bid, pass unless your count is about 8½.",
       "## Bid a little more than feels safe",
       "Thrown-in deals score nothing, so timid bidding loses. In the lab, a bot that adds about 0.7 tricks to a careful estimate won 57% of its games against the same bot without it.",
       "The coach shows this count, card by card, whenever you ask for a hint or get a grade in the auction.",

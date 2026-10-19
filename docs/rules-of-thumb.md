@@ -107,7 +107,11 @@ you'd make the higher bid about **80%** of the time:
 | about 10 or more | 9 | 9: about 80–85% |
 
 At a count of 9½ a 9 bid is made about 70% of the time, and still scores about 70 points less than 8 on average.
-Competition changes this: when an opponent may outbid your 8, a higher bid can be worth it to keep the contract.
+
+**Competition doesn't change it.** You might think a higher bid is worth it to keep the bid away from players
+still to call. Played out over 20,000 deals, bidding 9 never paid at any count up to 10, from any seat
+(`docs/lab/README.md`, finding 14). With players still to call, 8 pays from a count of about 8½. And after an
+opponent has bid, pass unless your count is about 8½ or more.
 
 *Source: solver data, 64,000 bidding decisions (`train/rules_of_thumb.py`).* Real play runs about half a trick
 below the solver, so a deal the solver makes with exactly the bid counts as half made. An earlier version of this

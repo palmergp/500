@@ -214,11 +214,62 @@ Neutral for experts, so the bots keep it: it's the house convention, and human p
 
 **In no trumps:** a long suit without the ace yields fewer tricks as it grows (5.1 at four cards, 4.3 at seven or more). With A-K at the head, length barely helps (6.3–6.4).
 
+### 14. How high to bid, by seat: competition doesn't make 9 pay
+
+*Measured by `fh-lab levels` over 20,000 deals (19,874 bidding decisions).*
+
+**Method:** for the first player in each deal with a count of 6½ or more in some suit, every option was played
+out: pass, and 7, 8, 9 and 10 in that suit. The Oracle finished the auction for everyone. The declarer took the
+kitty and discarded heuristically. The hand was solved with every card visible, scored for real play at half a
+trick below the solver. Values are points for the bidder's side minus the other side's, averaged per count.
+
+**The best option, by count and seat (no opponent has bid yet):**
+
+| Count | First to speak | Second | Third |
+|---|---|---|---|
+| 7 | 7 (+17) | 7 (+76) | 7 (−10) |
+| 8 | 7 (+94; 8: +69) | 7 (+126; 8: +103) | 7 (+95; 8: +80) |
+| 8½ | 8 (+118; 7: +113) | 8 (+154; 7: +147) | 8 (+140; 7: +127) |
+| 9 | 8 (+157; 9: +16) | 8 (+189; 9: +56) | 8 (+210; 9: +137) |
+| 9½ | 8 (+212; 9: +98) | 8 (+229; 9: +153) | — |
+
+- **A 9 bid was never the best option at any count up to 10, from any seat.** Competition (players still to call
+  who might outbid you) doesn't change the no-competition answer from rule 2 in `docs/rules-of-thumb.md`.
+- **Going up to 8 pays from about 8½** while others can still call, slightly earlier than with no competition.
+- **After an opponent's bid,** passing beat overcalling at 8 up to a count of 8, and overcalling paid from about
+  8½ (n = 902).
+- Last to speak is muddied by partner's bids (7 is often no longer available), so it isn't summarized.
+
+### 15. The coach's percentages were too pessimistic: now corrected
+
+*Measured by `fh-lab honesty` over 2,000 hands, with expert (Oracle) play on both sides.*
+
+At sampled decisions the coach gave its chance that the bid would be made; at the end of the hand we recorded
+whether it was.
+
+| Coach said (card play) | Actually made | Coach said (bids) | Actually made |
+|---|---|---|---|
+| 0–10% | 7% | 20–30% | 33% |
+| 10–20% | 48% | 30–40% | 48% |
+| 20–30% | 62% | 40–50% | 59% |
+| 40–50% | 72% | 50–60% | 69% |
+| 60–70% | 76% | 60–70% | 74% |
+| 80–90% | 86% | 80–90% | 92% |
+| 90–100% | 97% | 90–100% | 94% |
+
+- **Card play:** the coach's numbers come from deals solved as if both sides played perfectly. Real defenders
+  aren't perfect, so low chances were far too low: a bid the coach called 15% was made about half the time.
+- **Bids:** about 10 points low across the range.
+- **Fix:** the coach now shows real-play chances, mapped through these measured curves (`real_play_chance` in
+  `crates/ai/src/coach.rs`). Its choices are unchanged: they rank plays by expected points, and the bias is
+  mostly uniform across a decision's options. The curves describe expert play; a casual player's results will
+  be a little lower.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
 - **Signals:** what a mention or a 6-call is worth, compared with what it tells the opponents.
-- **Seat position:** what a once-around auction implies for each seat.
+- **Seat position:** what a once-around auction implies for each seat. Partly answered for bid levels (finding 14).
 - **The forced dealer:** strategy on the third deal.
 - **Score-aware bidding:** when defenders can go out on tricks.
 - **The playbook:** the 30 hypotheses in `docs/research/02-strategy-playbook.md` still need checking under these rules.
