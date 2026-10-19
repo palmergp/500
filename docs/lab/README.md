@@ -364,6 +364,24 @@ estimated from the score gap).
 - **Both near 500:** bid 7 even light. The declarers count first.
 - 9 and 10 were never best at any of these scores.
 
+### 21. The auction weights hurt card play, so they're off
+
+*Measured by `duel`, 1,800 deals each, the Oracle against itself with one part of its reading removed.*
+
+| The Oracle without… | The full Oracle gains per hand | 95% range |
+|---|---|---|
+| Weighting deals by the auction (what bids, mentions and passes suggest) | −3.1 | −6.8 to +0.7 |
+| Reading partner's discard signal | −1.1 | −3.0 to +0.7 |
+| Both (finding 19) | −4.8 | −8.6 to −1.0 |
+
+- The harm is almost all in the auction weights: hand-set likelihoods ("a mention comes with a bower 85% of the
+  time", "a passer rarely held 8½") that the lab never measured. They pushed the sampled deals away from the real
+  ones more than toward them.
+- **Change:** card play (The Counter, The Shark, The Oracle and the coach's hints and kitty comparisons) no longer
+  weights deals by the auction. Hard facts stay: a 6-call places the Joker, shown-out suits are voids, and the
+  discard signal is still read (neutral here, and it's the house convention).
+- Measuring the real likelihoods from self-play, and weighting by those, might turn this into a gain.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

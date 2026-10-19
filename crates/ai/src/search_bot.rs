@@ -131,7 +131,11 @@ impl SearchConfig {
         bid_samples: 6,
         discard_samples: 4,
         bid_margin: 10.0,
-        inference: true,
+        // Weighting worlds by the auction (what bids, mentions and passes suggest) made card play
+        // worse by about 3 points a hand in the lab (docs/lab/README.md, finding 21). Hard facts
+        // still apply: a 6-call places the Joker, shown-out suits are voids, and partner's discard
+        // signal is still read.
+        inference: false,
         goal: Goal::Points,
         // Measured with `fh-lab calibrate`: double-dummy results run about half a trick above
         // what search bots actually take as declarer.

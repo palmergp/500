@@ -409,7 +409,7 @@ impl Coach {
     fn compare_discards(&mut self, obs: &Observation, a: &[Card], b: &[Card]) -> (f64, f64) {
         let (declarer, contract) = obs.contract.expect("discarding without a contract");
         let trump = contract.trump();
-        let belief = Belief::new(obs, true);
+        let belief = Belief::new_with(obs, self.search.config().inference, true);
         let worlds = belief.sample_fitting(&mut self.search_rng(), obs.hand, 12);
         let mut solver = Solver::with_limit(trump, 1_500_000);
         let mut totals = [0.0, 0.0];
