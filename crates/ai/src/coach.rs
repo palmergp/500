@@ -99,10 +99,11 @@ impl Units {
     }
 }
 
-/// Whether the coach plays for the game rather than for points: a short game, or either side
-/// within 160 of the target.
+/// Whether the coach plays for the game rather than for points: in a game to 500, once either side
+/// is within 160 of it. In a short game (H25) it always plays for points (your score less theirs,
+/// hand by hand): there's no target to race to, so sacrifices that throw away points don't pay.
 pub fn plays_for_the_game(obs: &Observation) -> bool {
-    obs.rules.hand_limit.is_some() || obs.scores.iter().any(|&s| s >= obs.rules.target_score - 160)
+    obs.rules.hand_limit.is_none() && obs.scores.iter().any(|&s| s >= obs.rules.target_score - 160)
 }
 
 #[derive(Clone, Debug)]
@@ -981,13 +982,17 @@ mod tests {
                 let obs = game.observe(Seat::SOUTH);
                 assert_eq!(obs.to_act, Some(Seat::SOUTH));
                 let hint = Coach::new(seed).analyze(&obs, &game.legal_actions(), None);
-                assert_eq!(hint.units, Units::WinChance);
+                let short = scores == [0, 0];
+                assert_eq!(hint.units, if short { Units::Points } else { Units::WinChance });
                 cases += 1;
                 if let Some(o) = hint.options.iter().find(|o| o.action == hint.best && matches!(o.action, Action::Call(Call::Bid(_)))) {
                     if o.makes.unwrap_or(1.0) < 0.35 {
-                        // Near 500 a long shot can be a sacrifice; the hint must say so.
-                        assert!(hint.reasons.iter().any(|r| r.starts_with("A sacrifice")), "{scores:?} {:?}", hint.reasons);
-                        long_shots += usize::from(scores == [0, 0]);
+                        // Near 500 a long shot can be a sacrifice; the hint must say so. (A four-hand
+                        // game is played for points: no sacrifices there.)
+                        if !short {
+                            assert!(hint.reasons.iter().any(|r| r.starts_with("A sacrifice")), "{scores:?} {:?}", hint.reasons);
+                        }
+                        long_shots += usize::from(short);
                     }
                 }
             }

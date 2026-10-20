@@ -451,6 +451,10 @@ Shark, which always plays for the game, had the same flaw.
 mostly near 500 (380 each), where the opponents' bid would win them the game: a deliberate sacrifice, and the hint
 now says so (`over_an_opponents_bid_the_coach_doesnt_take_long_shots`).
 
+**Four-hand games are now played for points, not the game** (the user's choice): with no target to race to,
+the coach maximizes your score less theirs on each hand, so it never sacrifices. Games to 500 still switch to
+playing for the game within 160 of the target.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

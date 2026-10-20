@@ -334,6 +334,8 @@ export const LESSONS: Lesson[] = [
       "• They're near 500 (say 460) and you're not: bid, even with a light hand (a count of about 6½), at the cheapest level that takes you to 500 if you make it. Passing lets them win on defense with four tricks. At 300, that's 8 in spades, clubs or diamonds, or 7 in hearts or no trumps.",
       "• You're near 500 and they're not: any bid you make wins, so bid 7 (don't climb higher). Over an opponent's bid you can pass: four defensive tricks win too.",
       "• Both near 500: bid 7 even with a light hand. Any made bid wins, and the declarers count first.",
+      "## In a four-hand game",
+      "There's no 500 to race to: after four hands the higher score wins. So play every hand for points, as early in a normal game. A sacrifice that goes down to stop the opponents' bid just hands them the points. The coach plays four-hand games this way.",
     ],
     quiz: [
       {
