@@ -682,6 +682,21 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
             if let Some(o) = ev(best) {
                 if let Some(m) = o.makes {
                     reasons.push(format!("{c} makes in about {} of similar deals.", pct(m)));
+                    // A long shot over an opponent's bid near the end is a sacrifice: say so.
+                    if let Some((seat, theirs)) = high.filter(|(s, _)| s.team() != obs.seat.team()) {
+                        if m < 0.5 && plays_for_the_game(obs) {
+                            let them = obs.scores[seat.team().index()];
+                            let reason = if them + theirs.value() >= obs.rules.target_score {
+                                format!(
+                                    "A sacrifice: if they make {theirs} they reach {} and win the game. Going down in {c} costs points, but keeps the game alive.",
+                                    them + theirs.value()
+                                )
+                            } else {
+                                format!("A sacrifice for the score: letting {theirs} stand hurts your chances of winning the game more than going down in {c}.")
+                            };
+                            reasons.insert(0, reason);
+                        }
+                    }
                 }
             }
         }
@@ -945,6 +960,41 @@ mod tests {
         assert!(cases >= 20, "{cases} light hands");
         assert!(late[0] > early[0], "bids: {late:?} near the end vs {early:?} at the start, of {cases}");
         assert!(late[1] > early[1], "8-level bids: {late:?} vs {early:?}");
+    }
+
+    /// Over an opponent's bid near the end of a game, the coach doesn't suggest long-shot bids:
+    /// passing is valued in the same units as bidding (a user's case: third to speak, partner
+    /// passed, an opponent bid 8♣, the coach suggested 8♦ at 27%).
+    #[test]
+    fn over_an_opponents_bid_the_coach_doesnt_take_long_shots() {
+        let (mut cases, mut long_shots) = (0, 0);
+        for seed in 0..300u64 {
+            for scores in [[0, 0], [380, 380]] {
+                let rules = if scores == [0, 0] { Rules { hand_limit: Some(4), ..Rules::default() } } else { Rules::default() };
+                let mut game = Game::with_dealer(rules, seed, Seat::WEST); // North, East, South, West
+                game.set_scores(scores);
+                game.apply(Action::Call(Call::Pass)).unwrap();
+                let eight = Action::Call(Call::Bid(Contract::new(8, Strain::Clubs)));
+                if game.apply(eight).is_err() {
+                    continue;
+                }
+                let obs = game.observe(Seat::SOUTH);
+                assert_eq!(obs.to_act, Some(Seat::SOUTH));
+                let hint = Coach::new(seed).analyze(&obs, &game.legal_actions(), None);
+                assert_eq!(hint.units, Units::WinChance);
+                cases += 1;
+                if let Some(o) = hint.options.iter().find(|o| o.action == hint.best && matches!(o.action, Action::Call(Call::Bid(_)))) {
+                    if o.makes.unwrap_or(1.0) < 0.35 {
+                        // Near 500 a long shot can be a sacrifice; the hint must say so.
+                        assert!(hint.reasons.iter().any(|r| r.starts_with("A sacrifice")), "{scores:?} {:?}", hint.reasons);
+                        long_shots += usize::from(scores == [0, 0]);
+                    }
+                }
+            }
+        }
+        assert!(cases >= 400, "{cases}");
+        // Early in a four-hand game, long shots are rare (it was nearly every hand before the fix).
+        assert!(long_shots * 20 <= cases / 2, "{long_shots} long-shot bids out of {} early hands", cases / 2);
     }
 
     /// The real-play curves are increasing, and lift the solver's pessimistic low chances.

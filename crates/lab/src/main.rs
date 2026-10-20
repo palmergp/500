@@ -19,6 +19,7 @@ mod dataset;
 mod declarer;
 mod habits;
 mod honesty;
+mod honors;
 mod leads;
 mod levels;
 mod playdata;
@@ -83,6 +84,11 @@ fn main() {
             flag(&flags, "seed", 2_000_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
             flags.get("out").map_or("train/data/play", |s| s.as_str()),
+        ),
+        "honors" => honors::run(
+            flag(&flags, "deals", 2000),
+            flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "audit" => audit::run(
             flag(&flags, "deals", 150),

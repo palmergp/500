@@ -438,6 +438,19 @@ of 7 or more).* As finding 16, with aces kept (always right in no trumps).
 - Simply avoiding voids is worse: the cheapest such sets break guarded kings.
 - The plan is still 0.46 tricks short of the best set with hindsight (0.29 in suit bids).
 
+### 24. Bug: bidding over an opponent near the end of a game
+
+The value of passing over an opponent's bid was a fixed estimate in points ("they make it three times in
+four"), while bids, near the end of a game and in short games, are valued as the chance of winning the game
+(finding 20). Compared in mixed units, nearly any bid looked better than passing. Over an opponent's 8♣ at the
+start of a four-hand game, the coach suggested a long-shot bid (under 35% to make) on 275 of 300 hands. The
+Shark, which always plays for the game, had the same flaw.
+
+**Fixed:** passing is now valued by the same utility as the bids, from a spread of the opponents' likely tricks
+(make 75% of the time, half of those with a trick to spare). Long shots dropped to 7 of 300. The ones left are
+mostly near 500 (380 each), where the opponents' bid would win them the game: a deliberate sacrifice, and the hint
+now says so (`over_an_opponents_bid_the_coach_doesnt_take_long_shots`).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

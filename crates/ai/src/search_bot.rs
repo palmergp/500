@@ -452,11 +452,13 @@ impl SearchBot {
         let baseline = match obs.auction.high_bid() {
             None => 0.0,
             Some((seat, contract)) if seat == me.partner() => self.expected(obs, &dist(contract.strain), contract, me),
-            Some((_, contract)) => {
-                // An opponent's contract: they make it about three times in four (lab), taking
-                // about a third of a trick more than they bid.
-                let v = contract.value() as f64;
-                -(0.75 * v - 0.25 * v) + 10.0 * (10.0 - contract.level as f64 - 0.3)
+            Some((seat, contract)) => {
+                // An opponent's contract: they make it about three times in four (lab), half the
+                // time with a trick to spare. Valued by the same utility as the bids (points, or the
+                // chance of winning the game), so the two always compare in the same units.
+                let level = contract.level;
+                let spread = [(level.saturating_add(1).min(10), 0.5), (level, 0.25), (level.saturating_sub(1), 0.25)];
+                spread.iter().map(|&(tricks, p)| p * self.utility(obs, contract, seat, tricks)).sum()
             }
         };
         let mut bids = Vec::new();
