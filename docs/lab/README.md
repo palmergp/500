@@ -479,6 +479,30 @@ playing for the game within 160 of the target.
 - **The count now splits kings** (`crates/ai/src/thumb.rs`): suit bids ⅓ beside the ace, ⅕ with two or more
   guards, ⅛ with one; no trumps ½, but ⅓ with a single guard.
 
+### 26. Passing over an opponent's bid: how often they make it depends on your hand
+
+*Measured by `fh-lab opponents` over 6,000 deals of Oracle play: 5,328 times a player passed over an opponent's
+bid that became the final bid.* "Your tricks" is the bidding network's estimate of what your side would take
+declaring in the opponents' strain.
+
+| Your tricks in their strain | Times | They made it |
+|---|---|---|
+| 1–2 | 203 | 89% |
+| 2–3 | 1,312 | 86% |
+| 3–4 | 2,247 | 81% |
+| 4–5 | 1,243 | 69% |
+| 5–6 | 272 | 41% |
+| 6–7 | 46 | 20% |
+
+Overall they made 77%, close to the old fixed estimate of 75%. Holding your hand fixed, each level higher roughly
+halves the odds against them going down (logistic fit: `opponents_make` in `crates/ai/src/search_bot.rs`; at 8,
+with 4 tricks of yours, 52%). Bids of 9 and up were too rare to measure.
+
+The pass baseline now uses this fit in place of the fixed 75%. In a 1,500-deal duplicate match it gained **+2.9
+points per hand** over the old value (95% CI −0.2 to +5.9; 144 deals won, 101 lost, the rest tied): a small, likely
+gain. It declared less often (46% of hands against 54%) and made more of its bids (75% against 71%). The hint
+for a pass over an opponent's bid now quotes this chance ("they make 8♣ about 52% of the time").
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
