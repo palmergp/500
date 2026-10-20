@@ -175,6 +175,34 @@ impl Coach {
         analysis
     }
 
+    /// In the auction: how often each legal bid would make in real play (the bidding network,
+    /// through the measured curve), for the bidding box's tooltips once you've asked for a hint.
+    pub fn bid_chances(&self, obs: &Observation, legal: &[Action]) -> Vec<(Action, f64)> {
+        let Some(model) = crate::models::bid_model() else { return vec![] };
+        let (bids, _) = self.search.neural_values(obs, legal, model);
+        bids.into_iter().map(|(c, _, makes)| (Action::Call(Call::Bid(c)), real_play_chance(makes, BID_CURVE))).collect()
+    }
+
+    /// What a call that isn't a bid offers, in place of a make chance: a mention or 6-call is worth
+    /// tricks to your partner's count (rule 4 of docs/rules-of-thumb.md); passing over an
+    /// opponent's bid leaves them a measured chance to make it.
+    pub fn call_note(&self, obs: &Observation, action: Action) -> Option<String> {
+        let Action::Call(call) = action else { return None };
+        match call {
+            Call::Mention(s) => {
+                let value = if s == Strain::NoTrumps { 0.7 } else { 0.6 };
+                Some(format!("+{} trick to your partner's {s} count", crate::thumb::fraction(value)))
+            }
+            Call::Six(_) => Some("shows the Joker: +¾ trick to your partner's count (+1 in NT)".into()),
+            Call::Pass => {
+                let (_, contract) = obs.auction.high_bid()?;
+                let chance = self.search.opponents_chance(obs, crate::models::bid_model()?)?;
+                Some(format!("they make {contract} about {:.0}% of the time", 100.0 * chance))
+            }
+            Call::Bid(_) => None,
+        }
+    }
+
     /// As [`Coach::analyze`], leaving the close-call note out of the reasons.
     fn analyze_options(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
         let units = if plays_for_the_game(obs) { Units::WinChance } else { Units::Points };

@@ -11,10 +11,12 @@ interface Props {
   onAct: (index: number) => void;
   /** Index of the coach's suggested call. */
   hinted?: number;
+  /** After a hint: how often each bid (by action index) would make, shown in its tooltip. */
+  chances?: Map<number, number>;
 }
 
 /** Pass, mentions, 6-calls and the 7–10 bid grid. Calls that aren't legal now are disabled. */
-export function BiddingBox({ legal, mustBid, onAct, hinted }: Props) {
+export function BiddingBox({ legal, mustBid, onAct, hinted, chances }: Props) {
   const find = (kind: ActionView["kind"], strain?: StrainCode, level?: number) =>
     legal.find((a) => a.kind === kind && (strain === undefined || a.strain === strain) && (level === undefined || a.level === level));
 
@@ -24,7 +26,7 @@ export function BiddingBox({ legal, mustBid, onAct, hinted }: Props) {
       key={title}
       className={`call ${isRed(strain) ? "red" : ""} strain-${strain ?? "none"}${action && action.index === hinted ? " hinted" : ""}`}
       disabled={!action}
-      title={title}
+      title={action && chances?.has(action.index) ? `${title} · coach: makes about ${Math.round(100 * chances.get(action.index)!)}%` : title}
       onClick={() => action && onAct(action.index)}
     >
       {label}

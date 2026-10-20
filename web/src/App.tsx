@@ -77,6 +77,37 @@ function useMediaQuery(query: string): boolean {
   return matches;
 }
 
+/**
+ * The table as the hand just played ended: every card played, the last trick on the table. The
+ * engine deals the next hand in the same step that scores this one, so until you move on from the
+ * result the table shows the finished hand, not the new cards.
+ */
+function finishedHand(view: View, hand: HandView): View {
+  return {
+    ...view,
+    phase: "playing",
+    toAct: null,
+    humanToAct: false,
+    dealer: hand.dealer,
+    dealNumber: hand.dealNumber,
+    dealerForced: false,
+    mustBid: false,
+    hand: [],
+    handCounts: [0, 0, 0, 0],
+    calls: hand.calls,
+    contract: hand.contract,
+    kitty: null,
+    discards: null,
+    trick: null,
+    lastTrick: hand.tricks.at(-1) ?? null,
+    tricks: hand.tricks,
+    tricksWon: hand.tricksWon,
+    legal: [],
+    played: hand.tricks.flatMap((t) => t.plays.map((p) => p.card)),
+    trumpsUnseen: null,
+  };
+}
+
 function prompt(view: View): string {
   if (!view.humanToAct) return "";
   switch (view.phase) {
@@ -522,6 +553,8 @@ export function App() {
   })();
 
   const trick = held ?? view?.trick ?? null;
+  /** What the table shows: the finished hand while its result is up, else the game as it is. */
+  const table = view && result ? finishedHand(view, result) : view;
   const openTricks = (focus?: number) => setShowTricks({ focus });
   const deal = view ? view.history.length + 1 : 0;
   const dealGrades = grades.filter((g) => g.deal === deal).length;
@@ -531,7 +564,7 @@ export function App() {
   // Coach panels: in the side rail on wide screens, above the middle of the table otherwise.
   let coachPanels: ReactNode = null;
   if (view && atTable) {
-    const tracker = settings.tracker && !quizActive && view.phase === "playing";
+    const tracker = settings.tracker && !quizActive && view.phase === "playing" && !result;
     const grade = lastGrade && !currentHint;
     if (quizActive || currentHint || grade || tracker) {
       coachPanels = (
@@ -555,7 +588,8 @@ export function App() {
   // In the middle of the table, in place of the trick: whatever you need to act.
   let middle: ReactNode = undefined;
   if (view && view.humanToAct && !paused && view.phase === "bidding") {
-    middle = <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} hinted={hintedAction?.index} />;
+    const chances = currentHint?.bids ? new Map(currentHint.bids.map((b) => [b.index, b.makes ?? 0])) : undefined;
+    middle = <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} hinted={hintedAction?.index} chances={chances} />;
   } else if (view && jokerLeads) {
     middle = (
       <div className="joker-choice">
@@ -660,7 +694,7 @@ export function App() {
             {view ? (
               <>
                 <TableView
-                  view={view}
+                  view={table ?? view}
                   trick={trick}
                   sweepTo={held && sweeping ? held.winner : null}
                   trumpsUnseen={trumpsUnseen}
@@ -675,7 +709,7 @@ export function App() {
                   status={
                     <div className="status-row">
                       <div className="status" role="status">
-                        {lanStatus?.text || prompt(view) || message}
+                        {lanStatus?.text || prompt(table ?? view) || message}
                       </div>
                       {lanStatus?.seat !== undefined && lobby && (
                         <button type="button" onClick={() => netRef.current?.setBot(lanStatus.seat!, lobby.seats[lanStatus.seat!].bot)}>
@@ -696,11 +730,11 @@ export function App() {
                     </div>
                   }
                 >
-                  <div key={`deal-${view.history.length}`} className={`hand${view.hand.length > 10 ? " crowded" : ""}`} aria-label="Your hand">
-                    {view.hand.map((card, i) => (
+                  <div key={result ? "finished" : `deal-${view.history.length}`} className={`hand${view.hand.length > 10 ? " crowded" : ""}`} aria-label="Your hand">
+                    {(table ?? view).hand.map((card, i) => (
                       <Card
                         key={card.id}
-                        fan={{ index: i, count: view.hand.length }}
+                        fan={{ index: i, count: (table ?? view).hand.length }}
                         card={card}
                         playable={legalCards.has(card.id)}
                         selected={selected.includes(card.id)}
@@ -713,7 +747,7 @@ export function App() {
                 </TableView>
                 {wide && (
                   <aside className="rail" aria-label="Bidding and coach">
-                    <InfoPanel view={view} trumpsUnseen={trumpsUnseen} onTricks={() => openTricks()} decisions={dealGrades} onDecisions={openDecisions} />
+                    <InfoPanel view={table ?? view} trumpsUnseen={trumpsUnseen} onTricks={() => openTricks()} decisions={dealGrades} onDecisions={openDecisions} />
                     {coachPanels}
                   </aside>
                 )}
@@ -725,7 +759,7 @@ export function App() {
         </>
       )}
 
-      {result && view && atTable && (
+      {result && !held && view && atTable && (
         <Dialog title={`Hand ${view.history.filter((h) => !h.passedOut).length}`}>
           <Celebration hand={result} gameWinner={view.winner} />
           <HandResult hand={result} view={view} />

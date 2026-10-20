@@ -122,6 +122,8 @@ export interface OptionView {
   label: string;
   ev: number;
   makes: number | null;
+  /** For a call that isn't a bid: what it offers instead ("+0.6 trick to your partner's ♥ count"). */
+  note?: string | null;
 }
 
 export interface HintView {
@@ -132,6 +134,8 @@ export interface HintView {
   worlds: number;
   /** Indices (in `view.legal`) of plays about as good as the best: a close call. */
   close: number[];
+  /** In the auction: every legal bid with how often it would make (for the bidding box's tooltips). */
+  bids?: OptionView[];
 }
 
 export type Verdict = "best" | "good" | "inaccuracy" | "mistake" | "blunder";

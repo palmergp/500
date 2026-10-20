@@ -25,6 +25,9 @@ test("plays a hand through to the score", async ({ page }, info) => {
     if (!(await takeTurn(page))) await page.waitForTimeout(100);
   }
   await expect(result).toBeVisible();
+  // Behind the result is the hand just finished (every trick taken, no cards left), not the next deal.
+  await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(0);
+  await expect(page.locator(".pile")).toHaveCount(10);
   await page.screenshot({ path: `test-results/${info.project.name}-3-result.png` });
 
   // The score pad lists the hand, and the review shows all four hands.

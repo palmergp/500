@@ -63,6 +63,24 @@ test("a whole hand fits on the screen, with the coach's panels open", async ({ p
   expect(seen.has("bidding-seen") || seen.has("bidding")).toBe(true);
 });
 
+test("a full hand of card backs stays inside its seat on laptop screens", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "sizes are set here");
+  await startGame(page);
+  for (const [width, height] of [[1024, 640], [1280, 720], [1366, 768], [1100, 700], [1536, 864]]) {
+    await page.setViewportSize({ width, height });
+    await expect(page.locator(".seat-west .backs .card")).toHaveCount(10);
+    for (const seat of ["west", "east", "north"]) {
+      const box = await page.locator(`.seat-${seat}`).boundingBox();
+      const cards = await page.locator(`.seat-${seat} .backs .card`).evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => [r.left, r.right]));
+      for (const [left, right] of cards) {
+        expect(left, `${seat} at ${width}×${height}`).toBeGreaterThanOrEqual(box!.x - 1);
+        expect(right, `${seat} at ${width}×${height}`).toBeLessThanOrEqual(box!.x + box!.width + 1);
+      }
+    }
+    await page.screenshot({ path: `test-results/backs-${width}x${height}.png` });
+  }
+});
+
 test("trick piles, past tricks, and who called what", async ({ page }) => {
   test.setTimeout(240_000);
   await startGame(page);

@@ -15,6 +15,8 @@ pub struct OptionView {
     pub label: String,
     pub ev: f64,
     pub makes: Option<f64>,
+    /// For a call that isn't a bid: what it offers instead ("+0.6 trick to your partner's ♥ count").
+    pub note: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -28,6 +30,8 @@ pub struct HintView {
     pub worlds: usize,
     /// Indices (in `view.legal`) of plays about as good as the best: a close call.
     pub close: Vec<usize>,
+    /// In the auction: every legal bid with how often it would make, for the bidding box.
+    pub bids: Vec<OptionView>,
 }
 
 #[derive(Serialize)]
@@ -66,7 +70,7 @@ fn options_view(options: &[OptionEval], legal: &[Action]) -> Vec<OptionView> {
         .take(4)
         .filter_map(|o| {
             let index = legal.iter().position(|&a| a == o.action)?;
-            Some(OptionView { index, label: label(o.action), ev: o.ev, makes: o.makes })
+            Some(OptionView { index, label: label(o.action), ev: o.ev, makes: o.makes, note: None })
         })
         .collect()
 }
@@ -95,12 +99,26 @@ pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
     }
     let legal = game.legal_actions();
     let obs = game.observe(seat);
-    let analysis = Coach::new(save.seed ^ save.log.len() as u64).analyze(&obs, &legal, None);
+    let mut coach = Coach::new(save.seed ^ save.log.len() as u64);
+    let analysis = coach.analyze(&obs, &legal, None);
     let best = legal.iter().position(|&a| a == analysis.best).unwrap_or(0);
+    let mut options = options_view(&analysis.options, &legal);
+    let mut bids = Vec::new();
+    if obs.phase == Phase::Bidding {
+        for o in &mut options {
+            o.note = coach.call_note(&obs, legal[o.index]);
+        }
+        for (action, makes) in coach.bid_chances(&obs, &legal) {
+            if let Some(index) = legal.iter().position(|&a| a == action) {
+                bids.push(OptionView { index, label: label(action), ev: 0.0, makes: Some(makes), note: None });
+            }
+        }
+    }
     Ok(HintView {
         best,
         best_label: label(analysis.best),
-        options: options_view(&analysis.options, &legal),
+        options,
+        bids,
         reasons: analysis.reasons,
         worlds: analysis.worlds,
         close: analysis.close.iter().filter_map(|a| legal.iter().position(|l| l == a)).collect(),
@@ -360,6 +378,38 @@ mod tests {
         assert_eq!(grade.best_label.split(' ').count(), 3);
         assert!(!grade.reasons.is_empty());
         assert!(grade_discards(&save, first + 1).is_err(), "only from the first discard");
+    }
+
+    #[test]
+    fn auction_hints_give_every_bid_a_chance_and_every_other_call_a_note() {
+        let mut checked = 0;
+        for seed in 0..12 {
+            let mut table = Table::new(seed, "steady", "steady", "steady").unwrap();
+            while !table.human_to_act() {
+                table.step_bot();
+            }
+            let save = serde_json::to_string(&table.save()).unwrap();
+            let hint = hint(&save).unwrap();
+            let game = replay(&parse(&save).unwrap(), table.action_count()).unwrap();
+            let legal = game.legal_actions();
+            let bids = legal.iter().filter(|a| matches!(a, Action::Call(fh_core::Call::Bid(_)))).count();
+            assert_eq!(hint.bids.len(), bids, "a make chance for each legal bid");
+            assert!(hint.bids.iter().all(|b| b.makes.is_some_and(|m| (0.0..=1.0).contains(&m))));
+            let obs = game.observe(HUMAN);
+            let opponent_bid = obs.auction.high_bid().is_some_and(|(s, _)| s.team() != HUMAN.team());
+            for o in &hint.options {
+                let blank = o.makes.is_none() && o.note.is_none();
+                let quiet_pass = legal[o.index] == Action::Call(fh_core::Call::Pass) && !opponent_bid;
+                assert!(!blank || quiet_pass, "{} shows neither a chance nor a note", o.label);
+            }
+            // A mention says what it's worth to partner.
+            let coach = Coach::new(seed);
+            if let Some(&mention) = legal.iter().find(|a| matches!(a, Action::Call(fh_core::Call::Mention(_)))) {
+                assert!(coach.call_note(&obs, mention).is_some_and(|n| n.contains("partner")));
+                checked += 1;
+            }
+        }
+        assert!(checked > 0);
     }
 
     #[test]

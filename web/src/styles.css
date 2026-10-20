@@ -222,15 +222,23 @@ button:focus-visible {
 .chip.declarer {
   background: var(--gold);
 }
+/* Each back sits in a slot that shrinks when the seat is narrow, so a full hand overlaps more
+   instead of spilling out of its box. The last card shows whole. */
 .backs {
+  --card-w: clamp(22px, 4vw, 34px);
   display: flex;
   margin-top: 4px;
+  min-width: 0;
 }
 .seat-east .backs {
   justify-content: flex-end;
 }
-.backs .card + .card {
-  margin-left: calc(var(--card-w) * -0.42);
+.back-slot {
+  flex: 0 1 calc(var(--card-w) * 0.58);
+  min-width: 4px;
+}
+.back-slot:last-child {
+  flex: none;
 }
 .bubble {
   position: absolute;

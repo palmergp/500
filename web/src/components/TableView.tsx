@@ -101,7 +101,9 @@ function SeatPlate({ view, seat, showVoids, piles, onTricks }: PlateProps) {
       {seat !== 0 && (
         <div className="backs" aria-label={`${view.handCounts[seat]} cards`}>
           {Array.from({ length: backs }, (_, i) => (
-            <CardBack key={i} small />
+            <span key={i} className="back-slot">
+              <CardBack small />
+            </span>
           ))}
         </div>
       )}

@@ -19,7 +19,7 @@ function pct(x: number | null) {
 
 /** The coach's suggestion for the decision in front of you. */
 export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => void }) {
-  const showMakes = hint.options.some((o) => o.makes !== null);
+  const showMakes = hint.options.some((o) => o.makes !== null || o.note);
   return (
     <div className="coach-panel" role="note" aria-label="Coach's hint">
       <div className="coach-head">
@@ -44,7 +44,7 @@ export function HintPanel({ hint, onClose }: { hint: HintView; onClose: () => vo
         <p className="coach-options">
           {hint.options.map((o) => (
             <span key={o.index}>
-              {o.label}: makes {pct(o.makes)}
+              {o.label}: {o.makes !== null ? `makes ${pct(o.makes)}` : (o.note ?? "")}
             </span>
           ))}
         </p>
