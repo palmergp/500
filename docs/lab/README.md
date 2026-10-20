@@ -455,6 +455,30 @@ now says so (`over_an_opponents_bid_the_coach_doesnt_take_long_shots`).
 the coach maximizes your score less theirs on each hand, so it never sacrifices. Games to 500 still switch to
 playing for the game within 160 of the target.
 
+### 25. Side kings and queens
+
+*Measured by `fh-lab honors` over 4,000 deals of Oracle play in all four seats, and by refitting the bidding count
+(`train/rules_of_thumb.py` data) with kings and queens split by how they're held.* Full tables in
+`docs/bidding-count.md`.
+
+| Holding | Won a trick (suit / NT) | Worth when bidding (suit / NT) |
+|---|---|---|
+| King alone | 20% / 32% | +0.08 / +0.20 |
+| King with 1 guard | 36% / 51% | +0.13 / +0.32 |
+| King with 2+ guards | 23% / 55% | +0.20 / +0.51 |
+| King with the ace (on top of the ace) | 53% / 83% | +0.30 / +0.50 |
+| Queen with 2+ guards | 14% / 32% | +0.07 / +0.23 |
+| Queen with the king | 21% / 42% | +0.08 / +0.20 |
+
+- In suit bids side queens are worth almost nothing (under 0.1), however guarded. In no trumps a queen with two
+  guards is a real stopper (¼).
+- Long side suits get trumped: in a suit bid a king with three or more guards won only 15%, against 36% with one.
+  Yet for bidding it's worth more, since length also stops the opponents running the suit.
+- The ace's seat matters: a guarded king without its ace won 19% with the ace on its left (playing after it) and
+  41% with the ace in the kitty (suit bids).
+- **The count now splits kings** (`crates/ai/src/thumb.rs`): suit bids ⅓ beside the ace, ⅕ with two or more
+  guards, ⅛ with one; no trumps ½, but ⅓ with a single guard.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

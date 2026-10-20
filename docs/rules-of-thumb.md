@@ -17,7 +17,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 1. **Count your hand in the suit you'd name trumps:**
    - Joker 1½, right bower 1¼, left bower 1;
    - trump ace ¾, king ⅔, queen ½, each other trump ½;
-   - side ace ⅔, guarded side king ⅕, void ⅕;
+   - side ace ⅔, side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕;
    - then **add 3** for partner and the kitty.
 2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and to 9 only at about 10.** Each extra
    level adds just 100 points, but falling one trick short costs both bids' values.
@@ -26,7 +26,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    - partner's 6-call +¾, partner's mention of your suit +0.6, partner's bid of it +2¼;
    - partner's pass −0.9, any opponent's bid of your suit −2.
 5. **No trumps:**
-   - count Joker 2¼, each ace 1, guarded king ½, then add 3⅓;
+   - count Joker 2¼, each ace 1, guarded king ½ (⅓ with just one guard), then add 3⅓;
    - an unstopped suit hurts far less than its reputation.
    - **Suit or no trumps? Bid no trumps mainly with the Joker.**
      - Without it, no trumps beats your suit only about 30% of the time.
@@ -78,7 +78,9 @@ For the suit you'd make trumps, add up:
 | Queen of trumps | **½** |
 | Each other trump (10 or lower) | **½** |
 | Each side-suit ace | **⅔** |
-| Each guarded side king (king plus at least one more card in the suit) | **⅕** |
+| Each side king beside its ace (on top of the ace) | **⅓** |
+| Each side king with two or more guards (other cards in the suit) | **⅕** |
+| Each side king with just one guard | **⅛** |
 | Each side void | **⅕** |
 | Each side singleton | **⅛** |
 
@@ -157,7 +159,8 @@ Count:
 |---|---|
 | The Joker | **2¼** (it's every suit's top card) |
 | Each ace | **1** |
-| Each guarded king | **½** |
+| Each king with two or more guards, or beside its ace | **½** |
+| Each king with just one guard | **⅓** |
 | Each queen with two guards | **¼** |
 | Each extra card in a long suit headed by the ace | **⅛** |
 

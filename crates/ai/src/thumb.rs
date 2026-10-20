@@ -35,18 +35,28 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
             let small = hand.iter().filter(|&c| is_trump(c, trump)).count() - honours.iter().filter(|h| has(h.0)).count();
             add(format!("{small} other trump{}", if small == 1 { "" } else { "s" }), 0.5 * small as f32);
             let mut side_aces = 0;
-            let mut kings = 0;
+            // Side kings by how they're held (finding 25): beside the ace, with two or more guards, with one.
+            let (mut ace_kings, mut kings, mut thin_kings) = (0, 0, 0);
             let mut voids = 0;
             let mut singles = 0;
             for s in Suit::ALL.into_iter().filter(|&s| s != t) {
                 let cards: Vec<Card> = hand.iter().filter(|&c| effective_suit(c, trump) == Some(s)).collect();
                 side_aces += cards.iter().filter(|c| c.rank() == ACE).count();
-                kings += (cards.iter().any(|c| c.rank() == KING) && cards.len() >= 2) as usize;
+                if cards.iter().any(|c| c.rank() == KING) {
+                    match (cards.iter().any(|c| c.rank() == ACE), cards.len()) {
+                        (true, _) => ace_kings += 1,
+                        (false, 1) => {}
+                        (false, 2) => thin_kings += 1,
+                        (false, _) => kings += 1,
+                    }
+                }
                 voids += cards.is_empty() as usize;
                 singles += (cards.len() == 1) as usize;
             }
             add(plural(side_aces, "side ace"), 0.67 * side_aces as f32);
-            add(plural(kings, "guarded side king"), 0.2 * kings as f32);
+            add(plural_with(ace_kings, "side king", "beside its ace"), 0.33 * ace_kings as f32);
+            add(plural_with(kings, "side king", "with 2+ guards"), 0.2 * kings as f32);
+            add(plural_with(thin_kings, "side king", "with one guard"), 0.125 * thin_kings as f32);
             add(plural(voids, "side void"), 0.2 * voids as f32);
             add(plural(singles, "singleton"), 0.125 * singles as f32);
             add("partner and kitty".into(), 3.0);
@@ -57,6 +67,7 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
             }
             let mut aces = 0;
             let mut kings = 0;
+            let mut thin_kings = 0;
             let mut queens = 0;
             let mut long = 0;
             for s in Suit::ALL {
@@ -64,7 +75,14 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
                 let len = cards.len();
                 let has = |r: u8| cards.contains(Card::new(s, r));
                 aces += has(ACE) as usize;
-                kings += (has(KING) && len >= 2) as usize;
+                // A king with a single small guard is worth less (finding 25); beside the ace it's a full ½.
+                if has(KING) && len >= 2 {
+                    if len == 2 && !has(ACE) {
+                        thin_kings += 1;
+                    } else {
+                        kings += 1;
+                    }
+                }
                 queens += (has(QUEEN) && len >= 3) as usize;
                 if has(ACE) {
                     long += len.saturating_sub(3);
@@ -72,6 +90,7 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
             }
             add(plural(aces, "ace"), 1.0 * aces as f32);
             add(plural(kings, "guarded king"), 0.5 * kings as f32);
+            add(plural_with(thin_kings, "king", "with one guard"), 0.33 * thin_kings as f32);
             add(plural(queens, "guarded queen"), 0.25 * queens as f32);
             add(plural(long, "long card"), 0.125 * long as f32);
             add("partner and kitty".into(), 3.33);
@@ -90,6 +109,11 @@ fn plural(n: usize, what: &str) -> String {
         1 => format!("1 {what}"),
         _ => format!("{n} {what}s"),
     }
+}
+
+/// "2 side kings with one guard": the noun takes the plural, not the tail.
+fn plural_with(n: usize, what: &str, tail: &str) -> String {
+    format!("{} {tail}", plural(n, what))
 }
 
 /// Rule 4: what the other calls are worth for `strain`.

@@ -79,7 +79,8 @@ export const LESSONS: Lesson[] = [
     body: [
       "Count your hand in the suit you'd make trumps. These values were measured from 64,000 solved bidding decisions:",
       "• Joker 1½ · right bower 1¼ · left bower 1 · trump ace ¾ · trump king ⅔ · trump queen ½ · each other trump ½",
-      "• Each side ace ⅔ · each guarded side king ⅕ · each side void ⅕ · each singleton ⅛",
+      "• Each side ace ⅔ · each side king beside its ace ⅓ · each guarded side king ⅕ (⅛ with just one guard) · each side void ⅕ · each singleton ⅛",
+      "Side queens count nothing in a suit bid: even guarded, one wins a trick only about one time in seven.",
       "• Then add 3 for your partner and the kitty.",
       "That total is roughly what your side will take as declarer. Bid 7 when it reaches about 7 (6¾ in a red suit or clubs): the bid is then made about 60% of the time, which is what the scoring needs to pay.",
       "## How high?",

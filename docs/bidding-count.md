@@ -35,11 +35,15 @@ Count these with the suit you're thinking of making trumps.
 | Holding | Tricks |
 |---|---|
 | Each side ace | ⅔ |
-| Each **guarded side king** (a king with at least one other card in that suit) | **⅕** |
+| Each side king **beside its ace** (A-K in the same suit), on top of the ace | **⅓** |
+| Each side king with **two or more guards** (other cards in that suit) | **⅕** |
+| Each side king with just one guard (K-x) | ⅛ |
 | Each side void (no cards in a suit) | ⅕ |
 | Each side singleton (one card in a suit) | ⅛ |
 
-A lone side king (no other card in the suit) counts nothing: it's usually caught by the ace.
+A lone side king (no other card in the suit) counts nothing: it's usually caught by the ace. Side queens count
+nothing either, however they're guarded (under 0.1 of a trick each). See [how often side kings and queens win a
+trick](#side-kings-and-queens-how-often-they-win-a-trick) below.
 
 ### Then add
 
@@ -71,7 +75,8 @@ In no trumps there are no trump suits and no bowers: both jacks are ordinary jac
 |---|---|
 | **Joker** | **2¼** (worth more than in a suit: it's the only trump, and it stops any suit) |
 | Each ace | 1 |
-| Each **guarded king** (a king with at least one other card in the suit) | **½** |
+| Each king with **two or more guards**, or beside its ace | **½** |
+| Each king with just one guard (K-x) | ⅓ |
 | Each guarded queen (a queen with at least two other cards in the suit) | ¼ |
 | Each long card in a suit headed by its ace (each card beyond the third) | ⅛ |
 | **Your partner and the kitty** | **3⅓** |
@@ -142,3 +147,45 @@ Count both. Some measured guides (`docs/rules-of-thumb.md`, rules 5–5b):
 
 *Kept in step with `crates/ai/src/thumb.rs` (the coach's count) and `docs/rules-of-thumb.md`. If either changes,
 update this page.*
+
+## Side kings and queens: how often they win a trick
+
+*Measured by `fh-lab honors`: the Oracle played 4,000 deals in all four seats, and every side-suit king and queen
+was followed to see whether that card itself won a trick (lab finding 25).* A **guard** is another card of the
+same suit in the same hand.
+
+| Holding | Suit bids: won a trick | …when you declare | No trumps: won a trick | …when you declare |
+|---|---|---|---|---|
+| King alone | 20% | 40% | 32% | 57% |
+| King with 1 guard | 36% | 46% | 51% | 57% |
+| King with 2 guards | 28% | 53% | 57% | 68% |
+| King with 3+ guards | 15% | 46% | 51% | 77% |
+| King with the ace (A-K) | 53% | 84% | 83% | 96% |
+| Queen alone | 8% | 22% | 11% | 21% |
+| Queen with 1 guard | 13% | 25% | 18% | 34% |
+| Queen with 2 guards | 16% | 33% | 32% | 47% |
+| Queen with 3+ guards | 10% | 41% | 33% | 64% |
+| Queen with the king (K-Q) | 21% | 52% | 42% | 65% |
+
+- **In a suit bid a long side suit gets trumped.** A king with three guards wins less often than one with a
+  single guard: by the time the suit comes round a third time, someone is void.
+- **Where the ace sits matters.** A guarded king without its ace, in a suit bid / no trumps, won 19% / 43% with
+  the ace on your left (it plays after you), 26% / 54% on your right (before you), 31% / 60% with your partner,
+  and 41% / 69% in the kitty.
+- **What it's worth when you bid** is less than how often it wins: a king that wins a trick often takes one you'd
+  have won anyway, with a trump or another card. Held equal on everything else in the hand, the extra tricks
+  for your side as declarer were:
+
+| Holding | Suit bid | No trumps |
+|---|---|---|
+| King alone | +0.08 | +0.20 |
+| King with 1 guard | +0.13 | +0.32 |
+| King with 2+ guards | +0.20 | +0.51 |
+| King with the ace (on top of the ace) | +0.30 | +0.50 |
+| Queen alone | +0.03 | +0.01 |
+| Queen with 1 guard | +0.08 | +0.12 |
+| Queen with 2+ guards | +0.07 | +0.23 |
+| Queen with the king | +0.08 | +0.20 |
+
+These are the count's values above, rounded: in a suit bid only kings count (⅛ to ⅓), and in no trumps a
+guarded king is worth ½ and a queen with two guards ¼.
