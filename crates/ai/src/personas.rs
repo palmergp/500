@@ -113,6 +113,10 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { read_signals: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (ignores discard signals)", config, seed)));
         }
+        "oracle-fixedpass" => {
+            let config = SearchConfig { fixed_opponents: true, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (fixed pass value)", config, seed)));
+        }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));

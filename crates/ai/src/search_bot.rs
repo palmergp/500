@@ -120,6 +120,9 @@ pub struct SearchConfig {
     /// Read partner's and opponents' discard signals when imagining the hidden cards (with
     /// `inference`; lab variants turn it off on its own).
     pub read_signals: bool,
+    /// Value passing over an opponent's bid as if they make it three times in four, whatever we
+    /// hold (the old estimate; a lab variant keeps it to measure the fitted one, finding 26).
+    pub fixed_opponents: bool,
 }
 
 impl SearchConfig {
@@ -153,6 +156,7 @@ impl SearchConfig {
         signal_calls: true,
         track_voids: true,
         read_signals: true,
+        fixed_opponents: false,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -453,11 +457,14 @@ impl SearchBot {
             None => 0.0,
             Some((seat, contract)) if seat == me.partner() => self.expected(obs, &dist(contract.strain), contract, me),
             Some((seat, contract)) => {
-                // An opponent's contract: they make it about three times in four (lab), half the
-                // time with a trick to spare. Valued by the same utility as the bids (points, or the
-                // chance of winning the game), so the two always compare in the same units.
+                // An opponent's contract: how often it makes depends on what we hold in their strain
+                // (finding 26), two times in three with a trick to spare. Valued by the same utility as
+                // the bids (points, or the chance of winning the game), so the two always compare in
+                // the same units.
+                let ours: f64 = dist(contract.strain).iter().map(|&(t, p)| t as f64 * p).sum();
+                let p = if self.config.fixed_opponents { 0.75 } else { opponents_make(contract.level, ours) };
                 let level = contract.level;
-                let spread = [(level.saturating_add(1).min(10), 0.5), (level, 0.25), (level.saturating_sub(1), 0.25)];
+                let spread = [(level.saturating_add(1).min(10), p * 2.0 / 3.0), (level, p / 3.0), (level.saturating_sub(1), 1.0 - p)];
                 spread.iter().map(|&(tricks, p)| p * self.utility(obs, contract, seat, tricks)).sum()
             }
         };
@@ -475,6 +482,19 @@ impl SearchBot {
             }
         }
         (bids, baseline)
+    }
+
+    /// How often the opponents' high bid makes, given our hand (`opponents_make`); `None` unless
+    /// an opponent holds the high bid.
+    pub fn opponents_chance(&self, obs: &Observation, model: &Mlp) -> Option<f64> {
+        let (seat, contract) = obs.auction.high_bid()?;
+        if seat.team() == obs.seat.team() {
+            return None;
+        }
+        let logits = model.forward(&bid_features(obs));
+        let block = strain_block(contract.strain);
+        let ours: f64 = softmax(&logits[block..block + 11]).iter().enumerate().map(|(t, p)| t as f64 * p).sum();
+        Some(opponents_make(contract.level, ours))
     }
 
     fn neural_call(&mut self, obs: &Observation, legal: &[Action], model: &Mlp) -> Action {
@@ -577,6 +597,15 @@ impl SearchBot {
         }
         Action::Call(Call::Pass)
     }
+}
+
+/// How often an opponent's bid at `level` makes, given `ours`: the tricks our side would expect as
+/// declarer in their strain (the bidding network's estimate). A logistic fit to 5,328 Oracle hands
+/// (`fh-lab opponents`, docs/lab/README.md finding 26): with 3 tricks of ours they make 7 about 88%
+/// of the time, with 5 only 55%. Bids above 8 were too rare to measure, so 9 and 10 count as 9.
+pub fn opponents_make(level: u8, ours: f64) -> f64 {
+    let above = (level.saturating_sub(7)).min(2) as f64;
+    1.0 / (1.0 + (-(4.694 - 1.015 * above - 0.898 * ours)).exp())
 }
 
 /// A rough chance that `team` wins the game from scores `after` this hand. Terminal positions
