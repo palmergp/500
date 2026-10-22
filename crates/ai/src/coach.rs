@@ -15,7 +15,7 @@ use crate::solver::{Position, Solver};
 use crate::Bot;
 use fh_core::rules::is_trump;
 use fh_core::trick::trick_strength;
-use fh_core::{Action, Call, Card, CardSet, Contract, HandRecord, Observation, Phase, Play, Seat, Strain, Trick};
+use fh_core::{effective_suit, Action, Call, Card, CardSet, Contract, HandRecord, Observation, Phase, Play, Seat, Strain, Suit, Trick};
 
 /// The lab's rule of thumb: partner and the kitty are worth about 2.7 tricks (docs/lab/README.md).
 pub const PARTNER_AND_KITTY: f32 = 2.7;
@@ -54,6 +54,16 @@ impl Verdict {
 }
 
 /// One option the coach considered.
+impl Analysis {
+    /// Card play: every legal play with its value, the chance players see that the bid makes,
+    /// and the tricks the player's side takes on average, for the hand's tooltips after a hint.
+    pub fn play_chances(&self, obs: &Observation) -> Vec<(Action, f64, f64, f64)> {
+        let (Some(play), Some((declarer, _))) = (self.play.as_ref(), obs.contract) else { return vec![] };
+        let ours = declarer.team() == obs.seat.team();
+        play.stats.iter().map(|s| (s.action, s.ev, shown_play_chance(obs, s.makes), if ours { s.tricks } else { 10.0 - s.tricks })).collect()
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct OptionEval {
     pub action: Action,
@@ -241,7 +251,7 @@ impl Coach {
                 return Grade { chosen, best: analysis.best, loss: 0.0, verdict: Verdict::Good, analysis };
             }
             if let Some(play) = analysis.play.as_ref() {
-                let stat = |a: Action| play.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: real_play_chance(s.makes, PLAY_CURVE), ..s });
+                let stat = |a: Action| play.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: shown_play_chance(obs, s.makes), ..s });
                 analysis.reasons = play_reasons(obs, chosen, None, stat(chosen), None, play.worlds);
             } else if obs.phase == Phase::Bidding {
                 analysis.reasons = call_reasons(obs, chosen, None, &analysis.options, obs.auction.high_bid());
@@ -283,9 +293,13 @@ impl Coach {
         let best = ranked[0].0;
         // What players see is the real-play chance: the sampled deals are solved as if everyone
         // played perfectly, which understates the declarer's chances (`fh-lab honesty`).
-        let stat = |a: Action| result.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: real_play_chance(s.makes, PLAY_CURVE), ..s });
-        let mut options: Vec<OptionEval> =
-            ranked.iter().map(|&(action, ev)| OptionEval { action, ev, makes: stat(action).map(|s| s.makes) }).collect();
+        let stat = |a: Action| result.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: shown_play_chance(obs, s.makes), ..s });
+        // Once the tricks taken settle the bid, every play has the same chance: what's left is tricks.
+        let settled = settled(obs).is_some();
+        let mut options: Vec<OptionEval> = ranked
+            .iter()
+            .map(|&(action, ev)| OptionEval { action, ev, makes: stat(action).filter(|_| !settled).map(|s| s.makes) })
+            .collect();
         options.dedup_by_key(|o| o.action);
         // Still too close to call after the closer look: say so, rather than pick one as if sure.
         let close: Vec<Action> = ranked
@@ -564,6 +578,47 @@ const BID_CURVE: &[(f64, f64)] = &[
     (1.00, 0.97),
 ];
 
+/// Whether the tricks already taken settle the bid: `Some(true)` made, `Some(false)` beaten.
+pub fn settled(obs: &Observation) -> Option<bool> {
+    let (declarer, contract) = obs.contract?;
+    let won = obs.tricks_won[declarer.team().index()];
+    let lost = obs.tricks_won[declarer.team().other().index()];
+    if won >= contract.level {
+        Some(true)
+    } else if lost > 10 - contract.level {
+        Some(false)
+    } else {
+        None
+    }
+}
+
+/// The make chance players see for a card play: exact once the tricks taken settle it (a bid
+/// already beaten goes down every time), otherwise the measured real-play curve.
+fn shown_play_chance(obs: &Observation, raw: f64) -> f64 {
+    match settled(obs) {
+        Some(made) => f64::from(u8::from(made)),
+        None => real_play_chance(raw, PLAY_CURVE),
+    }
+}
+
+/// "K♠ is the highest card left in its suit", or, when you also hold higher cards of the suit
+/// (all the others above it gone), that it's as good as those.
+fn top_card_note(card: Card, hand: CardSet, trump: Option<Suit>) -> String {
+    let higher: Vec<String> = match effective_suit(card, trump) {
+        Some(suit) => hand
+            .iter()
+            .filter(|&c| c != card && !c.is_joker() && effective_suit(c, trump) == Some(suit) && trick_strength(c, suit, trump) > trick_strength(card, suit, trump))
+            .map(|c| c.to_string())
+            .collect(),
+        None => vec![],
+    };
+    if higher.is_empty() {
+        format!("{card} is the highest card left in its suit.")
+    } else {
+        format!("{card} wins as surely as your {}: together they're the highest cards left in the suit.", higher.join(" and "))
+    }
+}
+
 /// The real-play chance for a raw chance, on `curve`.
 pub fn real_play_chance(raw: f64, curve: &[(f64, f64)]) -> f64 {
     let raw = raw.clamp(0.0, 1.0);
@@ -598,8 +653,31 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     let seen = obs.played().union(obs.hand).union(obs.discards.unwrap_or_default());
     let chosen_play = chosen.and_then(play_card).filter(|&c| Some(c.card) != Some(best_play.card));
 
-    // How the contract fares, from the player's side.
-    if let Some(b) = best_stat {
+    // How the contract fares, from the player's side. Once it's settled, only tricks are left to play
+    // for: the defenders score 10 a trick whatever happens (and all ten score the declarers 250).
+    let ours = |s: PlayStat| if declaring { s.tricks } else { 10.0 - s.tricks };
+    if let (Some(state), Some(b)) = (settled(obs), best_stat) {
+        reasons.push(
+            match (state, declaring) {
+                (true, true) => "Your bid is made. Each trick you take now keeps 10 points from the defenders.",
+                (true, false) => "Their bid is made, but each trick you take still scores 10 points.",
+                (false, true) => "Your bid is beaten. Each trick you take still keeps 10 points from the defenders.",
+                (false, false) => "Their bid is beaten. Each more trick you take scores another 10 points.",
+            }
+            .into(),
+        );
+        match (chosen_play, chosen_stat) {
+            (Some(c), Some(cs)) if (ours(b) - ours(cs)).abs() >= 0.05 => reasons.push(format!(
+                "With {} your side takes {:.1} tricks on average; with {}, {:.1}.",
+                best_play.card,
+                ours(b),
+                c.card,
+                ours(cs)
+            )),
+            (None, _) => reasons.push(format!("Your side takes about {:.1} tricks after this play.", ours(b))),
+            _ => {}
+        }
+    } else if let Some(b) = best_stat {
         let side = |makes: f64| if declaring { makes } else { 1.0 - makes };
         let goal = if declaring { "is made" } else { "goes down" };
         match (chosen_play, chosen_stat) {
@@ -635,7 +713,7 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
             } else if !beats(best_play.card) && sure {
                 reasons.push(format!("Your partner's {winning} has this trick, so play low."));
                 if let Some(c) = chosen_play.filter(|c| is_boss(c.card, seen, trump) && !c.card.is_joker()) {
-                    reasons.push(format!("Save the {}: it is now the highest card left in its suit, a winner later.", c.card));
+                    reasons.push(format!("Save the {}: {} It's a winner later.", c.card, top_card_note(c.card, obs.hand, trump)));
                 }
             }
         } else if beats(best_play.card) && !chosen_play.is_some_and(|c| beats(c.card)) {
@@ -648,7 +726,7 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
             reasons.push(format!("Draw trumps: the opponents may still hold {out}."));
         }
     } else if is_boss(best_play.card, seen, trump) && !best_play.card.is_joker() {
-        reasons.push(format!("{} is the highest card left in its suit.", best_play.card));
+        reasons.push(top_card_note(best_play.card, obs.hand, trump));
     }
     let partner_winning = trick.winner(trump) == Some(me.partner());
     if chosen_play.is_some_and(|c| c.card.is_joker()) && !best_play.card.is_joker() && (trump.is_none() || partner_winning) {
@@ -950,6 +1028,43 @@ pub fn expert_replay(mut game: fh_core::Game, players: [&str; 4], seat: Seat, se
 mod tests {
     use super::*;
     use fh_core::{Game, Rules};
+
+    /// Once the tricks taken settle the bid, the hint talks tricks, and a beaten bid goes down
+    /// every time, not "97%" (a user's case: they had beaten 7NT and the review said 97%).
+    #[test]
+    fn once_the_bid_is_settled_the_coach_plays_for_tricks() {
+        let mut found = 0;
+        for seed in 0..40u64 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bots: [Box<dyn Bot>; 4] = std::array::from_fn(|i| crate::make_bot("steady", seed * 4 + i as u64).unwrap());
+            while game.phase() != Phase::GameOver && game.history().iter().all(|h| h.contract.is_none()) {
+                let seat = game.to_act().unwrap();
+                let obs = game.observe(seat);
+                if obs.phase == Phase::Playing && settled(&obs).is_some() && game.legal_actions().len() > 1 && found < 6 {
+                    let analysis = Coach::new(seed).analyze(&obs, &game.legal_actions(), None);
+                    assert!(analysis.options.iter().all(|o| o.makes.is_none()), "no chances once settled");
+                    let exact = f64::from(u8::from(settled(&obs).unwrap()));
+                    assert!(analysis.play_chances(&obs).iter().all(|&(_, _, m, _)| m == exact));
+                    assert!(analysis.reasons.iter().any(|r| r.contains("10 points")), "{:?}", analysis.reasons);
+                    found += 1;
+                }
+                let action = bots[seat.index()].choose(&obs, &game.legal_actions());
+                game.apply(action).unwrap();
+            }
+        }
+        assert!(found >= 3, "only {found} settled positions");
+    }
+
+    /// "K♠ is the highest card left" is wrong when you hold the A♠ too.
+    #[test]
+    fn a_top_card_note_mentions_your_higher_cards() {
+        let hand: CardSet = [Card::new(Suit::Spades, fh_core::cards::ACE), Card::new(Suit::Spades, fh_core::cards::KING)].into_iter().collect();
+        let king = Card::new(Suit::Spades, fh_core::cards::KING);
+        let note = top_card_note(king, hand, Some(Suit::Hearts));
+        assert!(note.contains("as surely as your A♠"), "{note}");
+        let ace = Card::new(Suit::Spades, fh_core::cards::ACE);
+        assert!(top_card_note(ace, hand, Some(Suit::Hearts)).contains("is the highest card left"));
+    }
 
     /// Near the end the coach plays for the game: behind with the opponents near 500, it bids
     /// light hands, and high enough to reach 500, more often than at the start (finding 20).

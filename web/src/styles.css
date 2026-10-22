@@ -158,7 +158,8 @@ button:focus-visible {
 .seat-east {
   grid-area: east;
   align-self: center;
-  justify-self: end;
+  /* Fills its column like West (rather than sizing to its cards), so a full hand can't push it
+     into the middle of the table. */
   text-align: right;
 }
 .center {
@@ -233,12 +234,16 @@ button:focus-visible {
 .seat-east .backs {
   justify-content: flex-end;
 }
+/* An explicit width, not just a flex basis: a flex row's natural width counts each item's
+   content (a whole card), which made East and North as wide as ten unoverlapped cards. */
 .back-slot {
-  flex: 0 1 calc(var(--card-w) * 0.58);
+  flex: 0 1 auto;
+  width: calc(var(--card-w) * 0.58);
   min-width: 4px;
 }
 .back-slot:last-child {
   flex: none;
+  width: auto;
 }
 .bubble {
   position: absolute;
@@ -294,12 +299,17 @@ button:focus-visible {
   color: var(--gold);
 }
 
+/* On a short screen the table squeezes the trick area; its cards then size to the area's real
+   height (a size container), so North's and South's cards never overlap. */
 .trick-area {
+  --table-card-w: var(--card-w);
   position: relative;
   width: calc(var(--card-w) * 3.6);
   height: calc(var(--card-w) * 3.3);
+  container-type: size;
 }
 .trick-card {
+  --card-w: min(var(--table-card-w), 30cqh);
   position: absolute;
   transition: transform 0.2s;
 }
@@ -727,6 +737,12 @@ button:focus-visible {
   border-color: var(--gold);
   padding: 3px 12px;
   font-weight: 600;
+}
+.finish-button {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--ink);
+  border-color: var(--felt-line);
+  padding: 3px 12px;
 }
 .coach-panel {
   width: min(560px, 100%);
@@ -2121,4 +2137,35 @@ button.danger {
   padding: 1px 7px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--gold) 25%, transparent);
+}
+
+/* A record you just set: a banner at the top that fades after a few seconds. */
+.record-toast {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  border: none;
+  top: 60px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  max-width: calc(100vw - 32px);
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--gold);
+  color: var(--felt-dark);
+  font-weight: 700;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.35);
+  animation: record-in 0.4s ease-out, record-out 0.6s ease-in 5.4s forwards;
+}
+@keyframes record-in {
+  from {
+    transform: translate(-50%, -30px);
+    opacity: 0;
+  }
+}
+@keyframes record-out {
+  to {
+    opacity: 0;
+  }
 }

@@ -21,9 +21,11 @@ interface CardProps {
   hinted?: boolean | "close";
   /** Position in a fanned hand, for the arc and the deal-in animation. */
   fan?: { index: number; count: number };
+  /** A tooltip (the coach's numbers for this card, after a hint). */
+  tip?: string;
 }
 
-export function Card({ card, onClick, playable, selected, fromKitty, small, hinted, fan }: CardProps) {
+export function Card({ card, onClick, playable, selected, fromKitty, small, hinted, fan, tip }: CardProps) {
   const offset = fan ? fan.index - (fan.count - 1) / 2 : 0;
   const style = fan
     ? ({ "--rot": `${offset * 1.6}deg`, "--drop": `${Math.abs(offset) * 1.4}px`, "--i": fan.index } as React.CSSProperties)
@@ -50,6 +52,7 @@ export function Card({ card, onClick, playable, selected, fromKitty, small, hint
       disabled={!onClick}
       aria-label={describe(card)}
       aria-pressed={selected || undefined}
+      title={tip}
       style={style}
     >
       <span className="corner">

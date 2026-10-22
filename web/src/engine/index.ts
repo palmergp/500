@@ -73,6 +73,11 @@ export class Engine extends WorkerClient {
     return this.call("act", { index }) as Promise<Snapshot>;
   }
 
+  /** Your turn, played for you by a quick bot ("finish the hand"). */
+  autoAct(): Promise<Snapshot> {
+    return this.call("autoAct", {}) as Promise<Snapshot>;
+  }
+
   /** The next bot move, or null if it's your turn or the game is over. */
   stepBot(): Promise<Snapshot | null> {
     return this.call("stepBot", {}) as Promise<Snapshot | null>;

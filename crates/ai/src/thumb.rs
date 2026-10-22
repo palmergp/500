@@ -128,12 +128,15 @@ fn auction_adjustments(obs: &Observation, strain: Strain) -> Vec<(String, f32)> 
         }
         let partner = seat == me.partner();
         match (partner, call) {
-            (true, Call::Six(_)) => out.push(("partner's 6-call".into(), if nt { 1.0 } else { 0.75 })),
+            // A 6-call names the caller's best strain: in yours it says much more (finding 27).
+            (true, Call::Six(s)) if s == strain && !nt => out.push(("partner's 6-call in it".into(), 1.4)),
+            (true, Call::Six(_)) => out.push(("partner's 6-call".into(), if nt { 1.0 } else { 0.5 })),
             (true, Call::Mention(s)) if s == strain => out.push(("partner's mention".into(), if nt { 0.7 } else { 0.6 })),
             (true, Call::Bid(c)) if c.strain == strain => out.push(("partner's bid".into(), 2.25)),
             (true, Call::Pass) => out.push(("partner passed".into(), if nt { -1.3 } else { -0.9 })),
-            (false, Call::Six(_)) => {
-                out.push(("an opponent's 6-call".into(), if nt { -0.7 } else { -0.5 }));
+            (false, Call::Six(s)) => {
+                let value = if nt { -0.7 } else if s == strain { -1.125 } else { -0.33 };
+                out.push((if s == strain && !nt { "an opponent's 6-call in it" } else { "an opponent's 6-call" }.into(), value));
                 opponents_showed = true;
             }
             (false, Call::Mention(s)) if s == strain => {

@@ -160,10 +160,10 @@ export const LESSONS: Lesson[] = [
     summary: "What partner's and opponents' calls are worth.",
     body: [
       "Add these to your count for the strain you're considering (measured):",
-      "• Partner called 6 (has the Joker): +¾ in a suit, +1 in no trumps.",
+      "• Partner called 6 (has the Joker): +1.4 if it's your suit, +½ in another suit, +1 in no trumps.",
       "• Partner mentioned your strain: +0.6. Partner bid it: +2¼.",
       "• Partner passed: −0.9 (−1.3 in no trumps). Their pass is real information: don't stretch after it.",
-      "• An opponent called 6: −½. An opponent mentioned your strain: −⅔. An opponent bid it: −2.",
+      "• An opponent called 6 in your suit: −1⅛ (they hold the Joker and length there). In another suit: −⅓. An opponent mentioned your strain: −⅔. An opponent bid it: −2.",
       "• Speaking last as dealer, with no opposing interest in your strain: +½.",
       "## Compete, and trust partner",
       "The neural bidder (The Oracle) declares about twice as often as the rule-based expert and scores 12 points a hand more: bid when the count says it pays, even if you go down a little more often. But don't pull partner out of their suit into yours: raise it or pass.",

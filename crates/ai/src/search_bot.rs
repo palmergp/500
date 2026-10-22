@@ -123,6 +123,8 @@ pub struct SearchConfig {
     /// Value passing over an opponent's bid as if they make it three times in four, whatever we
     /// hold (the old estimate; a lab variant keeps it to measure the fitted one, finding 26).
     pub fixed_opponents: bool,
+    /// When the bidding fallback makes a 6-call (lab variants; the house signal is `Always`).
+    pub six: crate::rule_bot::SixPolicy,
 }
 
 impl SearchConfig {
@@ -157,6 +159,7 @@ impl SearchConfig {
         track_voids: true,
         read_signals: true,
         fixed_opponents: false,
+        six: crate::rule_bot::SixPolicy::Always,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -183,7 +186,7 @@ impl SearchBot {
             config,
             rng: Rng::new(seed),
             discard_plan: Vec::new(),
-            fallback: RuleBot::new(name, Style { aggression: config.rule_aggression, ..Style::STEADY }, seed),
+            fallback: RuleBot::new(name, Style { aggression: config.rule_aggression, six: config.six, ..Style::STEADY }, seed),
             note: String::new(),
         }
     }
@@ -498,18 +501,14 @@ impl SearchBot {
     }
 
     fn neural_call(&mut self, obs: &Observation, legal: &[Action], model: &Mlp) -> Action {
-        let me = obs.seat;
         let (bids, baseline) = self.neural_values(obs, legal, model);
         let best = bids.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, v, m)| (v, c, m));
         let must_bid = obs.auction.must_bid();
         if let Some((value, contract, makes)) = best {
             self.note = format!("neural: best {contract} makes {:.0}%, EV {value:+.0} vs baseline {baseline:+.0}", 100.0 * makes);
-            let partner_strain = obs.auction.high_bid().filter(|(s, _)| *s == me.partner()).map(|(_, c)| c.strain);
-            let margin = match partner_strain {
-                Some(s) if s != contract.strain => self.config.bid_margin + 40.0,
-                _ => self.config.bid_margin,
-            };
-            if must_bid || value > baseline + margin {
+            // No extra bar for leaving partner's strain: the network already reads partner's bid, and
+            // where a 40-point bar alone made it pass, bidding scored 41 points more (finding 28).
+            if must_bid || value > baseline + self.config.bid_margin {
                 return Action::Call(Call::Bid(contract));
             }
         }

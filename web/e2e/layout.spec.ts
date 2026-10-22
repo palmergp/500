@@ -77,8 +77,43 @@ test("a full hand of card backs stays inside its seat on laptop screens", async 
         expect(right, `${seat} at ${width}×${height}`).toBeLessThanOrEqual(box!.x + box!.width + 1);
       }
     }
+    // The side seats stay in their columns, clear of the middle of the table.
+    const center = (await page.locator(".center").boundingBox())!;
+    const west = (await page.locator(".seat-west").boundingBox())!;
+    const east = (await page.locator(".seat-east").boundingBox())!;
+    expect(west.x + west.width, `West at ${width}×${height}`).toBeLessThanOrEqual(center.x + 1);
+    expect(east.x, `East at ${width}×${height}`).toBeGreaterThanOrEqual(center.x + center.width - 1);
     await page.screenshot({ path: `test-results/backs-${width}x${height}.png` });
   }
+});
+
+for (const [width, height] of [[1280, 720], [1229, 590], [1366, 657], [1536, 730], [1024, 600]]) test(`with large cards, the cards played to a trick don't overlap (${width}×${height})`, async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "sizes are set here");
+  test.setTimeout(180_000);
+  await page.setViewportSize({ width, height });
+  await freshStart(page, { bigCards: true });
+  await page.getByRole("button", { name: /^Play solo/ }).click();
+  await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Deal" }).click();
+  const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+  let checked = 0;
+  for (let step = 0; step < 3000 && checked < 6 && !(await result.isVisible()); step++) {
+    const rects = await page.locator(".trick-card .card").evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ l: r.left, r: r.right, t: r.top, b: r.bottom })));
+    if (rects.length >= 2) {
+      checked++;
+      for (let i = 0; i < rects.length; i++)
+        for (let j = i + 1; j < rects.length; j++) {
+          const [a, c] = [rects[i], rects[j]];
+          const overlap = Math.min(a.r, c.r) - Math.max(a.l, c.l) > 1 && Math.min(a.b, c.b) - Math.max(a.t, c.t) > 1;
+          // West and East cards sit beside North and South's: only a corner may touch.
+          const area = (Math.min(a.r, c.r) - Math.max(a.l, c.l)) * (Math.min(a.b, c.b) - Math.max(a.t, c.t));
+          expect(overlap && area > 0.15 * (a.r - a.l) * (a.b - a.t), `cards ${i} and ${j} overlap`).toBe(false);
+        }
+      if (checked === 1) await page.screenshot({ path: `test-results/big-cards-trick-${width}x${height}.png` });
+    }
+    if (!(await takeTurn(page))) await page.waitForTimeout(50);
+  }
+  expect(checked).toBeGreaterThan(0);
+  expect(await page.evaluate(() => document.scrollingElement!.scrollHeight <= window.innerHeight + 1)).toBe(true);
 });
 
 test("trick piles, past tricks, and who called what", async ({ page }) => {

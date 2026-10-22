@@ -46,6 +46,19 @@ pub struct Table {
     bots: [Option<Box<dyn Bot>>; 4],
     log: Vec<u16>,
     hands: Option<u8>,
+    bid_notes: Vec<BidNote>,
+}
+
+/// A bid as its bidder saw it: their rule-of-thumb count and the coach's make chance, from what
+/// they could see when they bid. Shown in the hand review.
+#[derive(Clone, Debug)]
+pub struct BidNote {
+    /// The deal it belongs to: its index in the game's history.
+    pub deal: usize,
+    pub seat: Seat,
+    pub contract: fh_core::Contract,
+    pub count: f32,
+    pub makes: Option<f64>,
 }
 
 impl Table {
@@ -67,7 +80,7 @@ impl Table {
         for seat in Seat::ALL {
             bots[seat.index()] = make_bot(&players[seat.index()], seed, seat)?;
         }
-        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands })
+        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands, bid_notes: Vec::new() })
     }
 
     /// Puts a person ("human") or a bot persona ("any" for a random one) in `seat`, mid-game if
@@ -146,6 +159,20 @@ impl Table {
         self.apply_index(index)
     }
 
+    /// The human's turn, played for them by The Natural (quick, and plays well): "finish the hand"
+    /// when the outcome is clear. It sees only what the human sees.
+    pub fn auto_act(&mut self) -> Result<Vec<EventView>, String> {
+        if !self.human_to_act() {
+            return Err("it is not your turn".into());
+        }
+        let seat = self.game.to_act().expect("someone is to act");
+        let mut bot = fh_ai::make_bot("natural", self.seed ^ self.log.len() as u64).or_else(|| fh_ai::make_bot("steady", self.seed)).expect("a bot");
+        let legal = self.game.legal_actions();
+        let action = bot.choose(&self.game.observe(seat), &legal);
+        let index = legal.iter().position(|&a| a == action).expect("bots choose legal actions");
+        self.apply_index(index)
+    }
+
     /// Lets the bot whose turn it is act. Returns `None` if it is the human's turn or the game is over.
     pub fn step_bot(&mut self) -> Option<Vec<EventView>> {
         let events = self.step_bot_events()?;
@@ -162,9 +189,20 @@ impl Table {
     fn apply_raw(&mut self, index: usize) -> Result<Vec<Event>, String> {
         let legal = self.game.legal_actions();
         let action: Action = *legal.get(index).ok_or_else(|| format!("no legal action #{index}"))?;
+        if let (Action::Call(fh_core::Call::Bid(contract)), Some(seat)) = (action, self.game.to_act()) {
+            let obs = self.game.observe(seat);
+            let makes = fh_ai::coach::Coach::new(self.seed).bid_chances(&obs, &legal).into_iter().find(|&(a, _)| a == action).map(|(_, m)| m);
+            let count = fh_ai::thumb::count(&obs, contract.strain).0;
+            self.bid_notes.push(BidNote { deal: self.game.history().len(), seat, contract, count, makes });
+        }
         let events = self.game.apply(action).map_err(|e| e.to_string())?;
         self.log.push(index as u16);
         Ok(events)
+    }
+
+    /// Every bid so far, as its bidder saw it.
+    pub fn bid_notes(&self) -> &[BidNote] {
+        &self.bid_notes
     }
 
     pub fn save(&self) -> SaveData {
@@ -314,7 +352,7 @@ mod tests {
         }
         let game = table.game();
         let names = ["S".to_string(), "W".to_string(), "N".to_string(), "E".to_string()];
-        let east = crate::view::View::build_for(game, &Lens::new(Seat::EAST, names), table.players(), table.action_count());
+        let east = crate::view::View::build_for(game, &Lens::new(Seat::EAST, names), table.players(), table.action_count(), table.bid_notes());
         let south = table.view();
         // East sees their own hand, at index 0, with their side's score first.
         assert_eq!(east.hand.len(), game.hand(Seat::EAST).len());

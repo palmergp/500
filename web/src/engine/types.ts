@@ -70,6 +70,16 @@ export interface HandView {
   kitty: CardView[];
   discards: CardView[];
   tricks: TrickView[];
+  /** Each bid with its bidder's rule-of-thumb count and the coach's make chance, from what they
+   * could see when they bid. */
+  bids?: BidNoteView[];
+}
+
+export interface BidNoteView {
+  seat: SeatIndex;
+  label: string;
+  count: number;
+  makes: number | null;
 }
 
 export interface View {
@@ -136,6 +146,8 @@ export interface HintView {
   close: number[];
   /** In the auction: every legal bid with how often it would make (for the bidding box's tooltips). */
   bids?: OptionView[];
+  /** In card play: every legal play with the bid's chance (null once settled) and your side's tricks (in `note`). */
+  plays?: OptionView[];
 }
 
 export type Verdict = "best" | "good" | "inaccuracy" | "mistake" | "blunder";

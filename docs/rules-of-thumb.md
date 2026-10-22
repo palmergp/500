@@ -23,8 +23,8 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    level adds just 100 points, but falling one trick short costs both bids' values.
 3. **Bid a little more than feels safe.** Timid bidding loses games under these rules.
 4. **Adjust for the auction:**
-   - partner's 6-call +¾, partner's mention of your suit +0.6, partner's bid of it +2¼;
-   - partner's pass −0.9, any opponent's bid of your suit −2.
+   - partner's 6-call in your suit +1.4 (in another suit +½), partner's mention of your suit +0.6, partner's bid of it +2¼;
+   - partner's pass −0.9, an opponent's 6-call in your suit −1⅛ (in another −⅓), any opponent's bid of your suit −2.
 5. **No trumps:**
    - count Joker 2¼, each ace 1, guarded king ½ (⅓ with just one guard), then add 3⅓;
    - an unstopped suit hurts far less than its reputation.
@@ -137,11 +137,13 @@ Add these to your count for the strain you're considering:
 
 | What happened | Suit bid | No trumps |
 |---|---|---|
-| Partner called 6 (they hold the Joker) | **+¾** | **+1** |
+| Partner called 6 in this suit (they hold the Joker) | **+1.4** | — |
+| Partner called 6 in another strain | **+½** | **+1** |
 | Partner mentioned this strain | **+0.6** | **+0.7** |
 | Partner bid this strain | **+2¼** | **+2¼** |
 | Partner passed | **−0.9** | **−1.3** |
-| An opponent called 6 | **−½** | **−0.7** |
+| An opponent called 6 in this suit | **−1⅛** | — |
+| An opponent called 6 in another strain | **−⅓** | **−0.7** |
 | An opponent mentioned this strain | **−⅔** | **−0.7** |
 | An opponent bid this strain | **−2** | **−2** |
 | You speak last (dealer), with no opposing bid, mention or 6 in this strain | **+½** | **+0.6** |

@@ -39,6 +39,10 @@
   `features::play_features`, cards in role-based slots `features::play_slot`), then
   `train/.venv/Scripts/python train/train_play.py` writes `crates/ai/models/play.fhnn`; `neural_play.rs` plays with it
   (persona id `neural`). Changing the inputs means regenerating the data and retraining.
+- Records and bid stats (`web/src/records.ts`): high game, best hand, highest bid made, and each bid you declared;
+  counted once per game and hand, shown on Learn → Progress, with a popover banner when you set one.
+- "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
+  worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save
   stores the pick. Short games: `Rules::hand_limit` (H25), stored in the save as `hands`.
 - Lessons live in `web/src/learn/lessons.ts`; their numbers come from `docs/rules-of-thumb.md`, so keep them in step.

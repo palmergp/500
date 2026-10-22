@@ -250,9 +250,22 @@ pub struct HandView {
     pub kitty: Vec<CardView>,
     pub discards: Vec<CardView>,
     pub tricks: Vec<TrickView>,
+    /// Each bid with its bidder's count and make chance when they bid.
+    pub bids: Vec<BidNoteView>,
 }
 
-pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens) -> HandView {
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BidNoteView {
+    pub seat: usize,
+    pub label: String,
+    /// The bidder's rule-of-thumb count in the bid's strain.
+    pub count: f32,
+    /// The coach's chance that the bid makes, from what the bidder could see.
+    pub makes: Option<f64>,
+}
+
+pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens, notes: &[crate::table::BidNote]) -> HandView {
     let trump = record.contract.and_then(|(_, c)| c.trump());
     let played = record.contract.is_some();
     HandView {
@@ -270,6 +283,11 @@ pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens) -> HandView {
         kitty: if played { cards_view(record.kitty, trump) } else { vec![] },
         discards: if played { cards_view(record.discards, trump) } else { vec![] },
         tricks: record.tricks.iter().map(|t| trick_view(t, trump, lens)).collect(),
+        bids: notes
+            .iter()
+            .filter(|n| n.deal + 1 == number)
+            .map(|n| BidNoteView { seat: lens.seat(n.seat), label: n.contract.to_string(), count: n.count, makes: n.makes })
+            .collect(),
     }
 }
 
@@ -335,12 +353,12 @@ impl View {
                 persona(id).map_or(id.clone(), |p| p.name.to_string())
             }
         });
-        View::build_for(table.game(), &Lens::new(Seat::SOUTH, names), table.players(), table.action_count())
+        View::build_for(table.game(), &Lens::new(Seat::SOUTH, names), table.players(), table.action_count(), table.bid_notes())
     }
 
     /// The table as `lens.viewer` sees it. `personas` are persona ids by real seat ("human" for
     /// people), `action_count` the number of actions taken so far.
-    pub fn build_for(game: &fh_core::Game, lens: &Lens, personas: &[String; 4], action_count: usize) -> View {
+    pub fn build_for(game: &fh_core::Game, lens: &Lens, personas: &[String; 4], action_count: usize, notes: &[crate::table::BidNote]) -> View {
         let viewer = lens.viewer;
         let obs = game.observe(viewer);
         let trump = obs.trump();
@@ -391,7 +409,7 @@ impl View {
                     }
                 })
                 .collect(),
-            history: game.history().iter().enumerate().map(|(i, h)| hand_view(i + 1, h, lens)).collect(),
+            history: game.history().iter().enumerate().map(|(i, h)| hand_view(i + 1, h, lens, notes)).collect(),
             action_count,
             played: cards_view(obs.played(), trump),
             trumps_unseen: trump.map(|_| {

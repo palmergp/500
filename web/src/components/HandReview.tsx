@@ -59,6 +59,19 @@ function Overview({ hand, players }: { hand: HandView; players: PlayerView[] }) 
           </span>
         ))}
       </p>
+      {hand.bids && hand.bids.length > 0 && (
+        <>
+          <h3>The bids, as their bidders saw them</h3>
+          <ul className="bid-notes">
+            {hand.bids.map((b, i) => (
+              <li key={i}>
+                {SEAT_NAMES[b.seat]} ({players[b.seat].name}) bid <strong>{b.label}</strong>: a count of {b.count.toFixed(1)}
+                {b.makes !== null && <>, and the coach gave it {Math.round(100 * b.makes)}% to make</>}.
+              </li>
+            ))}
+          </ul>
+        </>
+      )}
       <h3>Hands as dealt</h3>
       <div className="review-hands">
         {[2, 1, 3, 0].map((seat) => (

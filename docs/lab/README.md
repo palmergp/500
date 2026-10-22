@@ -503,6 +503,38 @@ points per hand** over the old value (95% CI −0.2 to +5.9; 144 deals won, 101 
 gain. It declared less often (46% of hands against 54%) and made more of its bids (75% against 71%). The hint
 for a pass over an opponent's bid now quotes this chance ("they make 8♣ about 52% of the time").
 
+### 27. A 6-call in the suit you'd bid says much more
+
+*Refit of the bidding count (`train/rules_of_thumb.py` data, 254,000 suit decisions), with 6-calls split by whether
+they name the strain you're counting.* Everything else in the hand held equal:
+
+| Call | In the suit you're counting | In another suit |
+|---|---|---|
+| An opponent called 6 | **−1.14** (±0.05) | −0.34 (±0.03) |
+| Partner called 6 | **+1.42** (±0.07) | +0.50 (±0.04) |
+
+The old count used one value for each (−½ and +¾). A 6-call shows the Joker *and* the caller's best suit, so when it's
+your suit the length (and likely a bower) is against you or with you. The count now uses −1⅛ / −⅓ and +1.4 / +½
+(`crates/ai/src/thumb.rs`); no trumps is unchanged (+1, −0.7). The user spotted this from a hand: an opponent's 6♦
+before their own diamond bid counted only −½.
+
+### 28. The bar for leaving partner's strain cost points
+
+*Measured by `fh-lab switch` over 20,000 deals.* The Oracle wanted 40 points more than usual before bidding a
+different strain over partner's bid, a rule from the first search bidder (finding 4), which sampled partner's hand
+badly. The bidding network reads partner's bid itself. In the 1,642 auctions where that rule alone turned a bid into a
+pass, the deal was played out both ways (solver, scored for real play):
+
+| Cases | n | Bidding minus passing (95%) |
+|---|---|---|
+| All | 1,642 | **+41 ± 10** |
+| Bid makes under 70% | 738 | +38 ± 16 |
+| Bid makes 70–85% | 771 | +45 ± 13 |
+| Bid makes over 85% | 133 | +37 ± 26 |
+
+**Removed** for the neural bidder (the Oracle and the coach). The user's hand: partner bid 7♦, their ♦ count was
+9¾, and the coach said pass with 8NT at 85% and 7NT at 93%; that was the rule at work.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

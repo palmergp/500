@@ -29,6 +29,8 @@ function handle(request: Request): unknown {
       return snapshot([]);
     case "act":
       return snapshot(table!.act(request.index));
+    case "autoAct":
+      return snapshot(table!.autoAct());
     case "stepBot": {
       const events = table!.stepBot();
       return events === null ? null : snapshot(events);

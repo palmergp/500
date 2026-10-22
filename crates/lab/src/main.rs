@@ -23,6 +23,7 @@ mod honors;
 mod leads;
 mod levels;
 mod opponents;
+mod switch;
 mod playdata;
 mod duel;
 mod sim;
@@ -89,6 +90,11 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "switch" => switch::run(
+            flag(&flags, "deals", 20000),
+            flag(&flags, "seed", 1_300_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "opponents" => opponents::run(

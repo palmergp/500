@@ -32,6 +32,9 @@ pub struct HintView {
     pub close: Vec<usize>,
     /// In the auction: every legal bid with how often it would make, for the bidding box.
     pub bids: Vec<OptionView>,
+    /// In card play: every legal play with the bid's chance and your side's tricks (in `note`),
+    /// for the hand's tooltips.
+    pub plays: Vec<OptionView>,
 }
 
 #[derive(Serialize)]
@@ -104,6 +107,20 @@ pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
     let best = legal.iter().position(|&a| a == analysis.best).unwrap_or(0);
     let mut options = options_view(&analysis.options, &legal);
     let mut bids = Vec::new();
+    let mut plays = Vec::new();
+    if obs.phase == Phase::Playing {
+        let settled = fh_ai::coach::settled(&obs).is_some();
+        for (action, ev, makes, tricks) in analysis.play_chances(&obs) {
+            if let Some(index) = legal.iter().position(|&a| a == action) {
+                let note = Some(format!("your side takes {tricks:.1} tricks on average"));
+                plays.push(OptionView { index, label: label(action), ev, makes: (!settled).then_some(makes), note });
+            }
+        }
+        // Once the bid is settled, the hint lists tricks instead of chances.
+        for o in &mut options {
+            o.note = plays.iter().find(|p| p.index == o.index).and_then(|p| p.note.clone());
+        }
+    }
     if obs.phase == Phase::Bidding {
         for o in &mut options {
             o.note = coach.call_note(&obs, legal[o.index]);
@@ -119,6 +136,7 @@ pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
         best_label: label(analysis.best),
         options,
         bids,
+        plays,
         reasons: analysis.reasons,
         worlds: analysis.worlds,
         close: analysis.close.iter().filter_map(|a| legal.iter().position(|l| l == a)).collect(),

@@ -3,6 +3,7 @@ import type { ActionView, CardView, CoachClient, DrillView, GradeView } from "..
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { LESSONS, type Lesson } from "../learn/lessons";
 import { leaks, loadProgress, recordScore, resetProgress, type Progress } from "../progress";
+import { loadRecords, resetRecords, type Records } from "../records";
 import { PATTERNS } from "../learn/patterns";
 import { loadMistakes, solveMistake, type Mistake } from "../mistakes";
 import { BiddingBox } from "./BiddingBox";
@@ -455,8 +456,70 @@ function MyMistakes({ coach }: { coach: CoachClient | null }) {
 
 const VERDICTS = ["best", "good", "inaccuracy", "mistake", "blunder"] as const;
 
+/** Your records, and each bid you've declared with how often you made it. */
+function RecordsView({ records }: { records: Records }) {
+  const bids = Object.entries(records.bids).sort((a, b) => b[1].bids - a[1].bids || a[0].localeCompare(b[0]));
+  const declared = bids.reduce((s, [, b]) => s + b.bids, 0);
+  const made = bids.reduce((s, [, b]) => s + b.made, 0);
+  return (
+    <>
+      <h4>Records</h4>
+      <div className="stat-tiles">
+        <div className="stat">
+          <span className="stat-value">{records.highGame ?? "—"}</span>
+          <span className="stat-label">high game (your side's final score)</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{records.bestHand ? `+${records.bestHand.points}` : "—"}</span>
+          <span className="stat-label">best hand{records.bestHand ? ` (${records.bestHand.label})` : ""}</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{records.highBid?.label ?? "—"}</span>
+          <span className="stat-label">highest bid you've made</span>
+        </div>
+        <div className="stat">
+          <span className="stat-value">{records.gamesPlayed ? `${records.gamesWon} of ${records.gamesPlayed}` : "—"}</span>
+          <span className="stat-label">games won</span>
+        </div>
+      </div>
+      <h4>Your bids</h4>
+      {declared === 0 ? (
+        <p className="note">Win an auction and play the hand: each bid you declare, and whether you made it, shows here.</p>
+      ) : (
+        <>
+          <p className="note">
+            You've declared {declared} {declared === 1 ? "bid" : "bids"} and made {Math.round((100 * made) / declared)}% of them. Most often:{" "}
+            <strong>{bids[0][0]}</strong> ({bids[0][1].bids} times).
+          </p>
+          <table className="score-pad bid-stats">
+            <thead>
+              <tr>
+                <th>Bid</th>
+                <th>Times</th>
+                <th>Made</th>
+              </tr>
+            </thead>
+            <tbody>
+              {bids.map(([label, b]) => (
+                <tr key={label}>
+                  <td>{label}</td>
+                  <td>{b.bids}</td>
+                  <td>
+                    {Math.round((100 * b.made) / b.bids)}% ({b.made})
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+    </>
+  );
+}
+
 function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
   const [progress, setProgress] = useState<Progress>(loadProgress);
+  const [records, setRecords] = useState<Records>(loadRecords);
   const myLeaks = leaks(progress).slice(0, 3);
   const hinted = progress.games.reduce((s, g) => s + (g.hinted ?? 0), 0);
   const games = progress.games.filter((g) => g.decisions > 0);
@@ -491,6 +554,8 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
           <span className="stat-label">play puzzles ({progress.puzzles.asked})</span>
         </div>
       </div>
+
+      <RecordsView records={records} />
 
       <h4>Your patterns</h4>
       {myLeaks.length === 0 ? (
@@ -589,9 +654,11 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
         <button
           type="button"
           onClick={() => {
-            if (confirm("Clear all progress records?")) {
+            if (confirm("Clear all progress, records and bid stats?")) {
               resetProgress();
+              resetRecords();
               setProgress(loadProgress());
+              setRecords(loadRecords());
             }
           }}
         >

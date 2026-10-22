@@ -27,6 +27,20 @@ pub struct Style {
     /// Whether the bot remembers cards from earlier tricks (otherwise it sees only its hand
     /// and the current trick).
     pub remembers_cards: bool,
+    /// When to make a 6-call with the Joker (lab variants vary it; the house signal is `Always`).
+    pub six: SixPolicy,
+}
+
+/// When a player holding the Joker, without a bid, calls 6 in their best strain.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum SixPolicy {
+    /// Always (the house signal).
+    Always,
+    /// Always, except as the first to call with a rule-of-thumb count below this: pass or
+    /// mention instead.
+    FirstNeeds(f32),
+    /// Never.
+    Never,
 }
 
 impl Style {
@@ -37,6 +51,7 @@ impl Style {
         bid_noise: 0.0,
         blunder_rate: 0.0,
         remembers_cards: true,
+        six: SixPolicy::Always,
     };
     pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4, ..Style::STEADY };
     pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7, ..Style::STEADY };
@@ -109,7 +124,12 @@ impl RuleBot {
             let forced = legal.iter().find(|a| matches!(a, Action::Call(Call::Bid(c)) if c.strain == best));
             return *forced.unwrap_or(&legal[0]);
         }
-        if obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best)) {
+        let six = match self.style.six {
+            SixPolicy::Always => true,
+            SixPolicy::Never => false,
+            SixPolicy::FirstNeeds(count) => obs.auction.calls().next().is_some() || crate::thumb::count(obs, best).0 >= count,
+        };
+        if six && obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best)) {
             return Action::Call(Call::Six(best));
         }
         for &(strain, _) in &strains {

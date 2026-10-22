@@ -117,6 +117,15 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { fixed_opponents: true, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (fixed pass value)", config, seed)));
         }
+        // Item 11 of the lab list: is a 6-call on a weak hand worth it as the first to call?
+        "oracle-firstsix6" => {
+            let config = SearchConfig { six: crate::rule_bot::SixPolicy::FirstNeeds(6.0), ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (first to call: 6 only from a count of 6)", config, seed)));
+        }
+        "oracle-nosix" => {
+            let config = SearchConfig { six: crate::rule_bot::SixPolicy::Never, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (never calls 6)", config, seed)));
+        }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));

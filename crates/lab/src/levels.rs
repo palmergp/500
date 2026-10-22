@@ -149,7 +149,7 @@ fn one(seed: u64, score: Option<Score>) -> Option<Row> {
 
 /// Plays out `option` for `seat`: the auction by the Oracle, the hand double-dummy. Points for the
 /// seat's side minus the other side's; a thrown-in deal scores 0.
-fn finish(start: &Game, option: Action, seat: Seat, seed: u64, by_win_chance: bool) -> Option<f64> {
+pub(crate) fn finish(start: &Game, option: Action, seat: Seat, seed: u64, by_win_chance: bool) -> Option<f64> {
     let rules = Rules::default();
     let mut game = start.clone();
     let mut bidders = bots(seed ^ 0xB1D);

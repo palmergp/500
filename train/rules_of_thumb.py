@@ -88,12 +88,16 @@ def nt_features(x):
 def call_features(x, strain):
     """What the others said, relative to the strain being considered."""
     six = lambda block: x[:, block + 7:block + 12].sum(1)
+    six_here = lambda block: x[:, block + 7 + strain]
     feats = {
-        "Partner called 6 (has the Joker)": six(PARTNER),
+        # A 6-call names the caller's best strain: in this one it says far more (finding 27).
+        "Partner called 6 in this strain": six_here(PARTNER),
+        "Partner called 6 in another strain": six(PARTNER) - six_here(PARTNER),
         "Partner mentioned this strain": x[:, PARTNER + 2 + strain],
         "Partner bid this strain": sum(x[:, PARTNER + 12 + lvl * 5 + strain] for lvl in range(4)),
         "Partner passed": x[:, PARTNER + 1],
-        "An opponent called 6 (has the Joker)": six(LEFT) + six(RIGHT),
+        "An opponent called 6 in this strain": six_here(LEFT) + six_here(RIGHT),
+        "An opponent called 6 in another strain": six(LEFT) + six(RIGHT) - six_here(LEFT) - six_here(RIGHT),
         "An opponent mentioned this strain": x[:, LEFT + 2 + strain] + x[:, RIGHT + 2 + strain],
         "An opponent bid this strain": sum(x[:, b + 12 + lvl * 5 + strain] for b in (LEFT, RIGHT) for lvl in range(4)),
         "Speaking last (dealer)": x[:, POS + 3],

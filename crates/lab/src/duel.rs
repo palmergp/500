@@ -28,6 +28,8 @@ struct Side {
 struct HandResult {
     /// A's points minus B's points.
     diff: i64,
+    /// Deals thrown in (nobody bid) before the one played.
+    thrown_in: u64,
     a: Side,
     b: Side,
 }
@@ -59,7 +61,8 @@ fn play_hand(seed: u64, ns: &str, ew: &str, a_is_ns: bool) -> HandResult {
     }
     let a_team = if a_is_ns { Team::NorthSouth } else { Team::EastWest };
     let (a_i, b_i) = (a_team.index(), a_team.other().index());
-    let mut result = HandResult { diff: (hand.score_change[a_i] - hand.score_change[b_i]) as i64, a: Side::default(), b: Side::default() };
+    let thrown_in = game.history().iter().filter(|h| h.contract.is_none()).count() as u64;
+    let mut result = HandResult { diff: (hand.score_change[a_i] - hand.score_change[b_i]) as i64, thrown_in, a: Side::default(), b: Side::default() };
     let side = if declarer.team() == a_team { &mut result.a } else { &mut result.b };
     side.declared += 1;
     if hand.tricks_won[declarer.team().index()] >= contract.level {
@@ -73,7 +76,7 @@ fn play_hand(seed: u64, ns: &str, ew: &str, a_is_ns: bool) -> HandResult {
 pub fn run(opts: Options) {
     let start = Instant::now();
     let threads = opts.threads.clamp(1, 64);
-    let results: Vec<(i64, Side, Side)> = std::thread::scope(|scope| {
+    let results: Vec<(i64, Side, Side, u64)> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|t| {
                 let opts = &opts;
@@ -85,7 +88,7 @@ pub fn run(opts: Options) {
                         let first = play_hand(seed, &opts.a, &opts.b, true);
                         let second = play_hand(seed, &opts.b, &opts.a, false);
                         let add = |x: Side, y: Side| Side { declared: x.declared + y.declared, made: x.made + y.made, points: x.points + y.points };
-                        out.push((first.diff + second.diff, add(first.a, second.a), add(first.b, second.b)));
+                        out.push((first.diff + second.diff, add(first.a, second.a), add(first.b, second.b), first.thrown_in + second.thrown_in));
                         d += threads;
                     }
                     out
@@ -103,7 +106,7 @@ pub fn run(opts: Options) {
     let ci = 1.96 * (var / n).sqrt();
     let wins = per_deal.iter().filter(|&&x| x > 0.0).count();
     let losses = per_deal.iter().filter(|&&x| x < 0.0).count();
-    let total = |f: fn(&(i64, Side, Side)) -> Side| {
+    let total = |f: fn(&(i64, Side, Side, u64)) -> Side| {
         results.iter().map(f).fold(Side::default(), |a, b| Side { declared: a.declared + b.declared, made: a.made + b.made, points: a.points + b.points })
     };
     let (a, b) = (total(|r| r.1), total(|r| r.2));
@@ -113,6 +116,8 @@ pub fn run(opts: Options) {
     println!();
     println!("{} gains {mean:+.1} points per hand over {} (95% CI {:+.1} to {:+.1}).", opts.a, opts.b, mean - ci, mean + ci);
     println!("Deals won/lost/tied by {}: {wins}/{losses}/{}", opts.a, results.len() - wins - losses);
+    let thrown: u64 = results.iter().map(|r| r.3).sum();
+    println!("Thrown-in deals before the one played: {:.1} per 100 hands", 100.0 * thrown as f64 / (2.0 * n));
     for (name, side) in [(&opts.a, a), (&opts.b, b)] {
         let hands = 2.0 * n;
         println!(

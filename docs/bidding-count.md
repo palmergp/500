@@ -95,11 +95,13 @@ Add or subtract these for what the other three players have called. (Your own ca
 
 | Call | Suit bid | No trumps |
 |---|---|---|
-| **Your partner called 6** (they hold the Joker) | **+¾** | **+1** |
+| **Your partner called 6 in this suit** (they hold the Joker) | **+1.4** | — |
+| Your partner called 6 in another strain | +½ | +1 |
 | Your partner mentioned this suit (or NT) | +0.6 | +0.7 |
 | Your partner bid this suit (or NT) | +2¼ | +2¼ |
 | **Your partner passed** | **−0.9** | **−1.3** |
-| An opponent called 6 | −½ | −0.7 |
+| **An opponent called 6 in this suit** | **−1⅛** | — |
+| An opponent called 6 in another strain | −⅓ | −0.7 |
 | An opponent mentioned this suit (or NT) | −⅔ | −0.7 |
 | An opponent bid this suit (or NT) | −2 | −2 |
 | You speak last (you're the dealer) and no opponent has shown strength | +½ | +0.6 |

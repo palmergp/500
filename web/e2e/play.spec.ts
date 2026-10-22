@@ -34,6 +34,8 @@ test("plays a hand through to the score", async ({ page }, info) => {
   await result.getByRole("button", { name: "Review hand" }).click();
   const review = page.getByRole("dialog", { name: "Hand review" });
   await expect(review.locator(".review-hand")).toHaveCount(6);
+  // Each bid with its bidder's count and the coach's chance when they bid.
+  await expect(review.locator(".bid-notes li").first()).toContainText(/bid .+: a count of \d+\.\d/);
   await page.screenshot({ path: `test-results/${info.project.name}-4-review.png`, fullPage: true });
   expect(errors).toEqual([]);
 });
@@ -48,4 +50,33 @@ test("restores a game after reload", async ({ page }) => {
   await expect
     .poll(() => hand.locator(".card").evaluateAll((cards) => cards.map((c) => c.getAttribute("aria-label"))))
     .toEqual(before);
+});
+
+test("finish the hand: a bot plays your cards quickly to the end", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(120_000);
+  await startGame(page);
+  // The speed button cycles the pace without opening the settings.
+  const speed = page.getByRole("button", { name: /^Speed:/ });
+  await expect(speed).toHaveAccessibleName("Speed: fast");
+  await speed.click();
+  await expect(speed).toHaveAccessibleName("Speed: slow");
+  await speed.click();
+  await expect(speed).toHaveAccessibleName("Speed: normal");
+  await speed.click();
+  // Bid and discard as usual, then finish once the cards are being played.
+  const finish = page.getByRole("button", { name: /^Finish hand/ });
+  for (let step = 0; step < 500 && !(await finish.isVisible()); step++) {
+    if (!(await takeTurn(page))) await page.waitForTimeout(100);
+  }
+  await finish.click();
+  await expect(page.getByRole("button", { name: "Stop" })).toBeVisible();
+  const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+  await expect(result).toBeVisible({ timeout: 60_000 });
+  // The hand counts toward your records and bid stats (Learn → Progress).
+  await result.getByRole("button", { name: "Next hand" }).click();
+  await page.getByRole("button", { name: "Learn" }).click();
+  await page.getByRole("tab", { name: "Progress" }).click();
+  await expect(page.getByRole("heading", { name: "Records" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Your bids" })).toBeVisible();
 });

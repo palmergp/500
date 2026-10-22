@@ -8,6 +8,7 @@ export type Request =
   | { id: number; op: "load"; save: string }
   | { id: number; op: "act"; index: number }
   | { id: number; op: "stepBot" }
+  | { id: number; op: "autoAct" }
   | { id: number; op: "hint"; save: string }
   | { id: number; op: "grade"; save: string; number: number }
   | { id: number; op: "gradeDiscards"; save: string; number: number }

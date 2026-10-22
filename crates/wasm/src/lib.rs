@@ -45,6 +45,13 @@ impl WasmTable {
         to_js(&events)
     }
 
+    /// Your turn, played for you by a quick bot (finishing a hand whose outcome is clear).
+    #[wasm_bindgen(js_name = autoAct)]
+    pub fn auto_act(&mut self) -> Result<JsValue, JsError> {
+        let events = self.0.auto_act().map_err(|e| JsError::new(&e))?;
+        to_js(&events)
+    }
+
     /// Lets the bot whose turn it is act; returns its events, or null when no bot is to act.
     #[wasm_bindgen(js_name = stepBot)]
     pub fn step_bot(&mut self) -> Result<JsValue, JsError> {

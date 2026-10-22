@@ -21,10 +21,15 @@ import { InfoPanel, TableView } from "./components/TableView";
 import { TricksDialog } from "./components/TricksDialog";
 import { DecisionsDialog } from "./components/DecisionsDialog";
 import { keepMistake } from "./mistakes";
-import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings } from "./settings";
+import { recordGame, recordHand } from "./records";
+import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
 const TRICK_HOLD = 1300;
+/** Pace while finishing a hand: every pause cut to a tenth. */
+const FINISH_FACTOR = 0.1;
+const SPEEDS: Speed[] = ["slow", "normal", "fast"];
+const SPEED_ICON: Record<Speed, string> = { slow: "🐢", normal: "▶", fast: "⏩" };
 /** Wide enough for a side rail beside the table (the auction, the bid and the coach). */
 const WIDE = "(min-width: 1100px)";
 
@@ -155,6 +160,10 @@ export function App() {
   const [lastGrade, setLastGrade] = useState<GradeView | null>(null);
   const [showSettings, setShowSettings] = useState(false);
   const [sweeping, setSweeping] = useState(false);
+  /** Playing out the rest of the hand quickly, a bot playing your cards (they aren't graded). */
+  const [finishing, setFinishing] = useState(false);
+  /** A record you just set ("highest bid made: 9♥"), shown for a moment at the top. */
+  const [recordToast, setRecordToast] = useState<string | null>(null);
   const [quizzed, setQuizzed] = useState<number | null>(null);
   const [showLearn, setShowLearn] = useState(false);
   const [showTricks, setShowTricks] = useState<{ focus?: number } | null>(null);
@@ -183,7 +192,7 @@ export function App() {
     gradesRef.current = grades;
   }, [grades]);
 
-  const factor = SPEED_FACTOR[lan && lobby ? lobby.pace : settings.speed];
+  const factor = finishing ? FINISH_FACTOR : SPEED_FACTOR[lan && lobby ? lobby.pace : settings.speed];
   /** Answers hints and reviews: the host for a LAN game (it holds the cards), else this device. */
   const coach: Coach | null = lan ? netRef.current : coachRef.current;
   /** The coach rebuilds positions from the save; a LAN host already has the game. */
@@ -206,9 +215,13 @@ export function App() {
         const hand = next.history.filter((h) => !h.passedOut).at(-1);
         const ours = hand?.contract ? hand.contract.declarer % 2 === 0 : false;
         audio.play(hand && ours === !!hand.made ? "made" : "set");
+        const broken = hand && gameRef.current ? recordHand(gameRef.current, hand) : [];
+        if (broken.length) setRecordToast(broken.join(" · "));
       } else if (e.kind === "gameWon") {
         audio.play(next.winner === 0 ? "win" : "lose");
         recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
+        const broken = gameRef.current ? recordGame(gameRef.current, next.scores[0], next.winner === 0) : [];
+        if (broken.length) setRecordToast((t) => [t, ...broken].filter(Boolean).join(" · "));
       }
     }
     // Screen readers hear every call, card, trick and score as it happens.
@@ -220,6 +233,7 @@ export function App() {
       setHeld(next.lastTrick ?? next.history.at(-1)?.tricks.at(-1) ?? null);
     }
     if (snapshot.events.some((e) => e.kind === "handScored")) {
+      setFinishing(false);
       setResult(next.history.filter((h) => !h.passedOut).at(-1) ?? null);
     }
   }, []);
@@ -353,6 +367,26 @@ export function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // A new record shows for a few seconds, as a popover so it stays above the hand's result
+  // (a modal dialog): raised again when the result opens.
+  const toastRef = useRef<HTMLDivElement>(null);
+  const resultOpen = !!result && !held;
+  useEffect(() => {
+    if (!recordToast) return;
+    const timer = setTimeout(() => setRecordToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [recordToast]);
+  useEffect(() => {
+    const el = toastRef.current;
+    if (!el || !recordToast) return;
+    try {
+      if (el.matches(":popover-open")) el.hidePopover();
+      el.showPopover();
+    } catch {
+      // No popover support: it shows in the page instead.
+    }
+  }, [recordToast, resultOpen]);
+
   // Show a finished trick for a moment before play continues.
   useEffect(() => {
     if (!held) return;
@@ -390,13 +424,13 @@ export function App() {
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
   useEffect(() => {
-    if (mode !== "solo" || !view || paused || view.humanToAct || view.phase === "gameOver") return;
+    if (mode !== "solo" || !view || paused || (view.humanToAct && !finishing) || view.phase === "gameOver") return;
     const pause = new Promise((r) => setTimeout(r, DELAY[view.phase] * factor));
     void request(async (engine) => {
-      const [snapshot] = await Promise.all([engine.stepBot(), pause]);
+      const [snapshot] = await Promise.all([view.humanToAct ? engine.autoAct() : engine.stepBot(), pause]);
       return snapshot;
     });
-  }, [mode, view, paused, factor, request]);
+  }, [mode, view, paused, factor, request, finishing]);
 
   const keepGrade = (save: string, found: GradeView | null, numbers: number[]) => {
     if (!found) return;
@@ -486,16 +520,27 @@ export function App() {
     saveSettings(next);
   };
 
-  const quizActive = !!view && atTable && settings.quiz && !paused && quizzed !== view.actionCount && quizDue(view);
+  const quizActive = !!view && atTable && settings.quiz && !paused && !finishing && quizzed !== view.actionCount && quizDue(view);
   const currentHint = hint && view && hint.forAction === view.actionCount && view.humanToAct ? hint.hint : null;
   const hintedAction = currentHint ? view?.legal[currentHint.best] : undefined;
   /** Cards the coach rates about as good as its choice (a close call). */
+  /** After a hint in card play: the coach's numbers for each card, shown when you hover over it. */
+  const cardTips = new Map<number, string>();
+  const declaring = view?.contract ? view.contract.declarer % 2 === 0 : true;
+  // Best first, so the Joker's lead (one option per named suit) shows its best.
+  for (const p of [...(currentHint?.plays ?? [])].sort((a, b) => b.ev - a.ev)) {
+    const id = view?.legal[p.index]?.card;
+    if (id == null || cardTips.has(id)) continue;
+    const chance =
+      p.makes === null ? null : declaring ? `the bid makes ${Math.round(100 * p.makes)}%` : `their bid goes down ${Math.round(100 * (1 - p.makes))}%`;
+    cardTips.set(id, `Coach: ${[chance, p.note].filter(Boolean).join(", ")}`);
+  }
   const alsoGood = new Set(currentHint && view ? currentHint.close.map((i) => view.legal[i]?.card).filter((c) => c != null) : []);
 
   const legalCards = useMemo(() => {
-    if (!view?.humanToAct || paused || (settings.quiz && view && quizzed !== view.actionCount && quizDue(view))) return new Set<number>();
+    if (!view?.humanToAct || paused || finishing || (settings.quiz && view && quizzed !== view.actionCount && quizDue(view))) return new Set<number>();
     return new Set(view.legal.filter((a) => a.card !== null).map((a) => a.card!));
-  }, [view, paused, settings.quiz, quizzed]);
+  }, [view, paused, finishing, settings.quiz, quizzed]);
 
   const kittyIds = useMemo(() => new Set(view?.phase === "discarding" ? view.kitty?.map((c) => c.id) : []), [view]);
   const discardsLeft = view ? 3 - (view.discards?.length ?? 0) : 0;
@@ -667,6 +712,17 @@ export function App() {
               <NavButton icon="📋" label="Score pad" tip="Score pad: every hand so far, and a review of each one" onClick={() => setShowScores(true)} disabled={!view} />
               {lan && <NavButton icon="👥" label="Table" tip="Who's sitting where; leave or end the game" onClick={() => setShowLobby(true)} />}
               <NavButton icon="⚙" label="Settings" tip="Settings: coach, counting aids, sound, speed and display" onClick={() => setShowSettings(true)} />
+              {!lan && (
+                <button
+                  type="button"
+                  className="icon-toggle speed-toggle"
+                  aria-label={`Speed: ${settings.speed}`}
+                  title={`Speed: ${settings.speed} (click for ${SPEEDS[(SPEEDS.indexOf(settings.speed) + 1) % SPEEDS.length]})`}
+                  onClick={() => changeSettings({ ...settings, speed: SPEEDS[(SPEEDS.indexOf(settings.speed) + 1) % SPEEDS.length] })}
+                >
+                  {SPEED_ICON[settings.speed]}
+                </button>
+              )}
               <button
                 type="button"
                 className="icon-toggle"
@@ -716,7 +772,24 @@ export function App() {
                           Let a bot play for them
                         </button>
                       )}
-                      {view.humanToAct && !paused && view.phase !== "gameOver" && (
+                      {mode === "solo" && view.phase === "playing" && !result && (
+                        <button
+                          type="button"
+                          className="finish-button"
+                          onClick={() => {
+                            setHint(null);
+                            setFinishing((f) => !f);
+                          }}
+                          title={
+                            finishing
+                              ? "Stop, and play the rest of your cards yourself"
+                              : "Finish the hand: play it out quickly, with a bot playing your cards (those plays aren't graded)"
+                          }
+                        >
+                          {finishing ? "Stop" : "Finish hand ⏭"}
+                        </button>
+                      )}
+                      {view.humanToAct && !paused && !finishing && view.phase !== "gameOver" && (
                         <button
                           type="button"
                           className="hint-button"
@@ -741,6 +814,7 @@ export function App() {
                         fromKitty={kittyIds.has(card.id)}
                         hinted={hintedAction?.card === card.id || (alsoGood.has(card.id) ? "close" : false)}
                         onClick={legalCards.has(card.id) ? () => clickCard(card) : undefined}
+                        tip={cardTips.get(card.id)}
                       />
                     ))}
                   </div>
@@ -759,6 +833,11 @@ export function App() {
         </>
       )}
 
+      {recordToast && atTable && (
+        <div ref={toastRef} popover="manual" className="record-toast" role="status">
+          <span aria-hidden="true">🏆</span> New record! {recordToast}
+        </div>
+      )}
       {result && !held && view && atTable && (
         <Dialog title={`Hand ${view.history.filter((h) => !h.passedOut).length}`}>
           <Celebration hand={result} gameWinner={view.winner} />
