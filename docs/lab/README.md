@@ -553,6 +553,31 @@ opponents aren't scared off often enough to bring redeals. Call 6 as the house s
 bidding network learned from always-6 play, so these variants mislead their partners slightly; with no difference
 measurable even so, a retrained network wouldn't change the answer much.)
 
+### 30. The low side-card lead after a winning trump: mostly a tie-break
+
+*Measured by `fh-lab lowlead` over 6,000 deals of Oracle play.* The user asked why the bots so often lead a trump
+winner and then a low side card, a near-certain loser. After a trump to trick 1 that declarer won (787 hands), the
+second lead was another trump 48% of the time, a side ace or king 31%, a side queen or jack 7%, and a low side card
+14%. The 285 low side leads at trick 2 or 3 (declarer having won every trick so far), by the suit's length:
+
+| Length in declarer's hand | n | Declarer trumped the suit later | Partner won the trick | Solver, all cards visible: vs the best trump lead | It was the solver's best (or tied) |
+|---|---|---|---|---|---|
+| 1 (makes a void) | 30 | 50% | 33% | −0.13 tricks | 67% |
+| 2 | 70 | 21% | 34% | −0.31 tricks | 69% |
+| 3 or more | 185 | 5% | 40% | −0.10 tricks | 77% |
+
+- **Rarely to make a void:** two-thirds come from suits of three or more, and declarer trumped those later only 5%
+  of the time.
+- **Mostly a tie:** in the deals the bot imagines, leading a low card and another trump come out about equal. Its
+  tie-break among plays within half a point of the best is to give up the cheapest card, and a low side card is
+  cheaper than a trump. It also gives up a loser early, while declarer still holds the top trumps, and partner won
+  the trick 40% of the time.
+- **Not free:** with every card visible it cost 0.1–0.3 tricks on average (most from doubletons), though it was the
+  best or tied lead about three times in four.
+
+For players: after a winning trump, keep drawing trumps or cash your side winners. Lead a low side card early only
+from a singleton you mean to trump, or to reach partner.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

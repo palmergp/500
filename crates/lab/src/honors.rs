@@ -56,7 +56,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
 }
 
 /// One hand of Oracle play; the record of the first deal that was bid and played.
-fn play(seed: u64) -> Option<HandRecord> {
+pub(crate) fn play(seed: u64) -> Option<HandRecord> {
     let mut game = Game::new(Rules::default(), seed);
     let mut bots: [Box<dyn fh_ai::Bot>; 4] = std::array::from_fn(|i| crate::make_bot("oracle", seed.wrapping_mul(4).wrapping_add(i as u64)));
     loop {
