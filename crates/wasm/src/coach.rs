@@ -540,3 +540,46 @@ pub fn drill_play(seed: u64) -> Result<DrillView, String> {
     }
     Err("no clear puzzle found in these deals; try again".into())
 }
+
+#[cfg(test)]
+mod timing {
+    use super::*;
+    use crate::table::Table;
+
+    /// How long a hint takes at South's first card of a hand (run with
+    /// `cargo test -p fh-wasm --release -- --ignored --nocapture first_card_hint`).
+    #[test]
+    #[ignore = "timing: run by hand"]
+    fn first_card_hint_time() {
+        let mut times = Vec::new();
+        for seed in 0..16 {
+            let mut table = Table::new(seed, "steady", "steady", "steady").unwrap();
+            loop {
+                if table.human_to_act() {
+                    if table.game().phase() == Phase::Playing {
+                        break;
+                    }
+                    table.act(0).unwrap();
+                } else {
+                    table.step_bot();
+                }
+            }
+            let save = serde_json::to_string(&table.save()).unwrap();
+            let start = std::time::Instant::now();
+            let h = hint(&save).unwrap();
+            let ms = start.elapsed().as_millis();
+            // Playing the hinted card: its grade reuses the hint's deals.
+            let number = table.action_count();
+            table.act(h.best).unwrap();
+            let start = std::time::Instant::now();
+            let save = serde_json::to_string(&table.save()).unwrap();
+            let g = grade(&save, number).unwrap();
+            let grade_ms = start.elapsed().as_millis();
+            assert!(g.is_none_or(|g| g.verdict == "best"));
+            println!("seed {seed}: {ms} ms, {} worlds, {} cards; grade after it {grade_ms} ms", h.worlds, table.view().legal.len());
+            times.push(ms);
+        }
+        times.sort();
+        println!("median {} ms, max {} ms", times[times.len() / 2], times.last().unwrap());
+    }
+}

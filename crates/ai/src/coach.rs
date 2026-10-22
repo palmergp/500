@@ -276,19 +276,43 @@ impl Coach {
 
     // ---- Card play ---------------------------------------------------------------------------
 
-    fn analyze_play(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
-        let mut result = self.search.play_stats(obs, legal);
-        // The first look is quick, and on a couple of dozen deals plays a few percent apart can
-        // swap places. If the best play isn't clearly ahead of the next different play, look at
-        // many more deals before choosing.
-        let first = self.search.evaluate_plays_from(obs, &result);
-        let runner_up = first.iter().skip(1).find(|&&(a, _)| !equivalent(&result, first[0].0, a));
-        if let Some(&(second, _)) = runner_up.filter(|_| result.valid) {
-            if !significant(Some(&result), first[0].0, second) {
-                let more = self.search.play_stats_sampled(obs, legal, CLOSER_LOOK, CLOSER_LOOK_MIN, CLOSER_LOOK_BUDGET);
-                result = result.merge(more);
-            }
+    /// The sampled deals behind a card-play analysis: the expensive part, remembered for the last
+    /// few positions so the grade that follows a hint (or the app's look-ahead) reuses them. Hints
+    /// and grades of a position use the same seed, so the numbers are the same either way.
+    fn play_result(&mut self, obs: &Observation, legal: &[Action]) -> PlayStats {
+        let units = self.units;
+        if let Some(hit) = PLAY_CACHE.with(|c| c.borrow().iter().find(|(o, u, _)| o == obs && *u == units).map(|(_, _, r)| r.clone())) {
+            return hit;
         }
+        let result = if legal.len() == 1 {
+            // No choice to make: a few deals are enough for the bid's chances.
+            self.search.play_stats_sampled(obs, legal, 8, 4, self.search.config().node_budget)
+        } else {
+            let mut result = self.search.play_stats(obs, legal);
+            // The first look is quick, and on a couple of dozen deals plays a few percent apart can
+            // swap places. If the best play isn't clearly ahead of the next different play, look
+            // at many more deals before choosing.
+            let first = self.search.evaluate_plays_from(obs, &result);
+            let runner_up = first.iter().skip(1).find(|&&(a, _)| !equivalent(&result, first[0].0, a));
+            if let Some(&(second, _)) = runner_up.filter(|_| result.valid) {
+                if !significant(Some(&result), first[0].0, second) {
+                    let more = self.search.play_stats_sampled(obs, legal, CLOSER_LOOK, CLOSER_LOOK_MIN, CLOSER_LOOK_BUDGET);
+                    result = result.merge(more);
+                }
+            }
+            result
+        };
+        PLAY_CACHE.with(|c| {
+            let mut cache = c.borrow_mut();
+            cache.push((obs.clone(), units, result.clone()));
+            let excess = cache.len().saturating_sub(PLAY_CACHE_SIZE);
+            cache.drain(..excess);
+        });
+        result
+    }
+
+    fn analyze_play(&mut self, obs: &Observation, legal: &[Action], chosen: Option<Action>) -> Analysis {
+        let result = self.play_result(obs, legal);
         let ranked = self.search.evaluate_plays_from(obs, &result);
         let best = ranked[0].0;
         // What players see is the real-play chance: the sampled deals are solved as if everyone
@@ -565,6 +589,13 @@ const PLAY_CURVE: &[(f64, f64)] = &[
     (0.990, 0.986),
     (1.000, 0.99),
 ];
+/// Card-play positions whose sampled deals are remembered (see `Coach::play_result`).
+const PLAY_CACHE_SIZE: usize = 6;
+
+thread_local! {
+    static PLAY_CACHE: std::cell::RefCell<Vec<(Observation, Units, PlayStats)>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
 const BID_CURVE: &[(f64, f64)] = &[
     (0.00, 0.05),
     (0.27, 0.33),

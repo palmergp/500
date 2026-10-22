@@ -473,13 +473,26 @@ export function App() {
     void request((engine) => send(engine, index, number)).then((snapshot) => snapshot && gradeLater(snapshot.save, [number]));
   };
 
+  // Card play: start the coach's analysis as soon as it's your turn, so a hint (and the grade after
+  // your play, which reuses it) is ready sooner. Only when the coach would do the work anyway:
+  // grading is on, or you've asked for a hint.
+  const lookAhead = useRef<{ save: string; hint: Promise<HintView> } | null>(null);
+  useEffect(() => {
+    const save = saveRef.current;
+    if (mode !== "solo" || !view?.humanToAct || view.phase !== "playing" || finishing || !save || !coachRef.current) return;
+    if (!settings.grade && hintedRef.current.size === 0) return;
+    if (lookAhead.current?.save === save) return;
+    const hint = coachRef.current.hint(save);
+    hint.catch(() => {});
+    lookAhead.current = { save, hint };
+  }, [mode, view, settings.grade, finishing]);
+
   const askHint = () => {
     const save = coachSave();
     if (!coach || !save || !view) return;
     const forAction = view.actionCount;
     setHintLoading(true);
-    coach
-      .hint(save)
+    (lookAhead.current?.save === save ? lookAhead.current.hint : coach.hint(save))
       .then((h) => {
         hintedRef.current.add(forAction);
         setHint({ forAction, hint: h });
