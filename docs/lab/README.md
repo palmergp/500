@@ -535,6 +535,24 @@ pass, the deal was played out both ways (solver, scored for real play):
 **Removed** for the neural bidder (the Oracle and the coach). The user's hand: partner bid 7♦, their ♦ count was
 9¾, and the coach said pass with 8NT at 85% and 7NT at 93%; that was the rule at work.
 
+### 29. Calling 6 with the Joker: it hardly matters
+
+*Measured by `duel` (duplicate, the Oracle in all seats).* The house signal is to call 6 whenever you hold the Joker
+and don't bid. The user asked whether the first to call should still do it with a weak suit (does partner's
+knowing where the Joker is outweigh the suggestion that the suit is good, and does it scare the opponents off,
+bringing a redeal?).
+
+| Variant | Deals that came out differently | Gain per hand for the house signal (95% CI) |
+|---|---|---|
+| First to call, with a count below 6: pass instead of 6 | 3 of 3,000 | +0.1 (−0.1 to +0.2) |
+| Never call 6 | 48 of 2,000 | +0.1 (−0.9 to +1.1) |
+
+Thrown-in deals stayed at 0.8 per 100 hands with every variant. The bidders already value a 6-call in another suit
+modestly (+½ for partner, −⅓ for an opponent, finding 27), so a weak 6-call rarely changes anyone's bid, and the
+opponents aren't scared off often enough to bring redeals. Call 6 as the house signal says; it costs nothing. (The
+bidding network learned from always-6 play, so these variants mislead their partners slightly; with no difference
+measurable even so, a retrained network wouldn't change the answer much.)
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
