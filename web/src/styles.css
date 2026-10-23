@@ -1693,16 +1693,18 @@ button.danger {
     scale: 0.4;
   }
 }
+/* West's and East's calls sit under their plates, in their own columns: beside them, a call ran
+   under a wide bidding box. */
 .seat-west .bubble {
-  top: 50%;
-  left: calc(100% + 8px);
-  transform: translateY(-50%);
+  top: calc(100% + 6px);
+  left: 0;
+  transform: none;
 }
 .seat-east .bubble {
-  top: 50%;
+  top: calc(100% + 6px);
   left: auto;
-  right: calc(100% + 8px);
-  transform: translateY(-50%);
+  right: 0;
+  transform: none;
 }
 .seat-south .bubble {
   top: auto;

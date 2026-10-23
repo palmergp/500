@@ -627,6 +627,54 @@ Four small trumps tell partner more than a bower with one other card. This is th
 only (the opponents hear it too; finding 19 put all signal calls together at about +2 points a hand). The bots
 still mention on a bower, which is what their bidding network learned to read.
 
+### 34. Leading winners first on near-ties: no difference
+
+*Measured by `duel`, 2,000 deals each played both ways.* The user saw partner bid 8♥ and lead a low club, an almost
+certain loser. Among plays within half a point of the best (in the deals the bot imagines), the search bots give up
+the cheapest card, and a low side card is cheaper than a trump (finding 30). A variant broke those ties the other
+way when leading for the declaring side: the dearest card (top trumps, then winners).
+
+| | Gain per hand for the usual tie-break (95% CI) | Deals won / lost |
+|---|---|---|
+| Lead winners on near-ties instead | −0.8 (−4.5 to +2.9) | 449 / 422 |
+
+It changed 871 deals of 2,000 and gained nothing either way. With every card visible a low side lead costs about
+¼ trick when declarer holds the top trumps (finding 18), but at the table, without seeing the hands, giving up a
+loser early (while declarer still holds trump control) does as well. The tie-break stays.
+
+### 35. A mention or 6-call after partner has called: no difference, so pass
+
+*Measured by `duel`, 2,000 deals each played both ways.* The user's point: once partner has called, partner can't
+use a mention or 6-call in the auction; it only tells partner something for the defence, and the opponents hear it
+too. The bots never read mentions in card play (finding 21), so for them it can only change the opponents' bids.
+
+| | Gain per hand for signalling after partner's call (95% CI) | Deals that differed |
+|---|---|---|
+| Pass instead | +0.3 (−0.3 to +1.0) | 26 of 2,000 |
+
+No measurable value. **The bots and the coach now pass instead** once partner has called (unless they bid), which
+is the simpler rule to teach; the lab variant `oracle-latesignals` keeps the old behaviour.
+
+### 36. The discard signal: worth nothing to the bots, and making it cost points
+
+*Measured by `duel`, 2,000 deals each played both ways.* The house signal: your first throw-off is a low card of
+your strongest side suit, so partner knows what to lead back. The user asked what it's worth.
+
+| Comparison | Gain per hand for the first (95% CI) |
+|---|---|
+| The Oracle (signals at a cost of up to 25 points) vs no signals at all | **−3.4** (−6.5 to −0.4) |
+| Signals at up to 5 points vs no signals | −1.6 (−4.1 to +0.8) |
+| Signals at up to 5 points vs up to 25 | **+1.8** (+0.1 to +3.4) |
+
+- Most of the cost was in making the signal: the bots gave up to 25 expected points to throw the right card.
+  With 5 the loss halves.
+- The information itself gains the bots nothing measurable (reading partner's signal alone was −1.1 ± 1.9,
+  finding 21). Their search already narrows the hidden cards from what has been played, and a signal that's
+  only made when cheap is also a less reliable one to read.
+- **Change:** the bots signal only when it costs at most 5 points. They keep the convention, since it's the table's
+  rule and a person partnering a bot reads it; with people, who can't count every card, the signal is probably
+  worth more than it is to the bots. That isn't measured here.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

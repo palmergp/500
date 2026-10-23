@@ -59,15 +59,16 @@ test("a whole hand fits on the screen, with the coach's panels open", async ({ p
     const problem = await scrolls(page);
     expect(problem, `while ${phase || "waiting"}`).toBeNull();
     // No call bubble may cover the bidding box.
-    const covered = await page.evaluate(() => {
+    const { box, covered } = await page.evaluate(() => {
       const box = document.querySelector(".bidding-box")?.getBoundingClientRect();
-      if (!box) return null;
+      if (!box) return { box: false, covered: null };
       for (const b of document.querySelectorAll(".bubble")) {
         const r = b.getBoundingClientRect();
-        if (r.width && r.left < box.right - 1 && r.right > box.left + 1 && r.top < box.bottom - 1 && r.bottom > box.top + 1) return b.textContent;
+        if (r.width && r.left < box.right - 1 && r.right > box.left + 1 && r.top < box.bottom - 1 && r.bottom > box.top + 1) return { box: true, covered: b.textContent };
       }
-      return null;
+      return { box: true, covered: null };
     });
+    if (box) seen.add("bidding-seen");
     expect(covered, "a call bubble covers the bidding box").toBeNull();
     if (!(await takeTurn(page))) await page.waitForTimeout(100);
   }

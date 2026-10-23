@@ -505,6 +505,12 @@ export function App() {
     });
   };
 
+  /** Loads a save once the engine is free (a bot may be mid-move): a busy engine drops requests. */
+  const loadWhenFree = async (save: string) => {
+    while (busy.current) await new Promise((r) => setTimeout(r, 50));
+    await request((engine) => engine.load(save));
+  };
+
   /** Plays the hand again from action `at` of the game: a sandbox that doesn't count. */
   const startReplay = (at: number, label: string) => {
     const save = replayRef.current?.resume ?? saveRef.current;
@@ -518,7 +524,7 @@ export function App() {
     setHint(null);
     setLastGrade(null);
     setFinishing(false);
-    void request((engine) => engine.load(saveAt(save, at)));
+    void loadWhenFree(saveAt(save, at));
   };
 
   /** Back from a replay to the real game, where you left it. */
@@ -531,7 +537,7 @@ export function App() {
     setHint(null);
     setLastGrade(null);
     setFinishing(false);
-    void request((engine) => engine.load(resume));
+    void loadWhenFree(resume);
   };
 
   const askHint = () => {

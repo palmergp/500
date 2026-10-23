@@ -29,8 +29,9 @@ pub struct Style {
     pub remembers_cards: bool,
     /// When to make a 6-call with the Joker (lab variants vary it; the house signal is `Always`).
     pub six: SixPolicy,
-    /// Whether to mention or call 6 after partner has had their call (it can then only help partner
-    /// on defence, and the opponents; a lab variant turns it off).
+    /// Whether to mention or call 6 after partner has had their call. Partner can't use it in the
+    /// auction then, and in 2,000 duplicate deals it made no difference (finding 35), so it's off;
+    /// a lab variant turns it back on.
     pub signal_after_partner: bool,
 }
 
@@ -55,7 +56,7 @@ impl Style {
         blunder_rate: 0.0,
         remembers_cards: true,
         six: SixPolicy::Always,
-        signal_after_partner: true,
+        signal_after_partner: false,
     };
     pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4, ..Style::STEADY };
     pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7, ..Style::STEADY };

@@ -130,9 +130,14 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { lead_winners: true, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (declarer leads winners on near-ties)", config, seed)));
         }
-        "oracle-quietlate" => {
-            let config = SearchConfig { signal_after_partner: false, ..SearchConfig::ORACLE };
-            return Some(Box::new(SearchBot::new("Oracle (no mention or 6 after partner's call)", config, seed)));
+        "oracle-latesignals" => {
+            let config = SearchConfig { signal_after_partner: true, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (mentions and 6-calls after partner's call too)", config, seed)));
+        }
+        "oracle-dearsignal" => {
+            // The old allowance (finding 36).
+            let config = SearchConfig { signal_allowance: 25.0, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (signals at up to 25 points)", config, seed)));
         }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };

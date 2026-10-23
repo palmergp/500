@@ -414,11 +414,11 @@ Two discards from a doubleton leave you void and able to trump.
 
 **The convention.** The first time you can't follow suit and don't trump, discard a low card from your strongest side suit. It tells partner where to lead when they run out of winners. Every bot here uses it and reads it.
 
-*Source: lab, 400 duplicate deals* (finding 11). For the expert bots the convention was a wash: **−0.8 ± 5 points a hand**.
+*Source: lab, 2,000 duplicate deals per comparison* (finding 36). For the expert bots the signal cost points: **−3.4 a hand** (−6.5 to −0.4) when they'd give up as much as 25 expected points to make it, and about −1.6 (not clearly different from nothing) when they make it only if it's nearly free.
 
-- **It costs a little:** the signal sometimes gives up a useful card in your best suit.
+- **Don't pay much for it:** signal with a card you can spare. If the right throw-off is a card you need (a guard, a winner), keep it.
 - **It's worth little to an expert bot,** which already places most cards from the bidding and play.
-- **Human partners get more out of it.** They can't infer as well, so the signal tells them something they wouldn't otherwise know. Use it freely; it isn't costing you anything measurable.
+- **Human partners probably get more out of it.** They can't infer as well, so the signal tells them something they wouldn't otherwise know. The bots now signal only when it costs them almost nothing, so when your bot partner does throw off a low card first, read it as their strongest suit.
 
 ### 17. Count every suit, and notice every throw-off
 

@@ -56,7 +56,7 @@ test("hints, grades and the hand review", async ({ page }, info) => {
   await page.screenshot({ path: `test-results/coach-3-decisions.png`, fullPage: true });
 
   await review.getByRole("tab", { name: "Trick by trick" }).click();
-  await expect(review.getByText(/With every card visible/)).toBeVisible({ timeout: 30_000 });
+  await expect(review.getByText(/With every card visible and perfect play/)).toBeVisible({ timeout: 30_000 });
   await expect(review.locator(".trick-list > li")).toHaveCount(10);
   await page.screenshot({ path: `test-results/coach-4-tricks.png`, fullPage: true });
 

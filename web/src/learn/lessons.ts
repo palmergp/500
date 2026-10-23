@@ -168,7 +168,8 @@ export const LESSONS: Lesson[] = [
       "## Compete, and trust partner",
       "The neural bidder (The Oracle) declares about twice as often as the rule-based expert and scores 12 points a hand more: bid when the count says it pays, even if you go down a little more often. But don't pull partner out of their suit into yours: raise it or pass.",
       "## Signal when you can't bid",
-      "Holding the Joker but no bid? Call 6: it's worth ¾ of a trick to your partner. Holding a bower in a suit you can't bid? Mention it.",
+      "Holding the Joker but no bid? Call 6: it tells partner where the Joker is. Strength in a suit you can't bid? Mention it: a bower with two more trumps tells partner about 1⅓ tricks, four trumps without a bower about 1, a bower with only one other card about ⅔.",
+      "Once partner has called, though, just pass: partner can't act on a mention or 6 any more, and in the lab it made no difference.",
     ],
     quiz: [
       { q: "Partner passed. Adjust your count by about…", options: ["+1", "0", "−0.9"], answer: 2, explain: "A pass shows weakness: about −0.9 in a suit bid." },
@@ -270,6 +271,7 @@ export const LESSONS: Lesson[] = [
       "Partner's mention is not a lead signal: leading partner's mentioned suit was no better than average. The mention helps partner's side bid. To tell partner where to lead, there's the discard signal.",
       "## The discard signal",
       "The first time you can't follow suit and don't trump, throw a low card from your strongest side suit. Partner now knows where to lead when they run out of winners, and you should read partner's first throw-off the same way.",
+      "Don't pay much for it: if the signal card is one you need (a guard or a winner), keep it. In the lab, bots that gave up real value to signal lost about 3 points a hand; the bots now signal only when it's nearly free.",
       "• Example: spades are trumps, a diamond is led, you have no diamonds and hold A K 7 6 5 of hearts. Throw the 5♥.",
       "• Everyone sees the signal, opponents included. Against expert bots it cost nothing measurable, so use it.",
       "## Following and trumping",

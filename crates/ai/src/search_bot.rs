@@ -125,7 +125,7 @@ pub struct SearchConfig {
     pub fixed_opponents: bool,
     /// When the bidding fallback makes a 6-call (lab variants; the house signal is `Always`).
     pub six: crate::rule_bot::SixPolicy,
-    /// Mention or call 6 after partner has called (lab variants turn it off).
+    /// Mention or call 6 after partner has called (off: finding 35; a lab variant turns it on).
     pub signal_after_partner: bool,
     /// Leading for the declaring side, break near-ties toward the dearest card (top trumps and
     /// winners) instead of the cheapest (a lab variant).
@@ -155,7 +155,9 @@ impl SearchConfig {
         search_bidding: false,
         neural_bidding: false,
         signals: true,
-        signal_allowance: 25.0,
+        // 25 cost the Oracle 3.4 points a hand against not signalling; 5 recovers about half
+        // (finding 36). The signal stays: it's the table's convention, which people read.
+        signal_allowance: 5.0,
         // Searched kitty choice gained +0.1 points a hand over the heuristic (finding 8): not
         // worth the time.
         search_discards: false,
@@ -165,7 +167,7 @@ impl SearchConfig {
         read_signals: true,
         fixed_opponents: false,
         six: crate::rule_bot::SixPolicy::Always,
-        signal_after_partner: true,
+        signal_after_partner: false,
         lead_winners: false,
     };
     pub const SHARK: SearchConfig =
