@@ -19,12 +19,13 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    - trump ace ¾, king ⅔, queen ½, each other trump ½;
    - side ace ⅔, side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕;
    - then **add 3** for partner and the kitty.
-2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and to 9 only at about 10.** Each extra
-   level adds just 100 points, but falling one trick short costs both bids' values.
+2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and stop there: a 9 bid almost never
+   pays, even at a count of 11.** Each extra level adds just 100 points, but falling one trick short costs both
+   bids' values.
 3. **Bid a little more than feels safe.** Timid bidding loses games under these rules.
 4. **Adjust for the auction:**
-   - partner's 6-call in your suit +1.4 (in another suit +½), partner's mention of your suit +0.6, partner's bid of it +2¼;
-   - partner's pass −0.9, an opponent's 6-call in your suit −1⅛ (in another −⅓), any opponent's bid of your suit −2.
+   - partner's 6-call in your suit +1.4 (in the left bower's suit +¾, in another +0.4), partner's mention of your suit +0.6, partner's bid of it +2¼;
+   - partner's pass −0.9, an opponent's 6-call in your suit −1⅛ (in the left bower's suit −½, in another −¼), any opponent's bid of your suit −2.
 5. **No trumps:**
    - count Joker 2¼, each ace 1, guarded king ½ (⅓ with just one guard), then add 3⅓;
    - an unstopped suit hurts far less than its reputation.
@@ -92,7 +93,7 @@ Then **add 3** for your partner and the kitty. That total is roughly how many tr
 - **The two jacks are worth more than the ace of trumps.**
 - **Voids help less than you'd think** (⅕ of a trick), because you need spare trumps to use them.
 
-### 2. Bid 7 at a count of about 7; go up to 8 at about 8½, and to 9 only at about 10
+### 2. Bid 7 at a count of about 7; go up to 8 at about 8½, and stop at 8
 
 **When a bid beats passing.** A 7-level bid needs to be made about 60% of the time to pay, given that defenders
 score 10 a trick either way. That happens from a count of about **7** (6¾ in clubs, diamonds and hearts, whose bids
@@ -107,10 +108,12 @@ you'd make the higher bid about **80%** of the time:
 |---|---|---|
 | under about 7 | pass, mention or 6 | |
 | about 7 to 8 | 7 | 7: 65–85% |
-| about 8½ to 9½ | 8 | 8: 78–92% |
-| about 10 or more | 9 | 9: about 80–85% |
+| about 8½ or more | 8 | 8: 78–92% |
 
-At a count of 9½ a 9 bid is made about 70% of the time, and still scores about 70 points less than 8 on average.
+**9 almost never pays.** The solver data once suggested 9 from a count of about 10, but checked against the coach
+and played out (`fh-lab thumbcheck`, finding 32), a 9 bid at a count of 10 to 12 was the coach's choice in under 1%
+of cases, and where it called 9 a blunder, the coach's choice (8, or passing over partner) scored 139 points more.
+At 8½ itself, 7 and 8 score about the same on average: the coach may prefer either for a particular hand.
 
 **Competition doesn't change it.** You might think a higher bid is worth it to keep the bid away from players
 still to call. Played out over 20,000 deals, bidding 9 never paid at any count up to 10, from any seat
@@ -138,12 +141,14 @@ Add these to your count for the strain you're considering:
 | What happened | Suit bid | No trumps |
 |---|---|---|
 | Partner called 6 in this suit (they hold the Joker) | **+1.4** | — |
-| Partner called 6 in another strain | **+½** | **+1** |
+| Partner called 6 in the left bower's suit (same color) | **+¾** | — |
+| Partner called 6 in another strain | **+0.4** | **+1** |
 | Partner mentioned this strain | **+0.6** | **+0.7** |
 | Partner bid this strain | **+2¼** | **+2¼** |
 | Partner passed | **−0.9** | **−1.3** |
 | An opponent called 6 in this suit | **−1⅛** | — |
-| An opponent called 6 in another strain | **−⅓** | **−0.7** |
+| An opponent called 6 in the left bower's suit (same color) | **−½** | — |
+| An opponent called 6 in another strain | **−¼** | **−0.7** |
 | An opponent mentioned this strain | **−⅔** | **−0.7** |
 | An opponent bid this strain | **−2** | **−2** |
 | You speak last (dealer), with no opposing bid, mention or 6 in this strain | **+½** | **+0.6** |

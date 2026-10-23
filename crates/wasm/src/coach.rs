@@ -242,6 +242,12 @@ pub struct TraceView {
     /// Declarer's tricks with perfect play by everyone, from the first lead.
     pub par: u8,
     pub plays: Vec<TracedPlayView>,
+    /// The same, had the declarer played the ten cards they were dealt (no kitty).
+    pub par_without_kitty: u8,
+    /// The declarer's rule-of-thumb count of their own ten dealt cards, without the constant.
+    pub own_count: f32,
+    /// The constant the count adds for partner and the kitty (3, or 3⅓ in no trumps).
+    pub constant: f32,
 }
 
 /// The double-dummy trace of deal `number` (hindsight: every card visible).
@@ -255,8 +261,21 @@ pub fn trace_for(save: &SaveData, number: usize, viewer: Seat) -> Result<Option<
     let rotate = |s: Seat| (s.index() + 4 - viewer.index()) % 4;
     let record = game.history().get(number - 1).ok_or("no such deal")?;
     let trump = record.contract.and_then(|(_, c)| c.trump());
+    let (declarer, contract) = match record.contract {
+        Some(c) => c,
+        None => return Ok(None),
+    };
+    // Without the kitty: the declarer keeps the ten cards they were dealt.
+    let par_without_kitty = fh_ai::solver::Solver::new(trump).solve(
+        &fh_ai::solver::Position { hands: record.dealt, trump, trick: fh_core::Trick::new(declarer) },
+        declarer.team(),
+    );
+    let own_count = fh_ai::thumb::card_count(record.dealt[declarer.index()], contract.strain);
     Ok(dd_trace(record).map(|(par, plays)| TraceView {
         par,
+        par_without_kitty,
+        own_count,
+        constant: fh_ai::thumb::constant(contract.strain),
         plays: plays
             .into_iter()
             .map(|p| TracedPlayView { seat: rotate(p.seat), card: card_view(p.card, trump), par_after: p.par_after, cost: p.cost })

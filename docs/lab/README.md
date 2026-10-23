@@ -578,6 +578,55 @@ second lead was another trump 48% of the time, a side ace or king 31%, a side qu
 For players: after a winning trump, keep drawing trumps or cash your side winners. Lead a low side card early only
 from a singleton you mean to trump, or to reach partner.
 
+### 31. A 6-call in your left bower's suit counts double
+
+*Refit of the bidding count, as finding 27, with 6-calls in another suit split by colour.* In a suit bid:
+
+| 6-call in… | By an opponent | By partner |
+|---|---|---|
+| Your suit | −1.14 | +1.42 |
+| Your left bower's suit (same colour) | **−0.51** (±0.05) | **+0.72** (±0.07) |
+| Another side suit | −0.25 (±0.04) | +0.39 (±0.05) |
+
+A 6-call in the same-colour suit often comes with that suit's jack, your left bower. The count now uses −½ / +¾
+there and −¼ / +0.4 for the other two suits.
+
+### 32. The count's thresholds against the coach: stop at 8
+
+*Measured by `fh-lab thumbcheck` over 30,000 deals of Oracle auctions.* Wherever a player's count in their clearly
+best suit sat just past a threshold, the bid the rule suggests was graded by the coach, and played out both ways
+(the rule's bid and the coach's choice; solver, scored for real play).
+
+| The rule's bid | Graded best or good | Mistake or blunder |
+|---|---|---|
+| 7 at a count of 7–7½, no bid yet | 94% | 2% |
+| 8 at 8½–9, no bid yet | 60% | 14% |
+| 9 at 10–10½ | under 1% | about 97% |
+| 9 at 10½–12 | about 2% | about 90% |
+
+Played out, the coach's choice beat the rule's bid by +139 ± 39 points where the coach called it a blunder, +42 ±
+24 for a mistake, +21 ± 20 for an inaccuracy and +11 ± 21 for "good": the coach's verdicts hold up. **The rule's
+"9 at about 10" was wrong**; it now says to stop at 8. At 8½, 7 and 8 score about the same on average (finding
+14), so the coach decides per hand; when you follow the count and it disagrees, the grade now says so and why.
+
+### 33. What a mention tells partner: length counts as much as the bower
+
+*Measured by `fh-lab mentions` over 2,000 deals (all four seats, all four suits).* For each holding a player might
+mention, their partner declared in that suit with the kitty (solver); partner's tricks less partner's own count,
+against holdings nobody would mention (no bower, three trumps or fewer):
+
+| What the mentioner holds (as trumps) | n | Worth to partner |
+|---|---|---|
+| A bower, two trumps or fewer in all | 3,838 | +0.65 tricks |
+| A bower and two more trumps | 4,487 | +1.35 |
+| A bower and three or more | 4,977 | +2.29 |
+| No bower, four trumps | 2,282 | +1.07 |
+| No bower, five or more | 666 | +1.81 |
+
+Four small trumps tell partner more than a bower with one other card. This is the information's worth to partner
+only (the opponents hear it too; finding 19 put all signal calls together at about +2 points a hand). The bots
+still mention on a bower, which is what their bidding network learned to read.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

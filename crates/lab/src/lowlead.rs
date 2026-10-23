@@ -23,8 +23,11 @@ struct Tally {
     best: u32,
 }
 
+/// The low leads by length, and what declarer led to trick 2.
+type Counts = (BTreeMap<String, Tally>, BTreeMap<&'static str, u32>);
+
 pub fn run(deals: u64, seed: u64, threads: u64) {
-    let parts: Vec<(BTreeMap<String, Tally>, BTreeMap<&'static str, u32>)> = std::thread::scope(|scope| {
+    let parts: Vec<Counts> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|t| {
                 scope.spawn(move || {

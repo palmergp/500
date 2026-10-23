@@ -22,6 +22,7 @@ import { TricksDialog } from "./components/TricksDialog";
 import { DecisionsDialog } from "./components/DecisionsDialog";
 import { keepMistake } from "./mistakes";
 import { recordGame, recordHand } from "./records";
+import { handCode, saveAt } from "./handcode";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -162,6 +163,12 @@ export function App() {
   const [sweeping, setSweeping] = useState(false);
   /** Playing out the rest of the hand quickly, a bot playing your cards (they aren't graded). */
   const [finishing, setFinishing] = useState(false);
+  /** Replaying a hand from a point in its review: the real game's save to come back to. Nothing
+   * in a replay counts (no saving, grades, records or progress). */
+  const replayRef = useRef<{ resume: string } | null>(null);
+  const [replaying, setReplaying] = useState<string | null>(null);
+  /** A hand code being shown (and copied). */
+  const [codeShown, setCodeShown] = useState<string | null>(null);
   /** A record you just set ("highest bid made: 9♥"), shown for a moment at the top. */
   const [recordToast, setRecordToast] = useState<string | null>(null);
   const [quizzed, setQuizzed] = useState<number | null>(null);
@@ -204,7 +211,8 @@ export function App() {
     setView(next);
     saveRef.current = snapshot.save;
     gameRef.current = snapshot.game ?? gameId(snapshot.save);
-    if (modeRef.current === "solo") savedGame.store(snapshot.save);
+    const replay = !!replayRef.current;
+    if (modeRef.current === "solo" && !replay) savedGame.store(snapshot.save);
     for (const e of snapshot.events) {
       if (e.kind === "played") audio.play("card");
       else if (e.kind === "dealt") audio.play("deal");
@@ -215,12 +223,12 @@ export function App() {
         const hand = next.history.filter((h) => !h.passedOut).at(-1);
         const ours = hand?.contract ? hand.contract.declarer % 2 === 0 : false;
         audio.play(hand && ours === !!hand.made ? "made" : "set");
-        const broken = hand && gameRef.current ? recordHand(gameRef.current, hand) : [];
+        const broken = hand && gameRef.current && !replay ? recordHand(gameRef.current, hand) : [];
         if (broken.length) setRecordToast(broken.join(" · "));
       } else if (e.kind === "gameWon") {
         audio.play(next.winner === 0 ? "win" : "lose");
-        recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
-        const broken = gameRef.current ? recordGame(gameRef.current, next.scores[0], next.winner === 0) : [];
+        if (!replay) recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
+        const broken = gameRef.current && !replay ? recordGame(gameRef.current, next.scores[0], next.winner === 0) : [];
         if (broken.length) setRecordToast((t) => [t, ...broken].filter(Boolean).join(" · "));
       }
     }
@@ -457,7 +465,7 @@ export function App() {
   };
 
   const gradeLater = (save: string, numbers: number[]) => {
-    if (!coach || !settings.grade) return;
+    if (!coach || !settings.grade || replayRef.current) return;
     for (const number of numbers) grade(() => coach.grade(save, number), save, [number]);
   };
 
@@ -486,6 +494,45 @@ export function App() {
     hint.catch(() => {});
     lookAhead.current = { save, hint };
   }, [mode, view, settings.grade, finishing]);
+
+  /** A hand code for the game as it stood after action `at`, copied to the clipboard and shown. */
+  const showCode = (at: number) => {
+    const save = saveRef.current;
+    if (!save || modeRef.current !== "solo") return;
+    void handCode(save, at, !!host).then((code) => {
+      setCodeShown(code);
+      navigator.clipboard?.writeText(code).catch(() => {});
+    });
+  };
+
+  /** Plays the hand again from action `at` of the game: a sandbox that doesn't count. */
+  const startReplay = (at: number, label: string) => {
+    const save = replayRef.current?.resume ?? saveRef.current;
+    if (!save || modeRef.current !== "solo") return;
+    replayRef.current = { resume: save };
+    setReplaying(label);
+    setReview(null);
+    setResult(null);
+    setShowScores(false);
+    setShowDecisions(false);
+    setHint(null);
+    setLastGrade(null);
+    setFinishing(false);
+    void request((engine) => engine.load(saveAt(save, at)));
+  };
+
+  /** Back from a replay to the real game, where you left it. */
+  const endReplay = () => {
+    const resume = replayRef.current?.resume;
+    if (!resume) return;
+    replayRef.current = null;
+    setReplaying(null);
+    setResult(null);
+    setHint(null);
+    setLastGrade(null);
+    setFinishing(false);
+    void request((engine) => engine.load(resume));
+  };
 
   const askHint = () => {
     const save = coachSave();
@@ -723,6 +770,9 @@ export function App() {
                 onClick={() => setShowLearn(true)}
               />
               <NavButton icon="📋" label="Score pad" tip="Score pad: every hand so far, and a review of each one" onClick={() => setShowScores(true)} disabled={!view} />
+              {mode === "solo" && view && (
+                <NavButton icon="🔗" label="Code" tip="A code for this exact moment of the game, copied for you: give it to Claude with a question" onClick={() => showCode(view.actionCount)} />
+              )}
               {lan && <NavButton icon="👥" label="Table" tip="Who's sitting where; leave or end the game" onClick={() => setShowLobby(true)} />}
               <NavButton icon="⚙" label="Settings" tip="Settings: coach, counting aids, sound, speed and display" onClick={() => setShowSettings(true)} />
               {!lan && (
@@ -777,6 +827,14 @@ export function App() {
                   dock={wide ? undefined : (coachPanels ?? undefined)}
                   status={
                     <div className="status-row">
+                      {replaying && (
+                        <span className="replay-banner">
+                          Replay from {replaying}: it doesn't count.{" "}
+                          <button type="button" onClick={endReplay}>
+                            Back to the game
+                          </button>
+                        </span>
+                      )}
                       <div className="status" role="status">
                         {lanStatus?.text || prompt(table ?? view) || message}
                       </div>
@@ -871,6 +929,10 @@ export function App() {
               >
                 New game
               </button>
+            ) : replaying ? (
+              <button type="button" className="primary" onClick={endReplay} autoFocus>
+                Back to the game
+              </button>
             ) : (
               <button
                 type="button"
@@ -895,13 +957,40 @@ export function App() {
             grades={grades.filter((g) => g.deal === review.number)}
             coach={coach}
             save={coachSave()}
+            onReplay={mode === "solo" ? startReplay : undefined}
+            onCode={mode === "solo" ? showCode : undefined}
+            end={view.history.find((h) => h.number === review.number + 1)?.firstAction ?? view.actionCount}
           />
         </Dialog>
       )}
       {showTricks && view && (
         <TricksDialog tricks={view.tricks} players={view.players} focus={showTricks.focus} onClose={() => setShowTricks(null)} />
       )}
-      {showDecisions && view && <DecisionsDialog grades={grades} deal={deal} pending={grading} onClose={() => setShowDecisions(false)} />}
+      {showDecisions && view && (
+        <DecisionsDialog
+          grades={replaying ? [] : grades}
+          deal={deal}
+          pending={grading}
+          onClose={() => setShowDecisions(false)}
+          onReplay={mode === "solo" ? startReplay : undefined}
+          onCode={mode === "solo" ? showCode : undefined}
+        />
+      )}
+      {codeShown && (
+        <Dialog title="Hand code" onClose={() => setCodeShown(null)}>
+          <p>This code names this exact moment of the game. Give it to Claude with your question.</p>
+          <input className="hand-code" readOnly value={codeShown} onFocus={(e) => e.currentTarget.select()} autoFocus aria-label="Hand code" />
+          <p className="note">{navigator.clipboard ? "It's been copied to your clipboard." : "Select it and copy it."}</p>
+          <div className="actions">
+            <button type="button" onClick={() => navigator.clipboard?.writeText(codeShown).catch(() => {})}>
+              Copy again
+            </button>
+            <button type="button" className="primary" onClick={() => setCodeShown(null)}>
+              Done
+            </button>
+          </div>
+        </Dialog>
+      )}
       {showScores && view && (
         <Dialog title="Score pad" wide onClose={() => setShowScores(false)}>
           <ScorePad history={view.history} players={view.players} onReview={(h) => { setShowScores(false); setReview(h); }} />

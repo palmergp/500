@@ -73,6 +73,8 @@ export interface HandView {
   /** Each bid with its bidder's rule-of-thumb count and the coach's make chance, from what they
    * could see when they bid. */
   bids?: BidNoteView[];
+  /** Where this deal's actions start in the game's log. */
+  firstAction: number;
 }
 
 export interface BidNoteView {
@@ -181,6 +183,12 @@ export function lossText(g: { loss: number; units?: "points" | "win" }): string 
 export interface TraceView {
   par: number;
   plays: { seat: SeatIndex; card: CardView; parAfter: number; cost: number }[];
+  /** The declarer's tricks with perfect play had they kept the ten cards they were dealt (no kitty). */
+  parWithoutKitty: number;
+  /** The declarer's rule-of-thumb count of their own ten dealt cards, without the constant. */
+  ownCount: number;
+  /** The constant the count adds for partner and the kitty (3, or 3⅓ in no trumps). */
+  constant: number;
 }
 
 export interface DrillView {

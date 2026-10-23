@@ -126,6 +126,14 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { six: crate::rule_bot::SixPolicy::Never, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (never calls 6)", config, seed)));
         }
+        "oracle-leadwinners" => {
+            let config = SearchConfig { lead_winners: true, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (declarer leads winners on near-ties)", config, seed)));
+        }
+        "oracle-quietlate" => {
+            let config = SearchConfig { signal_after_partner: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (no mention or 6 after partner's call)", config, seed)));
+        }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));

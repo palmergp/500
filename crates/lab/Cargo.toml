@@ -8,3 +8,5 @@ license.workspace = true
 [dependencies]
 fh-core = { path = "../core" }
 fh-ai = { path = "../ai" }
+fh-wasm = { path = "../wasm" }
+serde_json = "1.0.154"

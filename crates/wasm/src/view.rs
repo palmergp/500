@@ -252,6 +252,15 @@ pub struct HandView {
     pub tricks: Vec<TrickView>,
     /// Each bid with its bidder's count and make chance when they bid.
     pub bids: Vec<BidNoteView>,
+    /// Where this deal's actions start in the game's log (to replay from a point in it).
+    pub first_action: usize,
+}
+
+/// What the views add to the game itself (kept by the table).
+#[derive(Clone, Copy, Default)]
+pub struct Notes<'a> {
+    pub bids: &'a [crate::table::BidNote],
+    pub deal_starts: &'a [usize],
 }
 
 #[derive(Serialize)]
@@ -265,7 +274,7 @@ pub struct BidNoteView {
     pub makes: Option<f64>,
 }
 
-pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens, notes: &[crate::table::BidNote]) -> HandView {
+pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens, notes: Notes) -> HandView {
     let trump = record.contract.and_then(|(_, c)| c.trump());
     let played = record.contract.is_some();
     HandView {
@@ -283,7 +292,9 @@ pub fn hand_view(number: usize, record: &HandRecord, lens: &Lens, notes: &[crate
         kitty: if played { cards_view(record.kitty, trump) } else { vec![] },
         discards: if played { cards_view(record.discards, trump) } else { vec![] },
         tricks: record.tricks.iter().map(|t| trick_view(t, trump, lens)).collect(),
+        first_action: notes.deal_starts.get(number - 1).copied().unwrap_or(0),
         bids: notes
+            .bids
             .iter()
             .filter(|n| n.deal + 1 == number)
             .map(|n| BidNoteView { seat: lens.seat(n.seat), label: n.contract.to_string(), count: n.count, makes: n.makes })
@@ -353,12 +364,12 @@ impl View {
                 persona(id).map_or(id.clone(), |p| p.name.to_string())
             }
         });
-        View::build_for(table.game(), &Lens::new(Seat::SOUTH, names), table.players(), table.action_count(), table.bid_notes())
+        View::build_for(table.game(), &Lens::new(Seat::SOUTH, names), table.players(), table.action_count(), table.notes())
     }
 
     /// The table as `lens.viewer` sees it. `personas` are persona ids by real seat ("human" for
     /// people), `action_count` the number of actions taken so far.
-    pub fn build_for(game: &fh_core::Game, lens: &Lens, personas: &[String; 4], action_count: usize, notes: &[crate::table::BidNote]) -> View {
+    pub fn build_for(game: &fh_core::Game, lens: &Lens, personas: &[String; 4], action_count: usize, notes: Notes) -> View {
         let viewer = lens.viewer;
         let obs = game.observe(viewer);
         let trump = obs.trump();

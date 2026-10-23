@@ -29,6 +29,9 @@ pub struct Style {
     pub remembers_cards: bool,
     /// When to make a 6-call with the Joker (lab variants vary it; the house signal is `Always`).
     pub six: SixPolicy,
+    /// Whether to mention or call 6 after partner has had their call (it can then only help partner
+    /// on defence, and the opponents; a lab variant turns it off).
+    pub signal_after_partner: bool,
 }
 
 /// When a player holding the Joker, without a bid, calls 6 in their best strain.
@@ -52,6 +55,7 @@ impl Style {
         blunder_rate: 0.0,
         remembers_cards: true,
         six: SixPolicy::Always,
+        signal_after_partner: true,
     };
     pub const CAUTIOUS: Style = Style { aggression: -0.7, partner_credit: 1.2, kitty_credit: 0.4, ..Style::STEADY };
     pub const BOLD: Style = Style { aggression: 0.8, partner_credit: 1.8, kitty_credit: 0.7, ..Style::STEADY };
@@ -129,6 +133,10 @@ impl RuleBot {
             SixPolicy::Never => false,
             SixPolicy::FirstNeeds(count) => obs.auction.calls().next().is_some() || crate::thumb::count(obs, best).0 >= count,
         };
+        let partner_called = obs.auction.calls().any(|(s, _)| s == obs.seat.partner());
+        if partner_called && !self.style.signal_after_partner {
+            return Action::Call(Call::Pass);
+        }
         if six && obs.hand.contains(Card::JOKER) && is_legal(Call::Six(best)) {
             return Action::Call(Call::Six(best));
         }

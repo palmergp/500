@@ -19,7 +19,7 @@ use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::State;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
-use axum::routing::get;
+use axum::routing::{get, post};
 use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use qrcode::render::{svg, unicode};
@@ -238,7 +238,11 @@ async fn main() {
     let local = format!("http://localhost:{port}/");
     let state = AppState { room, url: url.clone() };
 
-    let app = Router::new().route("/api/info", get(info)).route("/api/qr.svg", get(qr_svg)).route("/ws", get(upgrade));
+    let app = Router::new()
+        .route("/api/info", get(info))
+        .route("/api/qr.svg", get(qr_svg))
+        .route("/api/hands", post(save_hand))
+        .route("/ws", get(upgrade));
     let app = match &files {
         Files::Disk(dist) => app.fallback_service(ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html")))),
         #[cfg(feature = "embed")]
@@ -288,6 +292,29 @@ async fn embedded(uri: axum::http::Uri) -> Response {
     // Built assets have content hashes in their names, so they never change.
     let cache = if path.starts_with("assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
     ([(header::CONTENT_TYPE, mime), (header::CACHE_CONTROL, cache.to_string())], file.contents()).into_response()
+}
+
+/// A hand code from the web app, with the game it names. Kept in the user's app-data folder by
+/// every copy of the host (`fh_wasm::table::hands_dir`), so `fh-lab show --code ...` finds it.
+#[derive(serde::Deserialize)]
+struct HandCode {
+    code: String,
+    /// The game up to the moment the code names (a save, as JSON).
+    save: String,
+}
+
+/// Keeps a hand code's game so the code can be looked up later (a question about a hand).
+async fn save_hand(Json(hand): Json<HandCode>) -> Response {
+    let ok_code = !hand.code.is_empty() && hand.code.len() <= 16 && hand.code.chars().all(|c| c.is_ascii_alphanumeric() || c == '-');
+    if !ok_code || hand.save.len() > 200_000 || serde_json::from_str::<fh_wasm::table::SaveData>(&hand.save).is_err() {
+        return axum::http::StatusCode::BAD_REQUEST.into_response();
+    }
+    let Some(dir) = fh_wasm::table::hands_dir() else { return axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response() };
+    let record = serde_json::json!({ "code": hand.code, "save": hand.save });
+    match std::fs::create_dir_all(&dir).and_then(|_| std::fs::write(dir.join(format!("{}.json", hand.code)), record.to_string())) {
+        Ok(()) => Json(serde_json::json!({ "ok": true })).into_response(),
+        Err(_) => axum::http::StatusCode::INTERNAL_SERVER_ERROR.into_response(),
+    }
 }
 
 /// Lets the web app know it was loaded from a host, and the address to share.

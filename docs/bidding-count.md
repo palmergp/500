@@ -96,12 +96,14 @@ Add or subtract these for what the other three players have called. (Your own ca
 | Call | Suit bid | No trumps |
 |---|---|---|
 | **Your partner called 6 in this suit** (they hold the Joker) | **+1.4** | — |
-| Your partner called 6 in another strain | +½ | +1 |
+| Your partner called 6 in the left bower's suit (same color) | +¾ | — |
+| Your partner called 6 in another strain | +0.4 | +1 |
 | Your partner mentioned this suit (or NT) | +0.6 | +0.7 |
 | Your partner bid this suit (or NT) | +2¼ | +2¼ |
 | **Your partner passed** | **−0.9** | **−1.3** |
 | **An opponent called 6 in this suit** | **−1⅛** | — |
-| An opponent called 6 in another strain | −⅓ | −0.7 |
+| An opponent called 6 in the left bower's suit (same color) | −½ | — |
+| An opponent called 6 in another strain | −¼ | −0.7 |
 | An opponent mentioned this suit (or NT) | −⅔ | −0.7 |
 | An opponent bid this suit (or NT) | −2 | −2 |
 | You speak last (you're the dealer) and no opponent has shown strength | +½ | +0.6 |
@@ -116,13 +118,15 @@ Add or subtract these for what the other three players have called. (Your own ca
 |---|---|---|
 | Under about 7 (6¾ in clubs, diamonds, hearts or no trumps) | Pass, mention or call 6 | |
 | About 7 | **7** | about 60–65% |
-| About 8½ | **8** | about 78% |
-| About 10 | **9** | about 80–85% |
+| About 8½ or more | **8** | about 78% |
+| (9 almost never: not even at 11) | | |
 
 **Why 8 waits for 8½:** each extra level adds only 100 points when you make it, but one trick short turns a plus
 into a minus. With 8 tricks, 8♦ scores +280 and 9♦ scores −380. So go up a level only when you'd make the
 higher bid about 80% of the time. Bidding higher to stop players still to call doesn't change this: across
-20,000 deals played out, a 9 bid never paid below a count of 10, from any seat.
+20,000 deals played out, a 9 bid never paid below a count of 10, from any seat, and checked against the coach a 9
+almost never paid even at 10 to 12 (lab finding 32). At 8½, 7 and 8 score about the same on average, so the coach
+may prefer either for a particular hand.
 
 **After an opponent has bid:** pass unless your count is about 8½ or more.
 

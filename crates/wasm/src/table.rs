@@ -47,6 +47,8 @@ pub struct Table {
     log: Vec<u16>,
     hands: Option<u8>,
     bid_notes: Vec<BidNote>,
+    /// Where each deal's actions start in the log (by the deal's index in the history).
+    deal_starts: Vec<usize>,
 }
 
 /// A bid as its bidder saw it: their rule-of-thumb count and the coach's make chance, from what
@@ -80,7 +82,7 @@ impl Table {
         for seat in Seat::ALL {
             bots[seat.index()] = make_bot(&players[seat.index()], seed, seat)?;
         }
-        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands, bid_notes: Vec::new() })
+        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands, bid_notes: Vec::new(), deal_starts: vec![0] })
     }
 
     /// Puts a person ("human") or a bot persona ("any" for a random one) in `seat`, mid-game if
@@ -197,12 +199,21 @@ impl Table {
         }
         let events = self.game.apply(action).map_err(|e| e.to_string())?;
         self.log.push(index as u16);
+        if self.game.history().len() >= self.deal_starts.len() {
+            self.deal_starts.push(self.log.len());
+        }
         Ok(events)
     }
 
     /// Every bid so far, as its bidder saw it.
     pub fn bid_notes(&self) -> &[BidNote] {
         &self.bid_notes
+    }
+
+    /// What the views add to the game itself: each bid as its bidder saw it, and where each
+    /// deal starts in the log.
+    pub fn notes(&self) -> crate::view::Notes<'_> {
+        crate::view::Notes { bids: &self.bid_notes, deal_starts: &self.deal_starts }
     }
 
     pub fn save(&self) -> SaveData {
@@ -231,6 +242,12 @@ fn make_bot(id: &str, seed: u64, seat: Seat) -> Result<Option<Box<dyn Bot>>, Str
     }
     let bot = fh_ai::make_bot(id, seed.wrapping_mul(4).wrapping_add(seat.index() as u64));
     bot.map(Some).ok_or_else(|| format!("unknown player type {id:?}"))
+}
+
+/// Where hand codes' games are kept on this computer: `%LOCALAPPDATA%/500/hands` (or `~/500/hands`).
+pub fn hands_dir() -> Option<std::path::PathBuf> {
+    let base = std::env::var_os("LOCALAPPDATA").or_else(|| std::env::var_os("HOME"))?;
+    Some(std::path::PathBuf::from(base).join("500").join("hands"))
 }
 
 /// The game after the first `actions` actions of a save (no bots needed).
@@ -352,7 +369,7 @@ mod tests {
         }
         let game = table.game();
         let names = ["S".to_string(), "W".to_string(), "N".to_string(), "E".to_string()];
-        let east = crate::view::View::build_for(game, &Lens::new(Seat::EAST, names), table.players(), table.action_count(), table.bid_notes());
+        let east = crate::view::View::build_for(game, &Lens::new(Seat::EAST, names), table.players(), table.action_count(), table.notes());
         let south = table.view();
         // East sees their own hand, at index 0, with their side's score first.
         assert_eq!(east.hand.len(), game.hand(Seat::EAST).len());

@@ -41,6 +41,14 @@
   (persona id `neural`). Changing the inputs means regenerating the data and retraining.
 - Records and bid stats (`web/src/records.ts`): high game, best hand, highest bid made, and each bid you declared;
   counted once per game and hand, shown on Learn → Progress, with a popover banner when you set one.
+- Hand codes (`web/src/handcode.ts`): the top bar's Code button (and Code in reviews and decision lists) names an
+  exact moment of a solo game. With a host the code is short (`XXXX-XXXX`) and the host saves the game in
+  `%LOCALAPPDATA%/500/hands/` (`POST /api/hands`); without one it's `500:` plus the game. **When the user gives a
+  code, run `cargo run --release -p fh-lab -- show --code CODE`**: the deal, the auction and play, and the coach's
+  view of that moment.
+- Replay (solo): from a hand's review ("Replay this hand", per decision, per trick) the play engine loads the save
+  cut at that action (`saveAt`); nothing in a replay is saved, graded or counted, and "Back to the game" reloads
+  the real save. `HandView.firstAction` (from `Table::notes`) says where each deal starts in the log.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
   worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save

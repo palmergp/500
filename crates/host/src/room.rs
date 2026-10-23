@@ -533,7 +533,7 @@ impl Room {
         let Some(table) = &self.table else { return };
         let lens = self.lens(seat);
         let snapshot = Snapshot {
-            view: View::build_for(table.game(), &lens, table.players(), table.action_count(), table.bid_notes()),
+            view: View::build_for(table.game(), &lens, table.players(), table.action_count(), table.notes()),
             events: events.iter().map(|e| event_view(e, &lens)).collect(),
             save: "",
             ms: 0,

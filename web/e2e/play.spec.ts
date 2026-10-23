@@ -1,3 +1,4 @@
+import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
 import { startGame, takeTurn } from "./helpers";
 
@@ -79,4 +80,39 @@ test("finish the hand: a bot plays your cards quickly to the end", async ({ page
   await page.getByRole("tab", { name: "Progress" }).click();
   await expect(page.getByRole("heading", { name: "Records" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Your bids" })).toBeVisible();
+});
+
+test("a hand code, and replaying a hand from its review", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(180_000);
+  await startGame(page);
+  // The code button names this exact moment (here with no host: a long code carrying the game).
+  await page.getByRole("button", { name: "Code" }).click();
+  const codeDialog = page.getByRole("dialog", { name: "Hand code" });
+  const code = await codeDialog.getByLabel("Hand code").inputValue();
+  expect(code).toMatch(/^(500:[A-Za-z0-9_-]+|[0-9A-Z]{4}-[0-9A-Z]{4})$/);
+  writeFileSync("test-results/hand-code.txt", code);
+  await codeDialog.getByRole("button", { name: "Done" }).click();
+
+  const finish = page.getByRole("button", { name: /^Finish hand/ });
+  for (let step = 0; step < 500 && !(await finish.isVisible()); step++) {
+    if (!(await takeTurn(page))) await page.waitForTimeout(100);
+  }
+  await finish.click();
+  const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+  await expect(result).toBeVisible({ timeout: 60_000 });
+  const scores = (await page.locator(".scores").textContent()) ?? "";
+  await result.getByRole("button", { name: "Review hand" }).click();
+  const review = page.getByRole("dialog", { name: "Hand review" });
+  // What partner and the kitty added, against the count's constant.
+  await review.getByRole("tab", { name: "Trick by trick" }).click();
+  await expect(review.getByRole("heading", { name: "What partner and the kitty added" })).toBeVisible({ timeout: 30_000 });
+  await review.getByRole("tab", { name: "Overview" }).click();
+  await review.getByRole("button", { name: "Replay this hand" }).click();
+  // The replay starts from the deal: a full hand again, and a reminder that it doesn't count.
+  await expect(page.locator(".replay-banner")).toBeVisible();
+  await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
+  await page.locator(".replay-banner").getByRole("button", { name: "Back to the game" }).click();
+  await expect(page.locator(".replay-banner")).toHaveCount(0);
+  await expect(page.locator(".scores")).toHaveText(scores);
 });

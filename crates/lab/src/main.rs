@@ -25,6 +25,9 @@ mod levels;
 mod opponents;
 mod switch;
 mod lowlead;
+mod thumbcheck;
+mod mentions;
+mod show;
 mod playdata;
 mod duel;
 mod sim;
@@ -91,6 +94,17 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),
+        "mentions" => mentions::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 2_000_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "thumbcheck" => thumbcheck::run(
+            flag(&flags, "deals", 4000),
+            flag(&flags, "seed", 1_900_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "lowlead" => lowlead::run(

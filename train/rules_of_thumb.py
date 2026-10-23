@@ -93,6 +93,7 @@ def call_features(x, strain):
         # A 6-call names the caller's best strain: in this one it says far more (finding 27).
         "Partner called 6 in this strain": six_here(PARTNER),
         "Partner called 6 in another strain": six(PARTNER) - six_here(PARTNER),
+        # (In a suit bid, a 6-call in the left bower's suit counts for about twice another: finding 31.)
         "Partner mentioned this strain": x[:, PARTNER + 2 + strain],
         "Partner bid this strain": sum(x[:, PARTNER + 12 + lvl * 5 + strain] for lvl in range(4)),
         "Partner passed": x[:, PARTNER + 1],

@@ -1708,6 +1708,12 @@ button.danger {
   top: auto;
   bottom: calc(100% + 6px);
 }
+/* North's call sits beside its plate: below it, it covered the top of the bidding box. */
+.seat-north .bubble {
+  top: 50%;
+  left: calc(100% + 8px);
+  transform: translateY(-50%);
+}
 
 /* ---- Trick piles: one per trick, in front of the player who keeps that side's tricks ----- */
 
@@ -2168,4 +2174,38 @@ button.danger {
   to {
     opacity: 0;
   }
+}
+
+/* Replaying a hand from its review: a reminder that it doesn't count, and the way back. */
+.replay-banner {
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(207, 227, 245, 0.95);
+  color: #123a5c;
+  font-weight: 600;
+  font-size: 0.85rem;
+}
+.replay-banner button {
+  padding: 1px 8px;
+  font-size: 0.8rem;
+}
+.moment-actions {
+  display: inline-flex;
+  gap: 6px;
+  margin: 4px 0 2px;
+}
+.moment-actions button,
+.replay-trick {
+  padding: 1px 8px;
+  font-size: 0.78rem;
+}
+.replay-trick {
+  margin-left: 8px;
+}
+.hand-code {
+  width: 100%;
+  font: 600 1.3rem/1.4 ui-monospace, monospace;
+  text-align: center;
+  padding: 6px;
+  letter-spacing: 0.08em;
 }

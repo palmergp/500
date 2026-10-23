@@ -260,6 +260,11 @@ impl Coach {
             return Grade { chosen, best: chosen, loss: 0.0, verdict: Verdict::Best, analysis };
         }
         let mut verdict = if chosen == analysis.best { Verdict::Best } else { Verdict::from_loss(loss, obs.phase == Phase::Bidding) };
+        if let (Action::Call(Call::Bid(c)), true) = (chosen, verdict > Verdict::Good) {
+            if let Some(note) = count_disagreement(obs, c, &analysis) {
+                analysis.reasons.insert(0, note);
+            }
+        }
         if analysis.close.contains(&chosen) {
             // One of the plays the coach couldn't separate from its choice: not a mistake.
             verdict = verdict.min(Verdict::Good);
@@ -767,6 +772,33 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     reasons
 }
 
+/// When a bid follows the count (7 from about 7, 8 from about 8½) but the coach prefers something
+/// else, why: the count is an average, and at its thresholds the levels score about the same (lab
+/// finding 32), so the coach's reading of this particular hand decides.
+fn count_disagreement(obs: &Observation, bid: Contract, analysis: &Analysis) -> Option<String> {
+    let count = thumb::count(obs, bid.strain).0;
+    let by_count = if count >= 8.5 { 8 } else if count >= 7.0 { 7 } else { return None };
+    if bid.level > by_count {
+        return None;
+    }
+    let makes = |a: Action| analysis.options.iter().find(|o| o.action == a).and_then(|o| o.makes);
+    let mine = makes(Action::Call(Call::Bid(bid)))?;
+    let best = match analysis.best {
+        Action::Call(Call::Bid(b)) => match makes(analysis.best) {
+            Some(m) => format!("{b}, which it gives {}", pct(m)),
+            None => b.to_string(),
+        },
+        Action::Call(Call::Pass) => "passing".into(),
+        other => other.to_string(),
+    };
+    Some(format!(
+        "Your count ({}) does point to {}, but the count is an average: at its thresholds the levels score about the same. For this hand the coach gives {bid} only {} and prefers {best}.",
+        thumb::fraction(count),
+        bid.level,
+        pct(mine)
+    ))
+}
+
 fn call_label(action: Action) -> String {
     match action {
         Action::Call(call) => call.to_string(),
@@ -786,7 +818,7 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     let (total, parts) = thumb::count(obs, focus);
     let shown: Vec<String> = parts.iter().take(6).map(|(l, v)| format!("{l} {}", thumb::fraction(*v))).collect();
     reasons.push(format!("Rule-of-thumb count for {focus}: about {} ({}).", thumb::fraction(total), shown.join(", ")));
-    reasons.push("A 7 bid pays from a count of about 7. Go up to 8 at about 8½, and to 9 only at about 10.".into());
+    reasons.push("A 7 bid pays from a count of about 7. Go up to 8 at about 8½, and stop at 8: a 9 almost never pays.".into());
     // Suit or no trumps (docs/rules-of-thumb.md, rule 5a).
     let joker = hand.contains(Card::JOKER);
     let aces = fh_core::Suit::ALL.iter().filter(|&&s| hand.contains(Card::new(s, fh_core::cards::ACE))).count();

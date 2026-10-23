@@ -4,12 +4,40 @@
 
 use fh_core::cards::{ACE, JACK, KING, QUEEN};
 use fh_core::rules::is_trump;
-use fh_core::{effective_suit, Call, Card, Observation, Strain, Suit};
+use fh_core::{effective_suit, Call, Card, CardSet, Observation, Strain, Suit};
+
+/// What the count adds for partner and the kitty (and everything else it doesn't name): the fit's
+/// constant.
+pub fn constant(strain: Strain) -> f32 {
+    if strain == Strain::NoTrumps {
+        3.33
+    } else {
+        3.0
+    }
+}
+
+/// The count of `hand`'s own cards in `strain`: without the constant or the auction.
+pub fn card_count(hand: CardSet, strain: Strain) -> f32 {
+    card_parts(hand, strain).iter().map(|p| p.1).sum()
+}
 
 /// The count for `strain` and its parts, largest first.
 pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
+    let mut parts = card_parts(obs.hand, strain);
+    parts.push(("partner and kitty".into(), constant(strain)));
+    for (label, value) in auction_adjustments(obs, strain) {
+        if value != 0.0 {
+            parts.push((label, value));
+        }
+    }
+    let total = parts.iter().map(|p| p.1).sum();
+    parts.sort_by(|a, b| b.1.abs().total_cmp(&a.1.abs()));
+    (total, parts)
+}
+
+/// The values of the cards themselves.
+fn card_parts(hand: CardSet, strain: Strain) -> Vec<(String, f32)> {
     let mut parts: Vec<(String, f32)> = Vec::new();
-    let hand = obs.hand;
     let mut add = |label: String, value: f32| {
         if value != 0.0 {
             parts.push((label, value));
@@ -59,7 +87,6 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
             add(plural_with(thin_kings, "side king", "with one guard"), 0.125 * thin_kings as f32);
             add(plural(voids, "side void"), 0.2 * voids as f32);
             add(plural(singles, "singleton"), 0.125 * singles as f32);
-            add("partner and kitty".into(), 3.0);
         }
         None => {
             if hand.contains(Card::JOKER) {
@@ -93,15 +120,9 @@ pub fn count(obs: &Observation, strain: Strain) -> (f32, Vec<(String, f32)>) {
             add(plural_with(thin_kings, "king", "with one guard"), 0.33 * thin_kings as f32);
             add(plural(queens, "guarded queen"), 0.25 * queens as f32);
             add(plural(long, "long card"), 0.125 * long as f32);
-            add("partner and kitty".into(), 3.33);
         }
     }
-    for (label, value) in auction_adjustments(obs, strain) {
-        add(label, value);
-    }
-    let total = parts.iter().map(|p| p.1).sum();
-    parts.sort_by(|a, b| b.1.abs().total_cmp(&a.1.abs()));
-    (total, parts)
+    parts
 }
 
 fn plural(n: usize, what: &str) -> String {
@@ -122,21 +143,32 @@ fn auction_adjustments(obs: &Observation, strain: Strain) -> Vec<(String, f32)> 
     let me = obs.seat;
     let mut out = Vec::new();
     let mut opponents_showed = false;
+    let left_bower_suit = strain.trump().map(|t| Strain::from_suit(t.same_color()));
     for (seat, call) in obs.auction.calls() {
         if seat == me {
             continue;
         }
         let partner = seat == me.partner();
         match (partner, call) {
-            // A 6-call names the caller's best strain: in yours it says much more (finding 27).
+            // A 6-call names the caller's best strain: in yours it says much more, and in the suit of
+            // your left bower more than in the other two (findings 27 and 31).
             (true, Call::Six(s)) if s == strain && !nt => out.push(("partner's 6-call in it".into(), 1.4)),
-            (true, Call::Six(_)) => out.push(("partner's 6-call".into(), if nt { 1.0 } else { 0.5 })),
+            (true, Call::Six(s)) if !nt && Some(s) == left_bower_suit => out.push(("partner's 6-call in the left bower's suit".into(), 0.75)),
+            (true, Call::Six(_)) => out.push(("partner's 6-call".into(), if nt { 1.0 } else { 0.4 })),
             (true, Call::Mention(s)) if s == strain => out.push(("partner's mention".into(), if nt { 0.7 } else { 0.6 })),
             (true, Call::Bid(c)) if c.strain == strain => out.push(("partner's bid".into(), 2.25)),
             (true, Call::Pass) => out.push(("partner passed".into(), if nt { -1.3 } else { -0.9 })),
             (false, Call::Six(s)) => {
-                let value = if nt { -0.7 } else if s == strain { -1.125 } else { -0.33 };
-                out.push((if s == strain && !nt { "an opponent's 6-call in it" } else { "an opponent's 6-call" }.into(), value));
+                let (label, value) = if nt {
+                    ("an opponent's 6-call", -0.7)
+                } else if s == strain {
+                    ("an opponent's 6-call in it", -1.125)
+                } else if Some(s) == left_bower_suit {
+                    ("an opponent's 6-call in the left bower's suit", -0.5)
+                } else {
+                    ("an opponent's 6-call", -0.25)
+                };
+                out.push((label.into(), value));
                 opponents_showed = true;
             }
             (false, Call::Mention(s)) if s == strain => {

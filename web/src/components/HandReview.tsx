@@ -12,13 +12,43 @@ interface Props {
   coach: Coach | null;
   /** The game's save, for the coach to rebuild positions. */
   save: string | null;
+  /** Play the hand again from action `at` (solo games): it doesn't count toward the game. */
+  onReplay?: (at: number, label: string) => void;
+  /** A hand code for the game as it stood after action `at`. */
+  onCode?: (at: number) => void;
+  /** Where this hand ends in the game's log, for its code. */
+  end?: number;
+}
+
+/** The first action of trick `k` (1-based) of `hand`: after the calls and the three discards. */
+export function trickStart(hand: HandView, k: number): number {
+  return hand.firstAction + hand.calls.length + 3 + 4 * (k - 1);
+}
+
+/** "Replay from here" and "Code" for a moment of a hand. */
+export function MomentActions({ at, label, onReplay, onCode }: { at: number; label: string; onReplay?: (at: number, label: string) => void; onCode?: (at: number) => void }) {
+  if (!onReplay && !onCode) return null;
+  return (
+    <span className="moment-actions">
+      {onReplay && (
+        <button type="button" onClick={() => onReplay(at, label)} title="Play the hand again from this point: try something else. It doesn't count toward the game.">
+          Replay from here
+        </button>
+      )}
+      {onCode && (
+        <button type="button" onClick={() => onCode(at)} title="A code for this exact moment, to ask about it later">
+          Code
+        </button>
+      )}
+    </span>
+  );
 }
 
 type Tab = "overview" | "decisions" | "tricks" | "luck";
 
 /** A played deal, in four views: what happened, your decisions, every trick with hindsight, and
  * how an expert would have done with your cards. */
-export function HandReview({ hand, players, grades, coach, save }: Props) {
+export function HandReview({ hand, players, grades, coach, save, onReplay, onCode, end }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const tabs: [Tab, string][] = [
     ["overview", "Overview"],
@@ -35,9 +65,27 @@ export function HandReview({ hand, players, grades, coach, save }: Props) {
           </button>
         ))}
       </div>
-      {tab === "overview" && <Overview hand={hand} players={players} />}
-      {tab === "decisions" && <DecisionList grades={grades} />}
-      {tab === "tricks" && <Tricks hand={hand} coach={coach} save={save} />}
+      {tab === "overview" && (
+        <>
+          <Overview hand={hand} players={players} />
+          {(onReplay || onCode) && (
+            <div className="actions">
+              {onReplay && (
+                <button type="button" onClick={() => onReplay(hand.firstAction, "the start of the hand")} title="Bid and play this deal again. It doesn't count toward the game.">
+                  Replay this hand
+                </button>
+              )}
+              {onCode && end !== undefined && (
+                <button type="button" onClick={() => onCode(end)} title="A code for this hand, to ask about it later">
+                  Hand code
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+      {tab === "decisions" && <DecisionList grades={grades} onReplay={onReplay} onCode={onCode} />}
+      {tab === "tricks" && <Tricks hand={hand} coach={coach} save={save} onReplay={onReplay} />}
       {tab === "luck" && <Luck hand={hand} coach={coach} save={save} />}
     </div>
   );
@@ -124,7 +172,7 @@ export function decisionLabel(g: GradeView): string {
 }
 
 /** Graded decisions, each with when it was made and (opened for slips) the coach's reasons. */
-export function DecisionList({ grades }: { grades: GradeView[] }) {
+export function DecisionList({ grades, onReplay, onCode }: { grades: GradeView[]; onReplay?: (at: number, label: string) => void; onCode?: (at: number) => void }) {
   if (grades.length === 0) {
     return <p>No graded decisions yet. Turn on “Grade my decisions” in Settings to see them.</p>;
   }
@@ -162,6 +210,7 @@ export function DecisionList({ grades }: { grades: GradeView[] }) {
                 ) : (
                   <p className="note">No further notes.</p>
                 )}
+                <MomentActions at={g.actionNumber} label={`your ${decisionLabel(g).toLowerCase()} decision`} onReplay={onReplay} onCode={onCode} />
               </details>
             </li>
           );
@@ -188,7 +237,7 @@ function useCoach<T>(load: (() => Promise<T>) | null): { value: T | null; error:
   return { value, error };
 }
 
-function Tricks({ hand, coach, save }: { hand: HandView; coach: Coach | null; save: string | null }) {
+function Tricks({ hand, coach, save, onReplay }: { hand: HandView; coach: Coach | null; save: string | null; onReplay?: (at: number, label: string) => void }) {
   const { value: trace, error } = useCoach<TraceView | null>(coach && save ? () => coach.trace(save, hand.number) : null);
   const c = hand.contract!;
   if (error) return <p>Could not analyze this hand: {error}</p>;
@@ -201,6 +250,7 @@ function Tricks({ hand, coach, save }: { hand: HandView; coach: Coach | null; sa
         took {hand.tricksWon[c.declarer % 2]}. Marked cards cost their side a trick <em>in hindsight</em>, which no player can know at the table:
         use it to spot patterns, not as a grade.
       </p>
+      <Contributions hand={hand} trace={trace} />
       <ol className="trick-list">
         {tricks.map(({ trick, plays }, i) => (
           <li key={i}>
@@ -212,10 +262,44 @@ function Tricks({ hand, coach, save }: { hand: HandView; coach: Coach | null; sa
               </span>
             ))}
             <span className="par">par {plays[3]?.parAfter ?? ""}</span>
+            {onReplay && (
+              <button type="button" className="replay-trick" onClick={() => onReplay(trickStart(hand, i + 1), `trick ${i + 1}`)} title={`Play the hand again from trick ${i + 1}`}>
+                Replay
+              </button>
+            )}
           </li>
         ))}
       </ol>
     </>
+  );
+}
+
+/** What partner and the kitty added to the declarer's own cards, against the count's constant. */
+function Contributions({ hand, trace }: { hand: HandView; trace: TraceView }) {
+  const c = hand.contract!;
+  // Real play runs about half a trick below the solver; the count estimates real play.
+  const real = trace.par - 0.5;
+  const added = real - trace.ownCount;
+  const kitty = trace.par - trace.parWithoutKitty;
+  const partner = added - kitty;
+  const n = (x: number) => (x >= 0 ? `+${x.toFixed(1)}` : x.toFixed(1));
+  return (
+    <div className="contributions">
+      <h3>What partner and the kitty added</h3>
+      <p>
+        {SEAT_NAMES[c.declarer]}'s own ten cards count <strong>{trace.ownCount.toFixed(1)}</strong> in {c.label.replace(/^\d+/, "")}. With every card
+        visible the side takes {trace.par} (about {real.toFixed(1)} in real play), so partner and the kitty added <strong>{n(added)}</strong> tricks,
+        against the <strong>{trace.constant === 3 ? "3" : "3⅓"}</strong> the count assumes.
+      </p>
+      <ul>
+        <li>
+          The kitty: <strong>{n(kitty)}</strong> ({trace.par} tricks with it, {trace.parWithoutKitty} had the declarer kept the cards they were dealt).
+        </li>
+        <li>
+          Partner (and anything the count misjudged): <strong>{n(partner)}</strong>.
+        </li>
+      </ul>
+    </div>
   );
 }
 

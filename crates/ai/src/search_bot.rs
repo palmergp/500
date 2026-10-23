@@ -125,6 +125,11 @@ pub struct SearchConfig {
     pub fixed_opponents: bool,
     /// When the bidding fallback makes a 6-call (lab variants; the house signal is `Always`).
     pub six: crate::rule_bot::SixPolicy,
+    /// Mention or call 6 after partner has called (lab variants turn it off).
+    pub signal_after_partner: bool,
+    /// Leading for the declaring side, break near-ties toward the dearest card (top trumps and
+    /// winners) instead of the cheapest (a lab variant).
+    pub lead_winners: bool,
 }
 
 impl SearchConfig {
@@ -160,6 +165,8 @@ impl SearchConfig {
         read_signals: true,
         fixed_opponents: false,
         six: crate::rule_bot::SixPolicy::Always,
+        signal_after_partner: true,
+        lead_winners: false,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -186,7 +193,11 @@ impl SearchBot {
             config,
             rng: Rng::new(seed),
             discard_plan: Vec::new(),
-            fallback: RuleBot::new(name, Style { aggression: config.rule_aggression, six: config.six, ..Style::STEADY }, seed),
+            fallback: RuleBot::new(
+                name,
+                Style { aggression: config.rule_aggression, six: config.six, signal_after_partner: config.signal_after_partner, ..Style::STEADY },
+                seed,
+            ),
             note: String::new(),
         }
     }
@@ -308,7 +319,14 @@ impl SearchBot {
         let mut scored: Vec<(Action, f64)> = result.stats.iter().map(|s| (s.action, s.ev)).collect();
         scored.sort_by(|a, b| b.1.total_cmp(&a.1));
         let top = scored[0].1;
-        let pick = (0..scored.len()).filter(|&i| top - scored[i].1 < 0.5).min_by_key(|&i| cost(&scored[i].0)).unwrap();
+        let near = (0..scored.len()).filter(|&i| top - scored[i].1 < 0.5);
+        let declaring_lead = obs.current_trick.as_ref().is_some_and(|t| t.cards().is_empty())
+            && obs.contract.is_some_and(|(d, _)| d.team() == obs.seat.team());
+        let pick = if self.config.lead_winners && declaring_lead {
+            near.max_by_key(|&i| cost(&scored[i].0)).unwrap()
+        } else {
+            near.min_by_key(|&i| cost(&scored[i].0)).unwrap()
+        };
         scored[..=pick].rotate_right(1);
         scored
     }

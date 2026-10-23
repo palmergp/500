@@ -189,6 +189,8 @@ version = "0.1.0"
 dependencies = [
  "fh-ai",
  "fh-core",
+ "fh-wasm",
+ "serde_json",
 ]
 
 [[package]]

@@ -11,10 +11,12 @@ interface Props {
   /** Grades still being worked out by the coach. */
   pending: number;
   onClose: () => void;
+  onReplay?: (at: number, label: string) => void;
+  onCode?: (at: number) => void;
 }
 
 /** The coach's grades for your decisions so far, during the hand: this deal or the whole game. */
-export function DecisionsDialog({ grades, deal, pending, onClose }: Props) {
+export function DecisionsDialog({ grades, deal, pending, onClose, onReplay, onCode }: Props) {
   const thisDeal = grades.filter((g) => g.deal === deal);
   const [scope, setScope] = useState<"deal" | "game">(thisDeal.length > 0 || grades.length === 0 ? "deal" : "game");
   const deals = [...new Set(grades.map((g) => g.deal))].sort((a, b) => b - a);
@@ -30,14 +32,14 @@ export function DecisionsDialog({ grades, deal, pending, onClose }: Props) {
       </div>
       {pending > 0 && <p className="note">The coach is still grading your last {pending === 1 ? "decision" : `${pending} decisions`}…</p>}
       {scope === "deal" ? (
-        <DecisionList grades={thisDeal} />
+        <DecisionList grades={thisDeal} onReplay={onReplay} onCode={onCode} />
       ) : grades.length === 0 ? (
         <DecisionList grades={[]} />
       ) : (
         deals.map((d) => (
           <section key={d} className="decision-deal">
             <h3>{d === deal ? "This hand" : `Deal ${d}`}</h3>
-            <DecisionList grades={grades.filter((g) => g.deal === d)} />
+            <DecisionList grades={grades.filter((g) => g.deal === d)} onReplay={onReplay} onCode={onCode} />
           </section>
         ))
       )}
