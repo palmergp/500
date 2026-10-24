@@ -33,6 +33,9 @@ mod lastdiscard;
 mod kittyplan;
 mod jokerplace;
 mod dealerjoker;
+mod kittysearch;
+mod hintcheck;
+mod plays;
 mod playdata;
 mod duel;
 mod sim;
@@ -100,6 +103,24 @@ fn main() {
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "plays" => plays::run(
+            flag(&flags, "deals", 2000),
+            flag(&flags, "seed", 3_100_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "hintcheck" => hintcheck::run(
+            flag(&flags, "deals", 600),
+            flag(&flags, "seed", 2_900_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flag(&flags, "reference", 256) as usize,
+        ),
+        "kittysearch" => kittysearch::run(
+            flag(&flags, "deals", 6000),
+            flag(&flags, "seed", 2_800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flag(&flags, "worlds", 24) as usize,
+            flag(&flags, "top", 5) as usize,
         ),
         "dealerjoker" => dealerjoker::run(
             flag(&flags, "deals", 20000),

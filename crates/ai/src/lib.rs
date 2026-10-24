@@ -8,6 +8,7 @@ pub mod evaluate;
 pub mod features;
 pub mod models;
 pub mod neural_play;
+pub mod guide_bot;
 pub mod nn;
 pub mod personas;
 pub mod rule_bot;

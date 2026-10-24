@@ -139,6 +139,21 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { signal_allowance: 25.0, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (signals at up to 25 points)", config, seed)));
         }
+        // The guide's bidding (docs/rules-of-thumb.md) with The Counter's play, and variants that
+        // drop one rule (docs/lab/README.md: the guide as a whole).
+        guide if guide.starts_with("guide") => {
+            use crate::guide_bot::{GuideBot, GuideRules};
+            let all = GuideRules::ALL;
+            let rules = match guide {
+                "guide" => all,
+                "guide-noauction" => GuideRules { auction: false, ..all },
+                "guide-nine" => GuideRules { stop_at_eight: false, ..all },
+                "guide-overcalls" => GuideRules { cautious_overcalls: false, ..all },
+                "guide-nosignals" => GuideRules { signals: false, ..all },
+                _ => return None,
+            };
+            return Some(Box::new(GuideBot::new("The guide", rules, seed)));
+        }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));

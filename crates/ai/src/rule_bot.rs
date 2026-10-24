@@ -341,6 +341,12 @@ impl KittyWeights {
 }
 
 pub fn set_discards_with(hand: CardSet, trump: Option<Suit>, count: usize, w: KittyWeights) -> Vec<Card> {
+    ranked_discards(hand, trump, count, w).into_iter().next().expect("a set")
+}
+
+/// Every kitty plan `set_discards` considers, best first by its score (for a search to choose among
+/// the top few). With too few side cards there's just the one plan.
+pub fn ranked_discards(hand: CardSet, trump: Option<Suit>, count: usize, w: KittyWeights) -> Vec<Vec<Card>> {
     let trumpish = |c: Card| is_trump(c, trump) || c.is_joker();
     let side: Vec<Card> = hand.iter().filter(|&c| !trumpish(c)).collect();
     if side.len() <= count || count == 0 || count > 3 {
@@ -352,7 +358,7 @@ pub fn set_discards_with(hand: CardSet, trump: Option<Suit>, count: usize, w: Ki
             rest.remove(card);
             out.push(card);
         }
-        return out;
+        return vec![out];
     }
     let trumps = hand.iter().filter(|&c| trumpish(c)).count();
     let void_worth = w.void_scale
@@ -377,27 +383,25 @@ pub fn set_discards_with(hand: CardSet, trump: Option<Suit>, count: usize, w: Ki
         void_worth * voids as f64 + w.singleton * singles as f64 - lost
     };
     let rank_sum = |set: &[Card]| set.iter().map(|c| c.rank() as u32).sum::<u32>();
-    let mut best: Option<(Vec<Card>, f64)> = None;
-    let mut consider = |set: Vec<Card>| {
-        let s = score(&set);
-        let better = match &best {
-            None => true,
-            Some((b, bs)) => s > *bs + 1e-9 || ((s - bs).abs() < 1e-9 && rank_sum(&set) < rank_sum(b)),
-        };
-        if better {
-            best = Some((set, s));
-        }
-    };
+    let mut all: Vec<(Vec<Card>, f64)> = Vec::new();
     let n = side.len();
     match count {
-        1 => (0..n).for_each(|i| consider(vec![side[i]])),
-        2 => (0..n).for_each(|i| (i + 1..n).for_each(|j| consider(vec![side[i], side[j]]))),
-        _ => (0..n).for_each(|i| (i + 1..n).for_each(|j| (j + 1..n).for_each(|k| consider(vec![side[i], side[j], side[k]])))),
+        1 => (0..n).for_each(|i| all.push((vec![side[i]], 0.0))),
+        2 => (0..n).for_each(|i| (i + 1..n).for_each(|j| all.push((vec![side[i], side[j]], 0.0)))),
+        _ => (0..n).for_each(|i| (i + 1..n).for_each(|j| (j + 1..n).for_each(|k| all.push((vec![side[i], side[j], side[k]], 0.0))))),
     }
-    let mut set = best.expect("a set").0;
-    // Put back the cheapest first (the order the discards are made in).
-    set.sort_by_key(|&c| (keep_value(c, hand, trump), c.id()));
-    set
+    for (set, s) in all.iter_mut() {
+        *s = score(set);
+    }
+    // Best first; ties to the lower cards.
+    all.sort_by(|a, b| b.1.total_cmp(&a.1).then(rank_sum(&a.0).cmp(&rank_sum(&b.0))));
+    all.into_iter()
+        .map(|(mut set, _)| {
+            // Put back the cheapest first (the order the discards are made in).
+            set.sort_by_key(|&c| (keep_value(c, hand, trump), c.id()));
+            set
+        })
+        .collect()
 }
 
 /// The kitty plan the bots and the coach use: judged as a set in a suit bid (`set_discards`,
