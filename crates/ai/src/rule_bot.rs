@@ -154,7 +154,9 @@ impl RuleBot {
     }
 
     fn discard(&self, obs: &Observation) -> Action {
-        Action::Discard(heuristic_discards(obs.hand, obs.trump(), 1)[0])
+        // The plan for all the discards still to make, so the set is judged as a whole.
+        let left = obs.hand.len().saturating_sub(10).max(1);
+        Action::Discard(heuristic_discards(obs.hand, obs.trump(), left)[0])
     }
 
     fn play(&mut self, obs: &Observation, legal: &[Action]) -> Action {
@@ -313,7 +315,103 @@ fn nt_keep_value(card: Card, hand: CardSet) -> i32 {
 }
 
 /// The `count` cards to discard from `hand`, chosen greedily by [`keep_value`].
+/// The kitty plan for a suit bid, judged as a whole set rather than one card at a time: each side
+/// suit emptied is worth about 0.4 tricks (more with more trumps: findings 16 and 38), and each card
+/// put back costs roughly what it's worth to keep (aces always kept; a king about 0.15, a queen
+/// 0.05, low cards nothing; a guard is no reason to keep a king). Ties go to the lower cards.
+/// Choosing one card at a time missed voids: with K♠ 5♠ and K♣ J♣ it put back 5♠ and J♣, then
+/// saw two bare kings as worthless and threw a heart, making no void at all.
+pub fn set_discards(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Card> {
+    set_discards_with(hand, trump, count, KittyWeights::DEFAULT)
+}
+
+/// The weights `set_discards` judges a kitty plan by (tuned in the lab: `fh-lab kittyplan`).
+#[derive(Clone, Copy, Debug)]
+pub struct KittyWeights {
+    /// Multiplies the measured worth of a void (0.33 / 0.43 / 0.52 tricks by trump length).
+    pub void_scale: f64,
+    pub king: f64,
+    pub queen: f64,
+    /// For each side suit cut to a single card.
+    pub singleton: f64,
+}
+
+impl KittyWeights {
+    pub const DEFAULT: KittyWeights = KittyWeights { void_scale: 1.5, king: 0.15, queen: 0.05, singleton: 0.1 };
+}
+
+pub fn set_discards_with(hand: CardSet, trump: Option<Suit>, count: usize, w: KittyWeights) -> Vec<Card> {
+    let trumpish = |c: Card| is_trump(c, trump) || c.is_joker();
+    let side: Vec<Card> = hand.iter().filter(|&c| !trumpish(c)).collect();
+    if side.len() <= count || count == 0 || count > 3 {
+        // Too few side cards: all of them, then the lowest trumps (as before).
+        let mut out: Vec<Card> = side.iter().copied().take(count).collect();
+        let mut rest = hand.minus(out.iter().copied().collect());
+        while out.len() < count {
+            let card = rest.iter().min_by_key(|&c| (keep_value(c, rest, trump), c.id())).expect("cards to discard");
+            rest.remove(card);
+            out.push(card);
+        }
+        return out;
+    }
+    let trumps = hand.iter().filter(|&c| trumpish(c)).count();
+    let void_worth = w.void_scale
+        * match trumps {
+            0..=5 => 0.33,
+            6 => 0.43,
+            _ => 0.52,
+        };
+    let worth = |c: Card| match c.rank() {
+        ACE => 1.0,
+        KING => w.king,
+        QUEEN => w.queen,
+        _ => 0.0,
+    };
+    let length = |set: &[Card], suit: Option<Suit>| side.iter().filter(|c| effective_suit(**c, trump) == suit && !set.contains(c)).count();
+    let score = |set: &[Card]| {
+        let lost: f64 = set.iter().map(|&c| worth(c)).sum();
+        let mut suits: Vec<Option<Suit>> = set.iter().map(|&c| effective_suit(c, trump)).collect();
+        suits.dedup();
+        let voids = suits.iter().filter(|&&s| length(set, s) == 0).count();
+        let singles = suits.iter().filter(|&&s| length(set, s) == 1).count();
+        void_worth * voids as f64 + w.singleton * singles as f64 - lost
+    };
+    let rank_sum = |set: &[Card]| set.iter().map(|c| c.rank() as u32).sum::<u32>();
+    let mut best: Option<(Vec<Card>, f64)> = None;
+    let mut consider = |set: Vec<Card>| {
+        let s = score(&set);
+        let better = match &best {
+            None => true,
+            Some((b, bs)) => s > *bs + 1e-9 || ((s - bs).abs() < 1e-9 && rank_sum(&set) < rank_sum(b)),
+        };
+        if better {
+            best = Some((set, s));
+        }
+    };
+    let n = side.len();
+    match count {
+        1 => (0..n).for_each(|i| consider(vec![side[i]])),
+        2 => (0..n).for_each(|i| (i + 1..n).for_each(|j| consider(vec![side[i], side[j]]))),
+        _ => (0..n).for_each(|i| (i + 1..n).for_each(|j| (j + 1..n).for_each(|k| consider(vec![side[i], side[j], side[k]])))),
+    }
+    let mut set = best.expect("a set").0;
+    // Put back the cheapest first (the order the discards are made in).
+    set.sort_by_key(|&c| (keep_value(c, hand, trump), c.id()));
+    set
+}
+
+/// The kitty plan the bots and the coach use: judged as a set in a suit bid (`set_discards`,
+/// finding 40), card by card in no trumps (`nt_keep_value`, finding 23).
 pub fn heuristic_discards(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Card> {
+    if trump.is_some() {
+        set_discards(hand, trump, count)
+    } else {
+        greedy_discards(hand, trump, count)
+    }
+}
+
+/// One card at a time, the lowest `keep_value` first (the suit-bid plan before finding 40).
+pub fn greedy_discards(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Card> {
     let mut hand = hand;
     let mut out = Vec::with_capacity(count);
     for _ in 0..count.min(hand.len()) {
@@ -344,6 +442,43 @@ mod tests {
     use super::*;
     use crate::{play_out, RandomBot};
     use fh_core::{Game, Rules, Team};
+
+    /// A user's kitty (code X5MF-5PK6): 7♦ with K♠ 5♠, K♣ J♣ and four hearts. One card at a time put
+    /// back 5♠ J♣ 4♥, leaving two bare kings and no void; judged as a set, the plan empties a suit.
+    #[test]
+    fn the_kitty_plan_makes_a_void_rather_than_two_bare_kings() {
+        use fh_core::cards::{JACK, KING, QUEEN};
+        let c = |s: Suit, r: u8| Card::new(s, r);
+        let hand: CardSet = [
+            c(Suit::Spades, 5),
+            c(Suit::Spades, KING),
+            c(Suit::Clubs, JACK),
+            c(Suit::Clubs, KING),
+            c(Suit::Diamonds, 5),
+            c(Suit::Diamonds, 7),
+            c(Suit::Diamonds, 10),
+            c(Suit::Diamonds, JACK),
+            c(Suit::Diamonds, KING),
+            c(Suit::Hearts, 4),
+            c(Suit::Hearts, 5),
+            c(Suit::Hearts, 6),
+            c(Suit::Hearts, QUEEN),
+        ]
+        .into_iter()
+        .collect();
+        let trump = Some(Suit::Diamonds);
+        let plan: CardSet = heuristic_discards(hand, trump, 3).into_iter().collect();
+        let left = hand.minus(plan);
+        let void = [Suit::Spades, Suit::Clubs].iter().any(|&s| left.iter().all(|x| x.suit() != Some(s)));
+        assert!(void, "plan {plan} leaves {left}");
+        // Asked one discard at a time (as the bots and the coach do), the plan holds together.
+        let mut rest = hand;
+        for left in (1..=3).rev() {
+            let card = heuristic_discards(rest, trump, left)[0];
+            assert!(plan.contains(card), "{card} isn't in {plan}");
+            rest.remove(card);
+        }
+    }
 
     fn rule_bots() -> [Box<dyn Bot>; 4] {
         std::array::from_fn(|_| Box::new(RuleBot::new("Steady", Style::STEADY, 0)) as Box<dyn Bot>)

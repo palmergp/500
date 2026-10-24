@@ -736,6 +736,38 @@ Within 0.1 trick either way, and the two plans tie on about 70% of deals. With a
 ace alone is slightly better; with three, shortening the long suit is. The coach's plan puts back the card beside
 the ace 86% of the time. The two discards that make the void are what count (finding 16).
 
+### 40. The kitty plan, judged as a set: +0.19 tricks where it differs
+
+The user's hand (code X5MF-5PK6): 7♦ with K♠ 5♠, K♣ J♣, Q♥ 6♥ 5♥ 4♥ and five trumps. Every three-card discard
+scored on 120 likely deals:
+
+| Put back | Tricks | Bid made |
+|---|---|---|
+| J♣ K♣ 5♠ (void ♣, K♠ alone) | 7.85 | 77% |
+| Any club or spade void, plus a low heart | 7.76 | 73–74% |
+| Three low hearts (Q♥ alone) | 7.46 | 62% |
+| The coach's plan then: 5♠ J♣ 4♥ (two bare kings, no void) | 7.38 | 58% |
+
+The plan chose one card at a time: 5♠ first, after which K♠ was alone and no longer "guarded", so cheap; J♣ the
+same; then a low heart. It never saw that K♣ J♣ together make a void. The new plan (`set_discards`) scores whole
+sets: each void is worth its measured value (0.33 / 0.43 / 0.52 tricks by trump length, finding 16) times 1.5, each
+suit cut to one card 0.1, and each card put back what it's worth to keep (ace 1, king 0.15, queen 0.05, lower 0).
+The weights were tuned by `fh-lab kittyplan` on 15,000 deals and checked on 40,000 fresh ones (solver, every card
+visible):
+
+| Plan | Tricks | Bid made |
+|---|---|---|
+| One card at a time | 7.80 | 69% |
+| As a set | **8.00** | **73%** |
+
+The plans differ on 25% of declared hands (+0.19 ± 0.03 tricks there, about +0.05 a declared hand overall). The
+bots and the coach use it for suit bids; no trumps keeps its own plan (finding 23). For this hand it now says
+5♠ K♠ J♣: void spades.
+
+**The principle:** empty a short suit before you shorten a long one. Putting back three low hearts left a singleton
+Q♥, a loser the first time hearts are led, and kept both kings as losers in their two-card suits; the void lets you
+trump that suit from its first lead, and the king you put back was rarely a trick anyway (0.15).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
