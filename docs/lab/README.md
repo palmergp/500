@@ -896,6 +896,24 @@ things worse, so the thresholds are right for the count; the network's edge is i
 guide's other rules only the signals showed a likely gain; the auction values and the overcall rule were within
 noise of nothing (they may matter more against players who read them than against bots).
 
+### 47. The coach's percentages, recalibrated
+
+*Measured by `fh-lab honesty` (2,000 hands of Oracle play each).* After the set kitty plan (finding 40), cheap
+signals (36), passing after partner's call (35) and the retrained bidding network (43), the coach had drifted to
+optimistic: bids stated 75% on average and 68% made, card play 77% and 72% (seed 4,200,000; bids stated 60–70% made
+53%). Both real-play curves (`BID_CURVE`, `PLAY_CURVE` in `crates/ai/src/coach.rs`) were refit by mapping each old
+point through the measured stated-to-actual table, and checked on fresh deals (seed 4,300,000):
+
+| | Stated | Made |
+|---|---|---|
+| Bids, before | 75% | 68% |
+| Bids, after (fresh deals) | **69%** | **70%** |
+| Card play, before | 77% | 72% |
+| Card play, after (fresh deals) | **72%** | **73%** |
+
+Every band with a few hundred predictions now matches within about 5 points. The coach's choices don't change:
+it ranks options by expected points; the curves only translate its chances for display.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

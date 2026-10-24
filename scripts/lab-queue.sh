@@ -36,4 +36,6 @@ run duel-guide-bolder duel --a guide-bolder --b guide --deals 1000 --seed 390000
 run duel-guide-boldest duel --a guide-boldest --b guide --deals 1000 --seed 4000000
 # 4. With the retrained bidding network embedded: are the coach's stated chances still honest?
 run honesty-v3 honesty --deals 2000 --seed 4200000
+# 5. The refitted real-play curves, on fresh deals.
+run honesty-v3-check honesty --deals 2000 --seed 4300000
 echo "queue finished $(date +%H:%M)"

@@ -576,20 +576,21 @@ fn significant(play: Option<&PlayStats>, best: Action, chosen: Action) -> bool {
 /// real defenders aren't perfect, so a bid the solver calls 15% is really made about half the
 /// time. Bid estimates also run low, by about 10 points.
 const PLAY_CURVE: &[(f64, f64)] = &[
-    // Refit after finding 21 (card play without auction weights): 6,200 predictions from
-    // `fh-lab honesty` runs at seeds 950,000 and 1,200,000.
-    (0.000, 0.03),
-    (0.010, 0.08),
-    (0.036, 0.43),
-    (0.071, 0.445),
-    (0.103, 0.554),
-    (0.140, 0.617),
-    (0.200, 0.634),
-    (0.385, 0.732),
-    (0.617, 0.836),
-    (0.810, 0.903),
-    (0.990, 0.986),
-    (1.000, 0.99),
+    // Refit after finding 47 (the set kitty plan, cheap signals, the retrained bidding network):
+    // 3,954 predictions from `fh-lab honesty --seed 4200000`, each old point mapped through the
+    // measured stated-to-actual table.
+    (0.000, 0.11),
+    (0.010, 0.131),
+    (0.036, 0.281),
+    (0.071, 0.288),
+    (0.103, 0.526),
+    (0.140, 0.572),
+    (0.200, 0.581),
+    (0.385, 0.656),
+    (0.617, 0.782),
+    (0.810, 0.871),
+    (0.990, 0.976),
+    (1.000, 0.98),
 ];
 /// Card-play positions whose sampled deals are remembered (see `Coach::play_result`).
 const PLAY_CACHE_SIZE: usize = 6;
@@ -599,16 +600,17 @@ thread_local! {
 }
 
 const BID_CURVE: &[(f64, f64)] = &[
-    (0.00, 0.05),
-    (0.27, 0.33),
-    (0.36, 0.48),
-    (0.45, 0.59),
-    (0.55, 0.69),
-    (0.65, 0.74),
-    (0.75, 0.83),
-    (0.84, 0.92),
-    (0.91, 0.94),
-    (1.00, 0.97),
+    // Refit after finding 47: 1,993 bid predictions, as for PLAY_CURVE.
+    (0.00, 0.06),
+    (0.27, 0.34),
+    (0.36, 0.452),
+    (0.45, 0.52),
+    (0.55, 0.603),
+    (0.65, 0.65),
+    (0.75, 0.756),
+    (0.84, 0.87),
+    (0.91, 0.89),
+    (1.00, 0.92),
 ];
 
 /// Whether the tricks already taken settle the bid: `Some(true)` made, `Some(false)` beaten.
@@ -1218,7 +1220,7 @@ mod tests {
         }
         assert!((0.55..0.7).contains(&real_play_chance(0.15, PLAY_CURVE)));
         assert!(real_play_chance(0.2, PLAY_CURVE) > 0.5, "a 20% solver chance is made more often than not");
-        assert!((real_play_chance(0.65, BID_CURVE) - 0.74).abs() < 1e-9);
+        assert!((real_play_chance(0.65, BID_CURVE) - 0.65).abs() < 1e-9);
     }
 
     /// Slips are tagged by kind, so the trainer can find a player's recurring leaks.
