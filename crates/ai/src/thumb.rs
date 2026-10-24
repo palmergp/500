@@ -195,6 +195,13 @@ fn auction_adjustments(obs: &Observation, strain: Strain) -> Vec<(String, f32)> 
     if dealer && !opponents_showed {
         out.push(("speaking last".into(), if nt { 0.6 } else { 0.5 }));
     }
+    // Speaking last, with nobody having bid or called 6, and without the Joker yourself: whoever held
+    // it would usually have bid, or called 6, so it's in the kitty about four times in five, and
+    // your count runs about 1¼ tricks low (finding 41; measured for suit bids).
+    let quiet = !obs.auction.calls().any(|(_, c)| matches!(c, Call::Six(_) | Call::Bid(_)));
+    if dealer && quiet && !nt && !obs.hand.contains(Card::JOKER) && obs.auction.calls().count() == 3 {
+        out.push(("nobody showed the Joker: probably in the kitty".into(), 1.25));
+    }
     out
 }
 

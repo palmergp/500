@@ -31,6 +31,8 @@ mod show;
 mod kxkitty;
 mod lastdiscard;
 mod kittyplan;
+mod jokerplace;
+mod dealerjoker;
 mod playdata;
 mod duel;
 mod sim;
@@ -97,6 +99,16 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "dealerjoker" => dealerjoker::run(
+            flag(&flags, "deals", 20000),
+            flag(&flags, "seed", 2_700_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "jokerplace" => jokerplace::run(
+            flag(&flags, "deals", 30000),
+            flag(&flags, "seed", 2_600_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "kittyplan" => kittyplan::run(

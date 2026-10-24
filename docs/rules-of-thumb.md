@@ -157,10 +157,14 @@ Add these to your count for the strain you're considering:
 | An opponent mentioned NT | **0** | (this strain: above) |
 | An opponent bid this strain | **−2** | **−2** |
 | You speak last (dealer), with no opposing bid, mention or 6 in this strain | **+½** | **+0.6** |
+| You speak last, nobody has bid or called 6, and you don't hold the Joker (it's probably in the kitty) | **+1¼** | |
 
 *Source: solver data* (±0.02–0.1 tricks), measured against partner not having called yet (finding 37).
 
 - **Partner's pass is real information.** It costs a trick, so don't stretch to bid after partner has passed.
+- **Speaking last after a quiet auction, the Joker is probably in the kitty.** Under the 6-call convention the
+  first two callers would have shown it, and a third caller holding it would usually have bid. Without it yourself,
+  it's in the kitty about four times in five: add 1¼ (finding 41).
 - **Partner's mention of another suit costs too** (−⅔): partner's strength is somewhere else. An opponent's mention
   of another suit helps a little (+¼): their strength isn't in yours. An opponent's NT mention makes no difference
   on average to a suit bid.

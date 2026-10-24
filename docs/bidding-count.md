@@ -111,6 +111,7 @@ Add or subtract these for what the other three players have called. (Your own ca
 | An opponent mentioned NT | 0 | (this strain: above) |
 | An opponent bid this strain | −2 | −2 |
 | You speak last (dealer), with no opposing bid, mention or 6 in this strain | +½ | +0.6 |
+| **You speak last, nobody has bid or called 6, and you don't hold the Joker** (it's probably in the kitty) | **+1¼** | |
 
 ---
 

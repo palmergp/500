@@ -768,6 +768,28 @@ bots and the coach use it for suit bids; no trumps keeps its own plan (finding 2
 Q♥, a loser the first time hearts are led, and kept both kings as losers in their two-card suits; the void lets you
 trump that suit from its first lead, and the king you put back was rarely a trick anyway (0.15).
 
+### 41. Speaking last after a quiet auction: the Joker is probably in the kitty
+
+The user asked: last to call, everyone passed or mentioned, so where's the Joker? Under the convention (call 6 with
+the Joker unless partner has already called), the first two callers would have shown it; the third, whose partner
+has called, wouldn't. So it's with the right-hand opponent or in the kitty. On card counts alone that's 10 to 3 for
+the opponent, but a player with the Joker usually bids.
+
+*Measured by `fh-lab dealerjoker` over 120,000 deals of Oracle auctions,* the dealer (South) without the Joker,
+its best suit solved with South declaring (kitty taken):
+
+| | n | Tricks less the network's estimate | Less the count |
+|---|---|---|---|
+| Any auction (every fifth deal, for reference) | 18,308 | +0.09 | −0.25 |
+| **Nobody bid or called 6** | **1,899** | **+0.33** | **+1.03** |
+| …the Joker in the kitty (81%) | 1,536 | +0.65 | +1.36 |
+| …the Joker with the right-hand opponent (19%) | 363 | −1.02 | −0.39 |
+
+Where the Joker is matters by two tricks (`fh-lab jokerplace`: with partner or in the kitty +0.8, with an opponent
+−1.3, against the count). In a quiet auction it's in the kitty four times in five, and the count ran 1.3 tricks low
+against its usual error. **The count now adds 1¼ there** (suit bids, without the Joker yourself). The bidding network
+was only about ¼ trick low.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

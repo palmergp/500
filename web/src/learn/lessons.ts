@@ -165,6 +165,7 @@ export const LESSONS: Lesson[] = [
       "• Partner passed: −1 (−1.6 in no trumps). Their pass is real information: don't stretch after it.",
       "• An opponent called 6 in your suit: −1 (they hold the Joker and length there). In your left bower's suit: −0.4. In another suit: −⅛. An opponent mentioned your strain: −½; another suit: +¼ (their strength isn't in yours); NT: no change. An opponent bid your strain: −2.",
       "• Speaking last as dealer, with no opposing interest in your strain: +½.",
+      "• Speaking last when nobody has bid or called 6, without the Joker yourself: +1¼ more. The first two callers would have shown the Joker, and a third holding it would usually have bid, so it's in the kitty about four times in five.",
       "## Compete, and trust partner",
       "The neural bidder (The Oracle) declares about twice as often as the rule-based expert and scores 12 points a hand more: bid when the count says it pays, even if you go down a little more often. But don't pull partner out of their suit into yours: raise it or pass.",
       "## Signal when you can't bid",
