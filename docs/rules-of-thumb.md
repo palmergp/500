@@ -51,10 +51,12 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    four, lead a side ace or a singleton first.
     - **In no trumps,** cash side winners and keep the Joker.
 10. **Don't rush the Joker.** The expert usually plays it in tricks 3–5.
-11. **Second hand low,** almost always in no trumps.
+11. **Second hand low,** almost always in no trumps. **Third hand high, and cover an honour with an honour:** each worth
+    almost half a trick.
+    - In a suit bid, second hand, winning cheaply when you can is as good or better (finding 45).
 12. **Trump the opponents' winners, not your partner's.** Do protect partner's trick when someone can still beat it.
 13. **On defense, lead a side ace if you have one.** Never a low trump, and partner's mention isn't a reason to lead that suit.
-14. **Holding the Joker but no bid? Call 6.** It's worth ¾ of a trick to your partner.
+14. **Holding the Joker but no bid? Call 6** (unless partner has already called). It's worth up to 1⅓ tricks to your partner.
 15. **Kitty discards come from your shortest side suits,** to make a void.
 
 **Signals and counting**
@@ -339,6 +341,10 @@ you, leading trump gives them the lead to attack your side suits. Take your side
 - With four or fewer, cash a side ace first.
 - A **small** trump is almost never the right opening lead (best only 21–30% of the time). There's one exception, in rule 9a.
 
+**After the first lead: draw trumps, then cash winners.** With every card visible (finding 45), a trump lead beat
+the best side lead while the opponents still held trumps, most when they held one or two (+0.09 and +0.05 tricks;
++0.01 with three or more). Once they're out of trumps, cash a side winner (+0.05, best or tied 99% of the time).
+
 ### 9a. If partner called 6, a small trump becomes a good lead
 
 When partner showed the Joker, leading a **small trump** was the best opening lead **62%** of the time, against about 25% normally (cost 8). A side ace was close (cost 5).
@@ -383,6 +389,18 @@ When following suit second, the expert plays low:
 
 Save your high cards for when they capture something.
 
+**Checked with every card visible** (`fh-lab plays`, 2,000 hands; finding 45), the plays around it:
+
+| Rule | Decisions | Tricks it gains | Its card best (or tied) |
+|---|---|---|---|
+| **Third hand high:** partner led, the declarer's side is winning: play the cheapest card that wins | 125 | **+0.46** | 99% |
+| **Cover an honour with an honour:** the declarer's side led a J, Q or K and you can beat it | 188 | **+0.43** | 99% |
+| Second hand low (against the cheapest card that would win), in a suit bid | 802 | −0.15 | 83% |
+
+Third hand high and covering an honour are near-certain. Second hand low is the expert's habit, but with every card
+visible taking the trick cheaply did a little better. Ducking's real value, making the declarer guess, is the one
+thing a solver that sees every card can't show, so take this one as a toss-up rather than a reversal.
+
 ### 12. Trump the opponents' winners, not your partner's
 
 When you can't follow suit:
@@ -405,6 +423,8 @@ The defenders' first lead in a suit bid:
 | The Joker | 23% | 36 |
 | A low trump | 17% | **44** |
 
+- **Leading a trump costs about a fifth of a trick** (−0.21 against the best side lead, 1,562 leads; finding 45).
+  Returning partner's suit or leading their signalled suit were about even with the best other lead.
 - **Partner's mention isn't a lead signal.** Leading partner's mentioned suit is no better than average: the mention helps you bid, not lead. Partner's **discard signal** (rule 16) is the lead-directing one.
 - *(The Counter's habits lean toward low side cards, 50% of its first leads. The full lead analysis prefers the ace.)*
 

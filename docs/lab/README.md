@@ -817,6 +817,85 @@ Not adopted:
   8–9, −1.0 at 9+, in both data sets). The thresholds were fitted on the count as it is, and the guide already says
   stop at 8, so the count isn't changed; the guide says why.
 
+### 43. The bidding network, retrained under today's conventions
+
+*Fresh data: `fh-lab dataset --bidder oracle`, 30,000 deals in six chunks (120,000 decisions), with the bots as they
+now bid and signal (no 6-calls or mentions after partner's call, cheap signals, the set kitty plan).* Two networks
+were trained (`train/train_bid.py`) and compared with the old one on the same 12,000 held-out fresh decisions:
+
+| Network | Log loss | Error | Bias | 8+ tricks: stated / actual |
+|---|---|---|---|---|
+| The old one | 1.983 | 1.530 | −0.11 | 33.2% / 35.0% |
+| Fresh data only | 1.971 | 1.515 | −0.08 | 33.4% / 35.0% |
+| **Fresh and old data** | **1.969** | **1.514** | **−0.03** | **34.7% / 35.0%** |
+
+In play (duplicate, 2,000 deals, `oracle-altnet` against the Oracle) the new one made no difference: −0.4 a hand
+(−4.6 to +3.8). It's embedded anyway, since what it states (the coach's percentages) is more honest. The lab variant
+`oracle-altnet` bids with any network named by `FH_ALT_BID_MODEL`.
+
+### 44. How often a card-play hint is wrong
+
+*Measured by `fh-lab hintcheck`: 600 hands of Counter play; one of South's plays each (a random trick with a choice)
+gets the coach's hint and a 256-deal look from the same belief.*
+
+| Decisions | n | Same card as the deep look | Points given up | Off by 5+ | Hint time (native) |
+|---|---|---|---|---|---|
+| All | 406 | 88% | 0.9 | 5% | 0.6 s |
+| Following suit | 295 | 96% | 0.3 | 2% | 0.4 s |
+| **Leading** | 111 | **69%** | **2.6** | 15% | 1.0 s |
+| 2–4 legal cards | 250 | 96–99% | 0.1–0.4 | 1–2% | 0.3–0.5 s |
+| 5+ legal cards | 156 | 73% | 2.1 | 12% | 0.9 s |
+| Trick 1 | 39 | 87% | 1.7 | 8% | 3.1 s |
+| Tricks 8–10 | 94 | 99% | 0.2 | 1% | under 0.01 s |
+
+Hints are reliable when following suit and late in the hand; leads with many cards are where they differ from a
+deeper look, by 2.6 expected points on average. Those already take the closer look (96 deals): forcing it changed
+nothing. The rest is the gap between 96 and 256 deals, part of it the deep look's own noise; closing it would mean
+two or three times the wait on the first trick.
+
+### 45. Card-play rules, checked with the solver
+
+*Measured by `fh-lab plays`: 2,000 hands of Counter play; at each decision fitting a rule, the real position solved
+with every card visible, the rule's card against the best card it rules out (for second hand low, against the
+cheapest card that would win).*
+
+| Rule | Decisions | Tricks the rule gains | Its card best (or tied) |
+|---|---|---|---|
+| Defence: third hand high (cheapest winner, vs low) | 125 | **+0.46** | 99% |
+| Defence: cover an honour with an honour (vs ducking) | 188 | **+0.43** | 99% |
+| Declarer: draw trumps, opponents holding 1 | 976 | +0.09 | 92% |
+| Declarer: draw trumps, opponents holding 2 | 982 | +0.05 | 89% |
+| Declarer: draw trumps, opponents holding 3+ | 3,625 | +0.01 | 89% |
+| Declarer: opponents out of trumps, cash a side winner | 963 | +0.05 | 99% |
+| Defence: lead partner's signalled suit | 733 | −0.05 | 91% |
+| Defence: return partner's first-led suit | 373 | −0.05 | 88% |
+| Defence: second hand low (vs the cheapest winner), suit bids | 802 | −0.15 | 83% |
+| Defence: lead a trump (vs the best side lead) | 1,562 | **−0.21** | 78% |
+
+Seeing every card favours plays that don't depend on the opponents guessing, so second hand low (whose value is
+the declarer's guess) is understated; the others are clear. The guide's rules 9, 11 and 13 now say so.
+
+### 46. The guide as a bot: its thresholds are right; the gap is judgment
+
+*Measured by `duel`, 1,000 deals each.* `guide` bids strictly by the guide (the count, its thresholds, the auction
+values, 6-calls and mentions, stop at 8) and plays like The Counter.
+
+| Match | Gain per hand (95% CI) | Declared: first / second | Made |
+|---|---|---|---|
+| The guide vs the Oracle (same play) | **−17.3** (−24.2 to −10.5) | 35% / 65% | 75% / 74% |
+| Guide ½ trick bolder vs the guide | −7.6 (−14.1 to −1.0) | 61% / 39% | 65% / 74% |
+| Guide 1 trick bolder vs the guide | −20.6 (−29.0 to −12.1) | 73% / 27% | 58% / 78% |
+| Guide 1½ tricks bolder vs the guide | −57.7 (−67.9 to −47.4) | 83% / 17% | 47% / 76% |
+| The guide vs without the auction values | −2.3 (−7.1 to +2.6) | | |
+| The guide vs overcalling freely | −2.0 (−5.6 to +1.7) | | |
+| The guide vs without 6-calls and mentions | +3.4 (−0.2 to +6.9) | | |
+
+Bidding by the count costs about 17 points a hand against the network, which declares nearly twice as often at the
+same success rate: it finds the hands worth bidding that the count undervalues. Simply bidding more boldly makes
+things worse, so the thresholds are right for the count; the network's edge is in reading the whole hand. Of the
+guide's other rules only the signals showed a likely gain; the auction values and the overcall rule were within
+noise of nothing (they may matter more against players who read them than against bots).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
