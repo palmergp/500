@@ -24,6 +24,8 @@
 - `fh-lab duel --a counter --b steady --deals 200` (duplicate match), `fh-lab calibrate`, `fh-lab bench` — see `docs/lab/README.md`,
   where lab findings are recorded.
 - Search bots budget work in solver nodes, not time (no clock in wasm; keeps runs reproducible).
+- Long lab runs (hours) go in `scripts/lab-queue.sh` (`bash scripts/lab-queue.sh`): one after another, each saved as it
+  finishes, so after a restart rerunning it skips what's done. Datasets are generated in chunks for the same reason.
 - `fh-lab coach --seed N --south rookie` prints the coach's grades and reasons for a hand: use it to check explanations.
 - The coach's card-play analysis takes a closer look (up to 64 more deals) when its best play isn't clearly ahead of
   the next different play, and reports plays it still can't separate as close calls (`Analysis::close`), so a near
