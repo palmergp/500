@@ -790,6 +790,33 @@ Where the Joker is matters by two tricks (`fh-lab jokerplace`: with partner or i
 against its usual error. **The count now adds 1¼ there** (suit bids, without the Joker yourself). The bidding network
 was only about ¼ trick low.
 
+### 42. What the count misses, found by search
+
+*Measured by `train/mine_count.py` (candidate features against the count's error, each added to the full fit) on
+the old bidding data (444,000 suit decisions, rule bots bidding) and on fresh data (475,000, the Oracle bidding at
+all four seats, today's conventions); kept only where both agree, then checked by `fh-lab countcheck` (the count's
+error by situation on fresh Oracle auctions, real-play tricks from the solver).*
+
+| Situation | Old data | Fresh data | Count's error before | After |
+|---|---|---|---|---|
+| Partner bid another strain | +0.60 / +0.22 (by seat) | +0.58 / +0.63 | +0.63 | −0.01 |
+| Partner passed, and you hold the Joker | +0.27 | +0.23 | +0.29 | +0.09 |
+| A bare side ace (no other card in its suit) | −0.24 | −0.22 | −0.26 | −0.07 |
+
+The count now adds **+½ for partner's bid in another strain** (+1 for no trumps), makes partner's pass **−¾ when you
+hold the Joker**, takes **¼ off a bare side ace**, and in no trumps takes ¼ off **the Joker with two or more aces**
+(−0.31 / −0.26).
+
+Not adopted:
+- **Both opponents passed:** +0.6 in both fits, but −0.35 in the count's error on Oracle auctions (the dealer's
+  bonuses already cover much of it).
+- **The auction values in general:** refit on Oracle-only data they change a lot (partner's pass −0.4 instead of
+  −1), because the Oracle bids far more readily (it almost never calls 6: it bids). They depend on how the other
+  players bid, so the count keeps values from the mixed data. Likewise the dealer runs −0.3 against Oracle bidders.
+- **Strong hands are overcounted:** from a count of 8 each extra point is worth only about 0.4 trick (error −0.4 at
+  8–9, −1.0 at 9+, in both data sets). The thresholds were fitted on the count as it is, and the guide already says
+  stop at 8, so the count isn't changed; the guide says why.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

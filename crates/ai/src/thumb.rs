@@ -82,6 +82,17 @@ fn card_parts(hand: CardSet, strain: Strain) -> Vec<(String, f32)> {
                 singles += (cards.len() == 1) as usize;
             }
             add(plural(side_aces, "side ace"), 0.67 * side_aces as f32);
+            // A side ace with no other card in its suit is worth less than an ace plus a singleton
+            // (finding 42).
+            let bare_aces = Suit::ALL
+                .into_iter()
+                .filter(|&s| s != t)
+                .filter(|&s| {
+                    let cards: Vec<Card> = hand.iter().filter(|&c| effective_suit(c, trump) == Some(s)).collect();
+                    cards.len() == 1 && cards[0].rank() == ACE
+                })
+                .count();
+            add(plural(bare_aces, "bare side ace"), -0.25 * bare_aces as f32);
             add(plural_with(ace_kings, "side king", "beside its ace"), 0.33 * ace_kings as f32);
             add(plural_with(kings, "side king", "with 2+ guards"), 0.2 * kings as f32);
             add(plural_with(thin_kings, "side king", "with one guard"), 0.125 * thin_kings as f32);
@@ -120,6 +131,10 @@ fn card_parts(hand: CardSet, strain: Strain) -> Vec<(String, f32)> {
             add(plural_with(thin_kings, "king", "with one guard"), 0.33 * thin_kings as f32);
             add(plural(queens, "guarded queen"), 0.25 * queens as f32);
             add(plural(long, "long card"), 0.125 * long as f32);
+            // The Joker and the aces overlap: some of the tricks they'd each take are the same ones.
+            if hand.contains(Card::JOKER) && aces >= 2 {
+                add("Joker with 2+ aces".into(), -0.25);
+            }
         }
     }
     parts
@@ -164,7 +179,11 @@ fn auction_adjustments(obs: &Observation, strain: Strain) -> Vec<(String, f32)> 
             (true, Call::Mention(Strain::NoTrumps)) => push("partner's NT mention", -0.25),
             (true, Call::Mention(_)) => push("partner's mention of another suit", -0.67),
             (true, Call::Bid(c)) if c.strain == strain => push("partner's bid", 2.25),
+            // Holding the Joker, you know partner didn't pass for lack of it: the pass says less.
+            (true, Call::Pass) if obs.hand.contains(Card::JOKER) => push("partner passed (you hold the Joker)", if nt { -1.35 } else { -0.75 }),
             (true, Call::Pass) => push("partner passed", if nt { -1.6 } else { -1.0 }),
+            // Partner bid another strain: a strong hand, which helps yours too (finding 42).
+            (true, Call::Bid(_)) => push("partner's bid in another strain", if nt { 1.0 } else { 0.5 }),
             (false, Call::Six(s)) => {
                 if nt {
                     push("an opponent's 6-call", -0.4);

@@ -17,7 +17,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 1. **Count your hand in the suit you'd name trumps:**
    - Joker 1½, right bower 1¼, left bower 1;
    - trump ace ¾, king ⅔, queen ½, each other trump ½;
-   - side ace ⅔, side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕;
+   - side ace ⅔ (but ¼ less for an ace with no other card in its suit), side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕;
    - then **add 3** for partner and the kitty.
 2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and stop there: a 9 bid almost never
    pays, even at a count of 11.** Each extra level adds just 100 points, but falling one trick short costs both
@@ -25,7 +25,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 3. **Bid a little more than feels safe.** Timid bidding loses games under these rules.
 4. **Adjust for the auction:**
    - partner's 6-call in your suit +1⅓ (in the left bower's suit +0.6, in another +¼), partner's mention of your suit +0.4, partner's bid of it +2¼;
-   - partner's mention of another suit −⅔, partner's pass −1;
+   - partner's mention of another suit −⅔, partner's bid of another strain +½, partner's pass −1 (−¾ if you hold the Joker);
    - an opponent's 6-call in your suit −1 (in the left bower's suit −0.4), an opponent's mention of your suit −½ (of another suit +¼), any opponent's bid of your suit −2.
 5. **No trumps:**
    - count Joker 2¼, each ace 1, guarded king ½ (⅓ with just one guard), then add 3⅓;
@@ -111,6 +111,9 @@ you'd make the higher bid about **80%** of the time:
 | about 7 to 8 | 7 | 7: 65–85% |
 | about 8½ or more | 8 | 8: 78–92% |
 
+**Strong hands count high.** From about 8, each extra point of count is worth only about 0.4 of a trick (finding 42):
+the hand can't take more than ten, and strong hands' cards overlap. That's why going past 8 doesn't pay.
+
 **9 almost never pays.** The solver data once suggested 9 from a count of about 10, but checked against the coach
 and played out (`fh-lab thumbcheck`, finding 32), a 9 bid at a count of 10 to 12 was the coach's choice in under 1%
 of cases, and where it called 9 a blunder, the coach's choice (8, or passing over partner) scored 139 points more.
@@ -148,7 +151,9 @@ Add these to your count for the strain you're considering:
 | Partner mentioned another suit (their strength is elsewhere) | **−⅔** | **−1⅛** |
 | Partner mentioned NT | **−¼** | (this strain: above) |
 | Partner bid this strain | **+2¼** | **+2¼** |
+| Partner bid another strain (a strong hand helps yours too) | **+½** | **+1** |
 | Partner passed | **−1** | **−1.6** |
+| …but you hold the Joker (so the pass wasn't for lack of it) | **−¾** instead | **−1⅓** instead |
 | An opponent called 6 in this suit | **−1** | — |
 | An opponent called 6 in the left bower's suit (same color) | **−0.4** | — |
 | An opponent called 6 in another suit | **−⅛** | **−0.4** |

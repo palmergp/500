@@ -35,6 +35,7 @@ Count these with the suit you're thinking of making trumps.
 | Holding | Tricks |
 |---|---|
 | Each side ace | ⅔ |
+| …less for a bare side ace (no other card in its suit) | −¼ |
 | Each side king **beside its ace** (A-K in the same suit), on top of the ace | **⅓** |
 | Each side king with **two or more guards** (other cards in that suit) | **⅕** |
 | Each side king with just one guard (K-x) | ⅛ |
@@ -79,6 +80,7 @@ In no trumps there are no trump suits and no bowers: both jacks are ordinary jac
 | Each king with just one guard (K-x) | ⅓ |
 | Each guarded queen (a queen with at least two other cards in the suit) | ¼ |
 | Each long card in a suit headed by its ace (each card beyond the third) | ⅛ |
+| The Joker with two or more aces (their tricks overlap) | −¼ |
 | **Your partner and the kitty** | **3⅓** |
 
 Long suits without the ace count nothing extra: in no trumps the opponents take their tricks first.
@@ -102,7 +104,9 @@ Add or subtract these for what the other three players have called. (Your own ca
 | **Partner mentioned another suit (their strength is elsewhere)** | **−⅔** | −1⅛ |
 | Partner mentioned NT | −¼ | (this strain: above) |
 | Partner bid this strain | +2¼ | +2¼ |
+| **Partner bid another strain** (a strong hand helps yours too) | **+½** | **+1** |
 | **Partner passed** | **−1** | −1.6 |
+| …but you hold the Joker (so the pass wasn't for lack of it) | −¾ instead | −1⅓ instead |
 | **An opponent called 6 in this suit** | **−1** | — |
 | An opponent called 6 in the left bower's suit (same color) | −0.4 | — |
 | An opponent called 6 in another suit | −⅛ | −0.4 |

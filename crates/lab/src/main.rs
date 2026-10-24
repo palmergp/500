@@ -36,6 +36,7 @@ mod dealerjoker;
 mod kittysearch;
 mod hintcheck;
 mod plays;
+mod countcheck;
 mod playdata;
 mod duel;
 mod sim;
@@ -102,6 +103,11 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "countcheck" => countcheck::run(
+            flag(&flags, "deals", 4000),
+            flag(&flags, "seed", 4_100_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "plays" => plays::run(
