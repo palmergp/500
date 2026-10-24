@@ -700,6 +700,24 @@ Counting no trumps: partner's mention of a suit −1.15, an opponent's +0.47.
   The count, the guide, the bidding-count reference and the lessons use the new values. The user's hand now counts
   8.0, which says 7♦, as the coach did.
 
+### 38. A king with one small card, the only suit you could empty: void it
+
+*Measured by `fh-lab kxkitty` over 300,000 deals (513 where it applies).* South declares at the count's level, and
+after the kitty the only side suit of one to three cards is a king with one small card (no ace). Two plans, solved
+on the same deals: put back the king, its guard and the lowest other side card (void), or keep the guarded king and
+put back the three lowest other side cards (never an ace).
+
+| Trumps after the kitty | Deals | Tricks: void / keep | Bid made: void / keep | Void better / keep better |
+|---|---|---|---|---|
+| 5 or fewer | 83 | 7.76 / 7.28 | 64% / 56% | 51% / 10% |
+| 6 | 173 | 8.64 / 8.14 | 88% / 77% | 54% / 14% |
+| 7 or more | 257 | 8.57 / 8.30 | 85% / 78% | 40% / 16% |
+| All | 513 | **8.46 / 8.08** | **83% / 74%** | 47% / 14% |
+
+The void wins by about 0.4 tricks at every trump length, as finding 16 found for voids in general: a guarded king
+in a suit bid often falls to the ace or gets trumped, while the void lets you trump that suit. The coach's kitty
+plan already voids it (98% of these deals). In no trumps it's the other way round (finding 23): keep the king.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

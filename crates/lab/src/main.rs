@@ -28,6 +28,7 @@ mod lowlead;
 mod thumbcheck;
 mod mentions;
 mod show;
+mod kxkitty;
 mod playdata;
 mod duel;
 mod sim;
@@ -94,6 +95,11 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "kxkitty" => kxkitty::run(
+            flag(&flags, "deals", 40000),
+            flag(&flags, "seed", 2_300_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),
