@@ -296,10 +296,8 @@ impl Coach {
             // at many more deals before choosing.
             let first = self.search.evaluate_plays_from(obs, &result);
             let runner_up = first.iter().skip(1).find(|&&(a, _)| !equivalent(&result, first[0].0, a));
-            // Leads with many cards were the hints' weak spot (`fh-lab hintcheck`): always look closer.
-            let wide_lead = obs.current_trick.as_ref().is_some_and(|t| t.cards().is_empty()) && legal.len() >= 5;
             if let Some(&(second, _)) = runner_up.filter(|_| result.valid) {
-                if wide_lead || !significant(Some(&result), first[0].0, second) {
+                if !significant(Some(&result), first[0].0, second) {
                     let more = self.search.play_stats_sampled(obs, legal, CLOSER_LOOK, CLOSER_LOOK_MIN, CLOSER_LOOK_BUDGET);
                     result = result.merge(more);
                 }

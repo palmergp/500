@@ -34,4 +34,6 @@ run plays-v2 plays --deals 2000
 run duel-guide-bold duel --a guide-bold --b guide --deals 1000 --seed 3800000
 run duel-guide-bolder duel --a guide-bolder --b guide --deals 1000 --seed 3900000
 run duel-guide-boldest duel --a guide-boldest --b guide --deals 1000 --seed 4000000
+# 4. With the retrained bidding network embedded: are the coach's stated chances still honest?
+run honesty-v3 honesty --deals 2000 --seed 4200000
 echo "queue finished $(date +%H:%M)"
