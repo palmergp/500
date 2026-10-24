@@ -29,6 +29,7 @@ mod thumbcheck;
 mod mentions;
 mod show;
 mod kxkitty;
+mod lastdiscard;
 mod playdata;
 mod duel;
 mod sim;
@@ -95,6 +96,11 @@ fn main() {
         "honors" => honors::run(
             flag(&flags, "deals", 2000),
             flag(&flags, "seed", 800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "lastdiscard" => lastdiscard::run(
+            flag(&flags, "deals", 300000),
+            flag(&flags, "seed", 2_400_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "kxkitty" => kxkitty::run(

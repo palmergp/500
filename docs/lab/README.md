@@ -718,6 +718,24 @@ The void wins by about 0.4 tricks at every trump length, as finding 16 found for
 in a suit bid often falls to the ace or gets trumped, while the void lets you trump that suit. The coach's kitty
 plan already voids it (98% of these deals). In no trumps it's the other way round (finding 23): keep the king.
 
+### 39. The third discard: beside an ace, or from a long weak suit? Barely matters
+
+*Measured by `fh-lab lastdiscard` over 400,000 deals (4,726 where it applies).* South declares; after the kitty the
+side suits are a low doubleton (put back: a void), an ace with one small card, and a suit of three or more without
+the ace. The third discard: the small card beside the ace (leaving the ace alone, a second void once it's cashed),
+or the lowest card of the long suit. Solved on the same deals:
+
+| Long suit, trumps | Deals | Tricks: beside the ace / long suit | Bid made | Better: ace / long |
+|---|---|---|---|---|
+| 3 cards, 6 trumps | 3,152 | 7.97 / 8.04 | 73% / 74% | 14% / 19% |
+| 4 cards, 5 trumps | 1,411 | 7.82 / 7.77 | 71% / 69% | 18% / 11% |
+| 5+ cards, 4 trumps | 162 | 7.48 / 7.52 | 63% / 64% | 14% / 17% |
+| All | 4,726 | 7.91 / 7.95 | 72% / 72% | 15% / 16% |
+
+Within 0.1 trick either way, and the two plans tie on about 70% of deals. With a four-card weak suit, leaving the
+ace alone is slightly better; with three, shortening the long suit is. The coach's plan puts back the card beside
+the ace 86% of the time. The two discards that make the void are what count (finding 16).
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

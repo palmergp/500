@@ -267,7 +267,12 @@ What each part is worth, solved with every card visible over 4,137 deals where t
 | Emptying a side suit (making a void) | **+0.4 tricks** (+0.3 with 5 or fewer trumps, +0.5 with 7 or more) | Rarely (5% of deals) |
 | Keeping a guarded king (K with a small card) | No difference (16% better, 18% worse) | Often |
 
-So don't spend a discard keeping a king guarded: use it to make the void.
+So don't spend a discard keeping a king guarded: use it to make the void. That holds even when the only suit you
+can empty is a king with one small card: put both back (+0.4 tricks, finding 38).
+
+**The third discard, once two have made a void, hardly matters.** Leaving an ace alone (putting back its small
+card) or shortening a long weak suit came out within 0.1 trick of each other (finding 39). With a weak suit of four
+or more, leave the ace alone, a second void once you've cashed it; with a weak suit of three, shorten that.
 
 **In no trumps it's the other way round.** You can't trump a void, so making one gains nothing (−0.07 tricks,
 even), while a guarded king is a stopper worth keeping: **+0.2 tricks** (better on 23% of deals, worse on 9%).
