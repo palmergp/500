@@ -130,6 +130,8 @@ pub struct SearchConfig {
     /// Leading for the declaring side, break near-ties toward the dearest card (top trumps and
     /// winners) instead of the cheapest (a lab variant).
     pub lead_winners: bool,
+    /// Bid with the network from `FH_ALT_BID_MODEL` instead of the embedded one (a lab variant).
+    pub alt_bid_model: bool,
 }
 
 impl SearchConfig {
@@ -169,6 +171,7 @@ impl SearchConfig {
         six: crate::rule_bot::SixPolicy::Always,
         signal_after_partner: false,
         lead_winners: false,
+        alt_bid_model: false,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -679,7 +682,7 @@ impl Bot for SearchBot {
             }
         }
         match obs.phase {
-            Phase::Bidding if self.config.neural_bidding => match crate::models::bid_model() {
+            Phase::Bidding if self.config.neural_bidding => match if self.config.alt_bid_model { crate::models::alt_bid_model() } else { crate::models::bid_model() } {
                 Some(model) => self.neural_call(obs, legal, model),
                 None => self.fallback.choose(obs, legal),
             },

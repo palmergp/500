@@ -21,10 +21,12 @@ pub struct GuideRules {
     pub cautious_overcalls: bool,
     /// Call 6 with the Joker and mention a bower when not bidding (before partner has called).
     pub signals: bool,
+    /// Tricks added to every count (positive bids more boldly): a lab variant tests the thresholds.
+    pub boldness: f32,
 }
 
 impl GuideRules {
-    pub const ALL: GuideRules = GuideRules { auction: true, stop_at_eight: true, cautious_overcalls: true, signals: true };
+    pub const ALL: GuideRules = GuideRules { auction: true, stop_at_eight: true, cautious_overcalls: true, signals: true, boldness: 0.0 };
 }
 
 pub struct GuideBot {
@@ -40,11 +42,8 @@ impl GuideBot {
     }
 
     fn count(&self, obs: &Observation, strain: Strain) -> f32 {
-        if self.rules.auction {
-            thumb::count(obs, strain).0
-        } else {
-            thumb::card_count(obs.hand, strain) + thumb::constant(strain)
-        }
+        let count = if self.rules.auction { thumb::count(obs, strain).0 } else { thumb::card_count(obs.hand, strain) + thumb::constant(strain) };
+        count + self.rules.boldness
     }
 
     /// The highest level the count supports in `strain`, if any.

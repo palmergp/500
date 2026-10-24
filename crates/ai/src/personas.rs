@@ -150,9 +150,16 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
                 "guide-nine" => GuideRules { stop_at_eight: false, ..all },
                 "guide-overcalls" => GuideRules { cautious_overcalls: false, ..all },
                 "guide-nosignals" => GuideRules { signals: false, ..all },
+                "guide-bold" => GuideRules { boldness: 0.5, ..all },
+                "guide-bolder" => GuideRules { boldness: 1.0, ..all },
+                "guide-boldest" => GuideRules { boldness: 1.5, ..all },
                 _ => return None,
             };
             return Some(Box::new(GuideBot::new("The guide", rules, seed)));
+        }
+        "oracle-altnet" => {
+            let config = SearchConfig { alt_bid_model: true, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (the network in FH_ALT_BID_MODEL)", config, seed)));
         }
         "oracle-novoids" => {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };

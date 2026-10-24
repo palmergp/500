@@ -118,8 +118,10 @@ fn one(seed: u64, out: &mut BTreeMap<String, Tally>) {
                         let leader_is_declarer_side = trick.leader().team() == declarer.team();
                         // Second hand low: the declarer's side led, you can beat it with an honour.
                         if played == 1 && leader_is_declarer_side && beats.iter().any(|c| c.rank() >= 12 || trumpish(*c)) && !beats.contains(&low) {
-                            if let (Some(r), Some(o)) = (value(low), best_of(&beats)) {
-                                record(out, "Defence: second hand low (vs winning the trick)".into(), r, o);
+                            // Against the cheapest card that wins (the best of several, picked with
+                            // hindsight, would favour winning unfairly).
+                            if let (Some(r), Some(o)) = (value(low), value(beats[0])) {
+                                record(out, "Defence: second hand low (vs the cheapest card that wins)".into(), r, o);
                             }
                         }
                         // Cover an honour with an honour: the declarer's side led a J, Q or K.

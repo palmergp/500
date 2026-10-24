@@ -26,4 +26,12 @@ run duel-guide-noauction duel --a guide --b guide-noauction --deals 1000 --seed 
 run duel-guide-nine duel --a guide --b guide-nine --deals 1000 --seed 3400000
 run duel-guide-overcalls duel --a guide --b guide-overcalls --deals 1000 --seed 3500000
 run duel-guide-nosignals duel --a guide --b guide-nosignals --deals 1000 --seed 3600000
+# 3. Follow-ups: the retrained network in play, bolder guides, fairer tests.
+export FH_ALT_BID_MODEL=train/data/bid_v3_mixed.fhnn
+run duel-altnet duel --a oracle-altnet --b oracle --deals 2000 --seed 3700000
+run hintcheck-closer hintcheck --deals 600
+run plays-v2 plays --deals 2000
+run duel-guide-bold duel --a guide-bold --b guide --deals 1000 --seed 3800000
+run duel-guide-bolder duel --a guide-bolder --b guide --deals 1000 --seed 3900000
+run duel-guide-boldest duel --a guide-boldest --b guide --deals 1000 --seed 4000000
 echo "queue finished $(date +%H:%M)"

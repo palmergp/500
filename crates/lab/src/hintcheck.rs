@@ -19,6 +19,7 @@ struct Tally {
     over5: u32,
     over20: u32,
     same: u32,
+    ms: f64,
 }
 
 pub fn run(deals: u64, seed: u64, threads: u64, reference: usize) {
@@ -47,14 +48,15 @@ pub fn run(deals: u64, seed: u64, threads: u64, reference: usize) {
             e.over5 += t.over5;
             e.over20 += t.over20;
             e.same += t.same;
+            e.ms += t.ms;
         }
     }
     println!("Card-play hints against a {reference}-deal look ({deals} hands, one decision each)\n");
-    println!("| Decisions | n | Same card as the deep look | Points the hint gives up | Off by 5+ | Off by 20+ |");
-    println!("|---|---|---|---|---|---|");
+    println!("| Decisions | n | Same card as the deep look | Points the hint gives up | Off by 5+ | Off by 20+ | Hint time (ms, native) |");
+    println!("|---|---|---|---|---|---|---|");
     for (k, t) in &all {
         let n = t.n as f64;
-        println!("| {k} | {} | {:.0}% | {:.1} | {:.0}% | {:.0}% |", t.n, 100.0 * t.same as f64 / n, t.loss / n, 100.0 * t.over5 as f64 / n, 100.0 * t.over20 as f64 / n);
+        println!("| {k} | {} | {:.0}% | {:.1} | {:.0}% | {:.0}% | {:.0} |", t.n, 100.0 * t.same as f64 / n, t.loss / n, 100.0 * t.over5 as f64 / n, 100.0 * t.over20 as f64 / n, t.ms / n);
     }
 }
 
@@ -71,7 +73,9 @@ fn one(seed: u64, out: &mut BTreeMap<String, Tally>, reference: usize) {
         let legal = game.legal_actions();
         let trick_number = obs.tricks_won[0] + obs.tricks_won[1];
         if seat == Seat::SOUTH && obs.phase == Phase::Playing && legal.len() > 1 && trick_number as usize >= target_trick {
+            let start = std::time::Instant::now();
             let hint = Coach::new(seed).analyze(&obs, &legal, None);
+            let ms = start.elapsed().as_secs_f64() * 1000.0;
             let mut deep = SearchBot::new("deep", SearchConfig::COUNTER, seed ^ 0xDEE9);
             let stats = deep.play_stats_sampled(&obs, &legal, reference, reference, u64::MAX);
             let ev = |a: Action| stats.stats.iter().find(|s| s.action == a).map(|s| s.ev);
@@ -106,6 +110,7 @@ fn one(seed: u64, out: &mut BTreeMap<String, Tally>, reference: usize) {
                 e.over5 += u32::from(loss >= 5.0);
                 e.over20 += u32::from(loss >= 20.0);
                 e.same += u32::from(loss < 0.5);
+                e.ms += ms;
             }
             return;
         }
