@@ -149,34 +149,43 @@ fn auction_adjustments(obs: &Observation, strain: Strain) -> Vec<(String, f32)> 
             continue;
         }
         let partner = seat == me.partner();
+        // Values from `train/rules_of_thumb.py` (findings 27, 31 and 37), against partner not having
+        // called yet: a 6-call names the caller's best strain, so in yours it says much more, and in
+        // your left bower's suit more than in the other two; a mention of another strain says the
+        // mentioner's strength is elsewhere (partner's is a minus, an opponent's a small plus).
+        let mut push = |label: &str, value: f32| out.push((label.to_string(), value));
         match (partner, call) {
-            // A 6-call names the caller's best strain: in yours it says much more, and in the suit of
-            // your left bower more than in the other two (findings 27 and 31).
-            (true, Call::Six(s)) if s == strain && !nt => out.push(("partner's 6-call in it".into(), 1.4)),
-            (true, Call::Six(s)) if !nt && Some(s) == left_bower_suit => out.push(("partner's 6-call in the left bower's suit".into(), 0.75)),
-            (true, Call::Six(_)) => out.push(("partner's 6-call".into(), if nt { 1.0 } else { 0.4 })),
-            (true, Call::Mention(s)) if s == strain => out.push(("partner's mention".into(), if nt { 0.7 } else { 0.6 })),
-            (true, Call::Bid(c)) if c.strain == strain => out.push(("partner's bid".into(), 2.25)),
-            (true, Call::Pass) => out.push(("partner passed".into(), if nt { -1.3 } else { -0.9 })),
+            (true, Call::Six(_)) if nt => push("partner's 6-call", 0.8),
+            (true, Call::Six(s)) if s == strain => push("partner's 6-call in it", 1.33),
+            (true, Call::Six(s)) if Some(s) == left_bower_suit => push("partner's 6-call in the left bower's suit", 0.6),
+            (true, Call::Six(_)) => push("partner's 6-call", 0.25),
+            (true, Call::Mention(s)) if s == strain => push("partner's mention", 0.4),
+            (true, Call::Mention(_)) if nt => push("partner's mention of a suit", -1.125),
+            (true, Call::Mention(Strain::NoTrumps)) => push("partner's NT mention", -0.25),
+            (true, Call::Mention(_)) => push("partner's mention of another suit", -0.67),
+            (true, Call::Bid(c)) if c.strain == strain => push("partner's bid", 2.25),
+            (true, Call::Pass) => push("partner passed", if nt { -1.6 } else { -1.0 }),
             (false, Call::Six(s)) => {
-                let (label, value) = if nt {
-                    ("an opponent's 6-call", -0.7)
+                if nt {
+                    push("an opponent's 6-call", -0.4);
                 } else if s == strain {
-                    ("an opponent's 6-call in it", -1.125)
+                    push("an opponent's 6-call in it", -1.0);
                 } else if Some(s) == left_bower_suit {
-                    ("an opponent's 6-call in the left bower's suit", -0.5)
+                    push("an opponent's 6-call in the left bower's suit", -0.4);
                 } else {
-                    ("an opponent's 6-call", -0.25)
-                };
-                out.push((label.into(), value));
+                    push("an opponent's 6-call", -0.125);
+                }
                 opponents_showed = true;
             }
             (false, Call::Mention(s)) if s == strain => {
-                out.push(("an opponent's mention".into(), if nt { -0.7 } else { -0.67 }));
+                push("an opponent's mention", if nt { -0.4 } else { -0.5 });
                 opponents_showed = true;
             }
+            (false, Call::Mention(_)) if nt => push("an opponent's mention of a suit", 0.5),
+            (false, Call::Mention(Strain::NoTrumps)) => {} // measured at 0 for a suit bid
+            (false, Call::Mention(_)) => push("an opponent's mention of another suit", 0.25),
             (false, Call::Bid(c)) if c.strain == strain => {
-                out.push(("an opponent's bid".into(), -2.0));
+                push("an opponent's bid", -2.0);
                 opponents_showed = true;
             }
             _ => {}

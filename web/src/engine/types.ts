@@ -134,7 +134,7 @@ export interface OptionView {
   label: string;
   ev: number;
   makes: number | null;
-  /** For a call that isn't a bid: what it offers instead ("+0.6 trick to your partner's ♥ count"). */
+  /** For a call that isn't a bid: what it offers instead ("+0.4 trick to your partner's ♥ count"). */
   note?: string | null;
 }
 

@@ -15,7 +15,7 @@ pub struct OptionView {
     pub label: String,
     pub ev: f64,
     pub makes: Option<f64>,
-    /// For a call that isn't a bid: what it offers instead ("+0.6 trick to your partner's ♥ count").
+    /// For a call that isn't a bid: what it offers instead ("+0.4 trick to your partner's ♥ count").
     pub note: Option<String>,
 }
 

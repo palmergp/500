@@ -675,6 +675,31 @@ your strongest side suit, so partner knows what to lead back. The user asked wha
   rule and a person partnering a bot reads it; with people, who can't count every card, the signal is probably
   worth more than it is to the bots. That isn't measured here.
 
+### 37. Mentions of another strain: partner's costs ⅔ of a trick
+
+*Refit of the whole count (`train/rules_of_thumb.py`, 254,000 suit and 63,000 no-trump decisions) with every call
+split by the strain it names, against partner not having called yet.* The user's hand (code 8T7A-EBDG): partner
+mentioned ♠, an opponent mentioned NT, and the count said 8.7 for diamonds while the coach gave 8♦ only 54%.
+
+| Call, when counting a suit | Tricks (95%) | Old count |
+|---|---|---|
+| Partner mentioned another suit | **−0.68** (±0.03) | 0 |
+| Partner mentioned NT | −0.25 (±0.05) | 0 |
+| An opponent mentioned another suit | +0.26 (±0.02) | 0 |
+| An opponent mentioned NT | **0.00** (±0.04) | 0 |
+
+Counting no trumps: partner's mention of a suit −1.15, an opponent's +0.47.
+
+- **Partner's mention of another suit is a minus:** partner's strength is elsewhere. Better than a pass (−1), worse
+  than not knowing.
+- **An opponent's NT mention doesn't matter on average** to a suit bid. On the user's hand the coach's network read
+  it as a minus (8♦ fell from 68% to 54%), an interaction with that hand, not a rule.
+- Small trumps are worth the same whether or not you hold a top trump (+0.49 and +0.47 each).
+- With every call separated, the rest of the auction values shift a little (partner's pass −1, partner's mention of
+  your suit +0.4, an opponent's of it −½; 6-calls +1⅓ / +0.6 / +¼ for partner and −1 / −0.4 / −⅛ for an opponent).
+  The count, the guide, the bidding-count reference and the lessons use the new values. The user's hand now counts
+  8.0, which says 7♦, as the coach did.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

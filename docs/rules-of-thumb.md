@@ -24,8 +24,9 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
    bids' values.
 3. **Bid a little more than feels safe.** Timid bidding loses games under these rules.
 4. **Adjust for the auction:**
-   - partner's 6-call in your suit +1.4 (in the left bower's suit +¾, in another +0.4), partner's mention of your suit +0.6, partner's bid of it +2¼;
-   - partner's pass −0.9, an opponent's 6-call in your suit −1⅛ (in the left bower's suit −½, in another −¼), any opponent's bid of your suit −2.
+   - partner's 6-call in your suit +1⅓ (in the left bower's suit +0.6, in another +¼), partner's mention of your suit +0.4, partner's bid of it +2¼;
+   - partner's mention of another suit −⅔, partner's pass −1;
+   - an opponent's 6-call in your suit −1 (in the left bower's suit −0.4), an opponent's mention of your suit −½ (of another suit +¼), any opponent's bid of your suit −2.
 5. **No trumps:**
    - count Joker 2¼, each ace 1, guarded king ½ (⅓ with just one guard), then add 3⅓;
    - an unstopped suit hurts far less than its reputation.
@@ -140,22 +141,29 @@ Add these to your count for the strain you're considering:
 
 | What happened | Suit bid | No trumps |
 |---|---|---|
-| Partner called 6 in this suit (they hold the Joker) | **+1.4** | — |
-| Partner called 6 in the left bower's suit (same color) | **+¾** | — |
-| Partner called 6 in another strain | **+0.4** | **+1** |
-| Partner mentioned this strain | **+0.6** | **+0.7** |
+| Partner called 6 in this suit (they hold the Joker) | **+1⅓** | — |
+| Partner called 6 in the left bower's suit (same color) | **+0.6** | — |
+| Partner called 6 in another suit | **+¼** | **+0.8** |
+| Partner mentioned this strain | **+0.4** | **+0.4** |
+| Partner mentioned another suit (their strength is elsewhere) | **−⅔** | **−1⅛** |
+| Partner mentioned NT | **−¼** | (this strain: above) |
 | Partner bid this strain | **+2¼** | **+2¼** |
-| Partner passed | **−0.9** | **−1.3** |
-| An opponent called 6 in this suit | **−1⅛** | — |
-| An opponent called 6 in the left bower's suit (same color) | **−½** | — |
-| An opponent called 6 in another strain | **−¼** | **−0.7** |
-| An opponent mentioned this strain | **−⅔** | **−0.7** |
+| Partner passed | **−1** | **−1.6** |
+| An opponent called 6 in this suit | **−1** | — |
+| An opponent called 6 in the left bower's suit (same color) | **−0.4** | — |
+| An opponent called 6 in another suit | **−⅛** | **−0.4** |
+| An opponent mentioned this strain | **−½** | **−0.4** |
+| An opponent mentioned another suit | **+¼** | **+½** |
+| An opponent mentioned NT | **0** | (this strain: above) |
 | An opponent bid this strain | **−2** | **−2** |
 | You speak last (dealer), with no opposing bid, mention or 6 in this strain | **+½** | **+0.6** |
 
-*Source: solver data* (±0.02–0.1 tricks).
+*Source: solver data* (±0.02–0.1 tricks), measured against partner not having called yet (finding 37).
 
-- **Partner's pass is real information.** It costs almost a trick, so don't stretch to bid after partner has passed.
+- **Partner's pass is real information.** It costs a trick, so don't stretch to bid after partner has passed.
+- **Partner's mention of another suit costs too** (−⅔): partner's strength is somewhere else. An opponent's mention
+  of another suit helps a little (+¼): their strength isn't in yours. An opponent's NT mention makes no difference
+  on average to a suit bid.
 - **Opponents' silence is information too.** As dealer, if neither opponent showed this strain, add half a trick.
 
 ### 5. No trumps

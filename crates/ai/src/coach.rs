@@ -199,11 +199,8 @@ impl Coach {
     pub fn call_note(&self, obs: &Observation, action: Action) -> Option<String> {
         let Action::Call(call) = action else { return None };
         match call {
-            Call::Mention(s) => {
-                let value = if s == Strain::NoTrumps { 0.7 } else { 0.6 };
-                Some(format!("+{} trick to your partner's {s} count", crate::thumb::fraction(value)))
-            }
-            Call::Six(_) => Some("shows the Joker: +¾ trick to your partner's count (+1 in NT)".into()),
+            Call::Mention(s) => Some(format!("+{} trick to your partner's {s} count", crate::thumb::fraction(0.4))),
+            Call::Six(s) => Some(format!("shows the Joker: +{} trick to your partner's {s} count, less in other suits", crate::thumb::fraction(1.33))),
             Call::Pass => {
                 let (_, contract) = obs.auction.high_bid()?;
                 let chance = self.search.opponents_chance(obs, crate::models::bid_model()?)?;

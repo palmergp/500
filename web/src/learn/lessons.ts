@@ -160,10 +160,10 @@ export const LESSONS: Lesson[] = [
     summary: "What partner's and opponents' calls are worth.",
     body: [
       "Add these to your count for the strain you're considering (measured):",
-      "• Partner called 6 (has the Joker): +1.4 if it's your suit, +¾ in your left bower's suit (same color), +0.4 in another suit, +1 in no trumps.",
-      "• Partner mentioned your strain: +0.6. Partner bid it: +2¼.",
-      "• Partner passed: −0.9 (−1.3 in no trumps). Their pass is real information: don't stretch after it.",
-      "• An opponent called 6 in your suit: −1⅛ (they hold the Joker and length there). In your left bower's suit: −½ (they may hold your left bower). In another suit: −¼. An opponent mentioned your strain: −⅔. An opponent bid it: −2.",
+      "• Partner called 6 (has the Joker): +1⅓ if it's your suit, +0.6 in your left bower's suit (same color), +¼ in another suit, +0.8 in no trumps.",
+      "• Partner mentioned your strain: +0.4. Partner mentioned another suit: −⅔ (their strength is elsewhere; −1⅛ for no trumps). Partner bid your strain: +2¼.",
+      "• Partner passed: −1 (−1.6 in no trumps). Their pass is real information: don't stretch after it.",
+      "• An opponent called 6 in your suit: −1 (they hold the Joker and length there). In your left bower's suit: −0.4. In another suit: −⅛. An opponent mentioned your strain: −½; another suit: +¼ (their strength isn't in yours); NT: no change. An opponent bid your strain: −2.",
       "• Speaking last as dealer, with no opposing interest in your strain: +½.",
       "## Compete, and trust partner",
       "The neural bidder (The Oracle) declares about twice as often as the rule-based expert and scores 12 points a hand more: bid when the count says it pays, even if you go down a little more often. But don't pull partner out of their suit into yours: raise it or pass.",
@@ -172,7 +172,7 @@ export const LESSONS: Lesson[] = [
       "Once partner has called, though, just pass: partner can't act on a mention or 6 any more, and in the lab it made no difference.",
     ],
     quiz: [
-      { q: "Partner passed. Adjust your count by about…", options: ["+1", "0", "−0.9"], answer: 2, explain: "A pass shows weakness: about −0.9 in a suit bid." },
+      { q: "Partner passed. Adjust your count by about…", options: ["+1", "0", "−1"], answer: 2, explain: "A pass shows weakness: about −1 in a suit bid." },
       {
         q: "You hold the Joker but your count is only 6½. Best call (if open)?",
         options: ["Pass", "6 in your best suit", "Bid 7 anyway"],

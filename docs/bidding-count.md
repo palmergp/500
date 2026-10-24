@@ -95,18 +95,22 @@ Add or subtract these for what the other three players have called. (Your own ca
 
 | Call | Suit bid | No trumps |
 |---|---|---|
-| **Your partner called 6 in this suit** (they hold the Joker) | **+1.4** | — |
-| Your partner called 6 in the left bower's suit (same color) | +¾ | — |
-| Your partner called 6 in another strain | +0.4 | +1 |
-| Your partner mentioned this suit (or NT) | +0.6 | +0.7 |
-| Your partner bid this suit (or NT) | +2¼ | +2¼ |
-| **Your partner passed** | **−0.9** | **−1.3** |
-| **An opponent called 6 in this suit** | **−1⅛** | — |
-| An opponent called 6 in the left bower's suit (same color) | −½ | — |
-| An opponent called 6 in another strain | −¼ | −0.7 |
-| An opponent mentioned this suit (or NT) | −⅔ | −0.7 |
-| An opponent bid this suit (or NT) | −2 | −2 |
-| You speak last (you're the dealer) and no opponent has shown strength | +½ | +0.6 |
+| **Partner called 6 in this suit (they hold the Joker)** | **+1⅓** | — |
+| Partner called 6 in the left bower's suit (same color) | +0.6 | — |
+| Partner called 6 in another suit | +¼ | +0.8 |
+| Partner mentioned this strain | +0.4 | +0.4 |
+| **Partner mentioned another suit (their strength is elsewhere)** | **−⅔** | −1⅛ |
+| Partner mentioned NT | −¼ | (this strain: above) |
+| Partner bid this strain | +2¼ | +2¼ |
+| **Partner passed** | **−1** | −1.6 |
+| **An opponent called 6 in this suit** | **−1** | — |
+| An opponent called 6 in the left bower's suit (same color) | −0.4 | — |
+| An opponent called 6 in another suit | −⅛ | −0.4 |
+| An opponent mentioned this strain | −½ | −0.4 |
+| An opponent mentioned another suit | +¼ | +½ |
+| An opponent mentioned NT | 0 | (this strain: above) |
+| An opponent bid this strain | −2 | −2 |
+| You speak last (dealer), with no opposing bid, mention or 6 in this strain | +½ | +0.6 |
 
 ---
 
