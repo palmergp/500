@@ -273,6 +273,18 @@ impl Coach {
             verdict = verdict.min(Verdict::Inaccuracy);
             analysis.reasons.push("A close call: the likely deals don't clearly separate these two plays.".into());
         }
+        // Anything short of best says what was: first, unless a reason already names it.
+        if verdict != Verdict::Best && chosen != analysis.best {
+            let best = call_label(analysis.best);
+            if !analysis.reasons.iter().any(|r| r.contains(&best)) {
+                let what = if obs.phase == Phase::Bidding { "call" } else { "play" };
+                let mut note = format!("Best {what}: {best}.");
+                if loss >= 1.0 {
+                    note = format!("{note} {}.", Units::of(obs).compare(&best, &format!("your {}", call_label(chosen)), loss));
+                }
+                analysis.reasons.insert(0, note);
+            }
+        }
         Grade { chosen, best: analysis.best, loss, verdict, analysis }
     }
 
@@ -1115,6 +1127,33 @@ mod tests {
             }
         }
         assert!(found >= 3, "only {found} settled positions");
+    }
+
+    /// Any grade short of best says what the best play was (the user: "it should tell you what the
+    /// best play was").
+    #[test]
+    fn a_grade_short_of_best_names_the_best_play() {
+        let mut checked = 0;
+        for seed in 0..30u64 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bots: [Box<dyn Bot>; 4] = std::array::from_fn(|i| crate::make_bot(if i == 0 { "rookie" } else { "steady" }, seed * 4 + i as u64).unwrap());
+            while game.phase() != Phase::GameOver && game.history().iter().all(|h| h.contract.is_none()) && checked < 8 {
+                let seat = game.to_act().unwrap();
+                let obs = game.observe(seat);
+                let legal = game.legal_actions();
+                let action = bots[seat.index()].choose(&obs, &legal);
+                if seat == Seat::SOUTH && obs.phase != Phase::Discarding && legal.len() > 1 {
+                    let grade = Coach::new(seed).grade(&obs, &legal, action);
+                    if grade.verdict != Verdict::Best && grade.best != action {
+                        let best = call_label(grade.best);
+                        assert!(grade.analysis.reasons.iter().any(|r| r.contains(&best)), "{:?} for {action}, best {best}: {:?}", grade.verdict, grade.analysis.reasons);
+                        checked += 1;
+                    }
+                }
+                game.apply(action).unwrap();
+            }
+        }
+        assert!(checked >= 3, "only {checked} grades short of best");
     }
 
     /// "K♠ is the highest card left" is wrong when you hold the A♠ too.

@@ -65,10 +65,11 @@ export function GradeBar({ grade, onUndo, onClose }: { grade: GradeView; onUndo?
         <span>
           <VerdictChip verdict={grade.verdict} /> {kitty && "Put back "}
           {grade.chosenLabel}
-          {!fine && (
+          {grade.verdict !== "best" && grade.bestLabel !== grade.chosenLabel && (
             <>
               {" "}
-              · better: <strong>{grade.bestLabel}</strong> <span className="loss">(−{lossText(grade)})</span>
+              · best: <strong>{grade.bestLabel}</strong>
+              {grade.loss >= 1 && <span className="loss"> (−{lossText(grade)})</span>}
             </>
           )}
         </span>

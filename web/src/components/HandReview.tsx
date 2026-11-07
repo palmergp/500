@@ -193,7 +193,7 @@ export function DecisionList({ grades, onReplay, onCode }: { grades: GradeView[]
                 <summary>
                   <span className="decision-when">{decisionLabel(g)}</span> <VerdictChip verdict={g.verdict} />{" "}
                   <strong>{g.phase === "discarding" && g.chosenLabel.includes(" ") ? `Put back ${g.chosenLabel}` : g.chosenLabel}</strong>
-                  {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · better: {g.bestLabel}</>}
+                  {g.bestLabel !== g.chosenLabel && g.verdict !== "best" && <> · best: {g.bestLabel}</>}
                   {g.loss >= 1 && <span className="loss"> (−{lossText(g)})</span>}
                   {g.hinted && (
                     <span className="hinted-tag" title="You asked for a hint on this decision, so it doesn't count toward your patterns">
