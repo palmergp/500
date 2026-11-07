@@ -110,7 +110,17 @@ impl RuleBot {
             .into_iter()
             .map(|s| (s, self.estimate(obs, s) + noise * (2.0 * self.rng.unit() as f32 - 1.0)))
             .collect();
-        strains.sort_by(|a, b| b.1.total_cmp(&a.1));
+        // Best estimate first. A tie (the estimator can rate a long trump suit and the same honours
+        // as a side suit equally; floating-point sums then differ in the last bit) goes to the suit
+        // with more trumps, then the higher count, not to rounding noise (a user's hand, code
+        // NQE9-5DH3: 9♣ over five hearts).
+        let trumps = |s: Strain| obs.hand.iter().filter(|&c| s.trump().is_some() && (is_trump(c, s.trump()) || c.is_joker())).count();
+        let hundredths = |e: f32| (e * 100.0).round() as i32;
+        strains.sort_by(|a, b| {
+            hundredths(b.1).cmp(&hundredths(a.1))
+                .then_with(|| trumps(b.0).cmp(&trumps(a.0)))
+                .then_with(|| crate::thumb::count(obs, b.0).0.total_cmp(&crate::thumb::count(obs, a.0).0))
+        });
 
         let partner_high = obs.auction.high_bid().map(|(seat, _)| seat) == Some(obs.seat.partner());
         for &(strain, estimate) in &strains {
@@ -445,7 +455,41 @@ impl Bot for RuleBot {
 mod tests {
     use super::*;
     use crate::{play_out, RandomBot};
-    use fh_core::{Game, Rules, Team};
+    use fh_core::{Game, Rules, Seat, Team};
+
+    /// A user's hand (code NQE9-5DH3): Joker, J♣ 7♣, A♦ K♦ 4♦, A♥ K♥ J♥ 10♥. The rule bots' estimate
+    /// rates clubs and hearts exactly equal; the tie goes to hearts, the longer trump suit.
+    #[test]
+    fn a_tied_estimate_goes_to_the_longer_trump_suit() {
+        use fh_core::cards::{ACE, JACK, KING};
+        let c = |s: Suit, r: u8| Card::new(s, r);
+        let hand: CardSet = [
+            Card::JOKER,
+            c(Suit::Clubs, JACK),
+            c(Suit::Clubs, 7),
+            c(Suit::Diamonds, ACE),
+            c(Suit::Diamonds, KING),
+            c(Suit::Diamonds, 4),
+            c(Suit::Hearts, ACE),
+            c(Suit::Hearts, KING),
+            c(Suit::Hearts, JACK),
+            c(Suit::Hearts, 10),
+        ]
+        .into_iter()
+        .collect();
+        let (clubs, hearts) = (crate::evaluate::hand_tricks(hand, Strain::Clubs), crate::evaluate::hand_tricks(hand, Strain::Hearts));
+        assert!((clubs - hearts).abs() < 0.001, "{clubs} vs {hearts}");
+        // The decision as East, first to speak, holding that hand.
+        let game = Game::with_dealer(Rules::default(), 7, Seat::NORTH);
+        let mut obs = game.observe(Seat::EAST);
+        obs.hand = hand;
+        let mut bot = RuleBot::new("g", Style::BOLD, 1);
+        let legal = game.legal_actions();
+        match bot.choose(&obs, &legal) {
+            Action::Call(Call::Bid(contract)) => assert_eq!(contract.strain, Strain::Hearts, "{contract}"),
+            other => panic!("expected a bid, got {other}"),
+        }
+    }
 
     /// A user's kitty (code X5MF-5PK6): 7♦ with K♠ 5♠, K♣ J♣ and four hearts. One card at a time put
     /// back 5♠ J♣ 4♥, leaving two bare kings and no void; judged as a set, the plan empties a suit.
