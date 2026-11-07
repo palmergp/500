@@ -851,7 +851,8 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
             match call {
                 Call::Six(s) => reasons.push(format!("Your partner showed the Joker (6{s}).")),
                 Call::Mention(s) if s.trump().is_some() => reasons.push(format!("Your partner mentioned {s}, probably with a bower.")),
-                Call::Mention(_) => reasons.push("Your partner mentioned NT, probably with aces or the Joker.".into()),
+                // With the Joker partner would have called 6 (the convention), so a NT mention shows aces.
+                Call::Mention(_) => reasons.push("Your partner mentioned NT: usually two or more aces, but not the Joker (with it they'd have called 6).".into()),
                 Call::Bid(c) => reasons.push(format!("Your partner bid {c}.")),
                 Call::Pass => {}
             }
@@ -863,6 +864,20 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
             if let Some(o) = ev(best) {
                 if let Some(m) = o.makes {
                     reasons.push(format!("{c} makes in about {} of similar deals.", pct(m)));
+                    // A bid the count doesn't reach: say so, rather than leave the count saying pass.
+                    let count = thumb::count(obs, c.strain).0;
+                    let needs = if c.strain == Strain::Spades { 7.0 } else { 6.75 };
+                    if count < needs {
+                        reasons.insert(
+                            1,
+                            format!(
+                                "Your count for {} is only {}, short of a bid. The coach reads more of this hand and the auction than the count does, and this one is a judgment call: it gives {c} about {}.",
+                                c.strain,
+                                thumb::fraction(count),
+                                pct(m)
+                            ),
+                        );
+                    }
                     // A long shot over an opponent's bid near the end is a sacrifice: say so.
                     if let Some((seat, theirs)) = high.filter(|(s, _)| s.team() != obs.seat.team()) {
                         if m < 0.5 && plays_for_the_game(obs) {
