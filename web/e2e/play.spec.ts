@@ -115,4 +115,15 @@ test("a hand code, and replaying a hand from its review", async ({ page }, info)
   await page.locator(".replay-banner").getByRole("button", { name: "Back to the game" }).click();
   await expect(page.locator(".replay-banner")).toHaveCount(0);
   await expect(page.locator(".scores")).toHaveText(scores);
+
+  // A new game started during a replay ends the replay (the banner used to stay).
+  await page.getByRole("button", { name: "Score pad" }).click();
+  await page.getByRole("dialog", { name: "Score pad" }).getByRole("button", { name: /Review/ }).first().click();
+  await page.getByRole("dialog", { name: "Hand review" }).getByRole("button", { name: "Replay this hand" }).click();
+  await expect(page.locator(".replay-banner")).toBeVisible();
+  await page.getByRole("button", { name: "Menu" }).click();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Play solo/ }).click();
+  await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Deal" }).click();
+  await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
+  await expect(page.locator(".replay-banner")).toHaveCount(0);
 });

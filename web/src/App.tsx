@@ -276,6 +276,10 @@ export function App() {
     setShowTricks(null);
     setShowDecisions(false);
     setMessage("");
+    // A new game (or a host's table) ends any replay: its game is gone, and so is the way back.
+    replayRef.current = null;
+    setReplaying(null);
+    setFinishing(false);
   }, []);
 
   /** Leaves the host's table (your seat waits for you) and plays against bots on this device. */
@@ -923,7 +927,12 @@ export function App() {
             <button type="button" onClick={() => setReview(result)}>
               Review hand
             </button>
-            {view.phase === "gameOver" ? (
+            {replaying ? (
+              // A replay always leads back to the real game, even when it reaches the game's end.
+              <button type="button" className="primary" onClick={endReplay} autoFocus>
+                Back to the game
+              </button>
+            ) : view.phase === "gameOver" ? (
               <button
                 type="button"
                 className="primary"
@@ -934,10 +943,6 @@ export function App() {
                 }}
               >
                 New game
-              </button>
-            ) : replaying ? (
-              <button type="button" className="primary" onClick={endReplay} autoFocus>
-                Back to the game
               </button>
             ) : (
               <button
