@@ -25,6 +25,12 @@ impl WasmTable {
         Table::with_players(seed as u64, players, (hands > 0).then_some(hands)).map(WasmTable).map_err(|e| JsError::new(&e))
     }
 
+    /// Names the players (a tournament's): West, North and East; South is "You".
+    #[wasm_bindgen(js_name = setNames)]
+    pub fn set_names(&mut self, west: &str, north: &str, east: &str) {
+        self.0.set_names(["You", west, north, east].map(String::from));
+    }
+
     /// Rebuilds a game from [`WasmTable::save`] output.
     pub fn load(json: &str) -> Result<WasmTable, JsError> {
         let save: SaveData = serde_json::from_str(json).map_err(|e| JsError::new(&e.to_string()))?;
@@ -67,6 +73,13 @@ struct PersonaView {
     id: &'static str,
     name: &'static str,
     blurb: &'static str,
+}
+
+/// A tournament table the person isn't at: a short game of `hands` hands between four personas.
+#[wasm_bindgen(js_name = simulateGame)]
+pub fn simulate_game(seed: u32, south: &str, west: &str, north: &str, east: &str, hands: u8) -> Result<JsValue, JsError> {
+    let result = table::simulate(seed as u64, [south, west, north, east].map(String::from), hands).map_err(|e| JsError::new(&e))?;
+    to_js(&result)
 }
 
 /// The AI players available to sit at the table.

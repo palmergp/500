@@ -21,6 +21,9 @@ pub struct SaveData {
     /// A short game of this many hands (H25); absent for a game to 500.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub hands: Option<u8>,
+    /// Display names by seat (a tournament's players), instead of the personas' names.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub names: Option<[String; 4]>,
 }
 
 /// The rules for a game to 500, or a short game of `hands` hands (H25).
@@ -46,6 +49,7 @@ pub struct Table {
     bots: [Option<Box<dyn Bot>>; 4],
     log: Vec<u16>,
     hands: Option<u8>,
+    names: Option<[String; 4]>,
     bid_notes: Vec<BidNote>,
     /// Where each deal's actions start in the log (by the deal's index in the history).
     deal_starts: Vec<usize>,
@@ -82,7 +86,7 @@ impl Table {
         for seat in Seat::ALL {
             bots[seat.index()] = make_bot(&players[seat.index()], seed, seat)?;
         }
-        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands, bid_notes: Vec::new(), deal_starts: vec![0] })
+        Ok(Table { game: Game::new(rules_for(hands), seed), seed, players, bots, log: Vec::new(), hands, names: None, bid_notes: Vec::new(), deal_starts: vec![0] })
     }
 
     /// Puts a person ("human") or a bot persona ("any" for a random one) in `seat`, mid-game if
@@ -96,6 +100,15 @@ impl Table {
 
     pub fn game(&self) -> &Game {
         &self.game
+    }
+
+    /// Display names by seat, if the game has them (a tournament's players).
+    pub fn names(&self) -> Option<&[String; 4]> {
+        self.names.as_ref()
+    }
+
+    pub fn set_names(&mut self, names: [String; 4]) {
+        self.names = Some(names);
     }
 
     pub fn players(&self) -> &[String; 4] {
@@ -217,7 +230,7 @@ impl Table {
     }
 
     pub fn save(&self) -> SaveData {
-        SaveData { version: 1, seed: self.seed, players: self.players.clone(), log: self.log.clone(), hands: self.hands }
+        SaveData { version: 1, seed: self.seed, players: self.players.clone(), log: self.log.clone(), hands: self.hands, names: self.names.clone() }
     }
 
     pub fn restore(save: &SaveData) -> Result<Table, String> {
@@ -225,6 +238,7 @@ impl Table {
             return Err(format!("unsupported save version {}", save.version));
         }
         let mut table = Table::build(save.seed, save.players.clone(), save.hands)?;
+        table.names = save.names.clone();
         for &index in &save.log {
             if table.game.phase() == Phase::GameOver {
                 return Err("save continues past the end of the game".into());
@@ -242,6 +256,29 @@ fn make_bot(id: &str, seed: u64, seat: Seat) -> Result<Option<Box<dyn Bot>>, Str
     }
     let bot = fh_ai::make_bot(id, seed.wrapping_mul(4).wrapping_add(seat.index() as u64));
     bot.map(Some).ok_or_else(|| format!("unknown player type {id:?}"))
+}
+
+/// A short game played out by four bots (a tournament's other tables): each side's final score
+/// (North–South, East–West) and each hand's score changes.
+#[derive(Clone, Debug, serde::Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Simulated {
+    pub scores: [i32; 2],
+    pub hands: Vec<[i32; 2]>,
+}
+
+/// Plays a whole game between the personas in `players` (South, West, North, East), for a
+/// tournament's tables the person isn't at.
+pub fn simulate(seed: u64, players: [String; 4], hands: u8) -> Result<Simulated, String> {
+    let mut table = Table::with_players(seed, players, Some(hands))?;
+    while table.game().phase() != Phase::GameOver {
+        if table.step_bot_events().is_none() {
+            return Err("a seat has no bot".into());
+        }
+    }
+    let game = table.game();
+    let hands = game.history().iter().filter(|h| h.contract.is_some()).map(|h| h.score_change).collect();
+    Ok(Simulated { scores: game.scores(), hands })
 }
 
 /// Where hand codes' games are kept on this computer: `%LOCALAPPDATA%/500/hands` (or `~/500/hands`).
@@ -284,6 +321,25 @@ pub fn replay_to_deal(save: &SaveData, number: usize) -> Result<(Game, usize), S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A tournament's names survive a save and show in the view; South stays "You".
+    #[test]
+    fn display_names_are_saved_and_shown() {
+        let mut table = Table::with_players(5, ["human", "steady", "rock", "gambler"].map(String::from), Some(4)).unwrap();
+        table.set_names(["You", "Ada", "Ben", "Cy"].map(String::from));
+        let restored = Table::restore(&table.save()).unwrap();
+        let names: Vec<String> = restored.view().players.iter().map(|p| p.name.clone()).collect();
+        assert_eq!(names, ["You", "Ada", "Ben", "Cy"]);
+    }
+
+    /// A tournament's other tables: four bots play a short game to the end, and the hands add up.
+    #[test]
+    fn a_simulated_game_runs_to_the_end() {
+        let result = simulate(11, ["steady", "rock", "gambler", "rookie"].map(String::from), 4).unwrap();
+        assert!(result.hands.len() >= 4);
+        let sums = result.hands.iter().fold([0, 0], |acc, h| [acc[0] + h[0], acc[1] + h[1]]);
+        assert_eq!(sums, result.scores);
+    }
 
     /// Plays the human seat with the first legal action until the game ends.
     fn auto_play(table: &mut Table) {

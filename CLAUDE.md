@@ -51,6 +51,11 @@
 - Replay (solo): from a hand's review ("Replay this hand", per decision, per trick) the play engine loads the save
   cut at that action (`saveAt`); nothing in a replay is saved, graded or counted, and "Back to the game" reloads
   the real save. `HandView.firstAction` (from `Table::notes`) says where each deal starts in the log.
+- Tournament mode (`web/src/tournament.ts`, `components/Tournament.tsx`): 12 players (you and 11 bots with random
+  names and personas), 3 tables, 8 rounds of a 4-hand game; a side's final score goes to both partners' totals, and
+  partners never repeat (circle-method schedule). You play one table (names via `SaveData.names`); the other two are
+  played out by `simulateGame` in a third worker (`Simulator`). Saved in local storage; standings after each round,
+  then a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
   worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save

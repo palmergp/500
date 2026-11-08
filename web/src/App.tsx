@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ActionView, CardView, Coach, GradeView, HandView, HintView, Persona, Snapshot, TrickView, View } from "./engine";
-import { CoachClient, Engine, SUIT_SYMBOL } from "./engine";
+import { CoachClient, Engine, SUIT_SYMBOL, Simulator } from "./engine";
 import { detectHost, NetClient, savedName, type HostInfo, type Lobby as LobbyState } from "./net";
 import { Lobby } from "./components/Lobby";
 import { BiddingBox } from "./components/BiddingBox";
@@ -23,6 +23,8 @@ import { DecisionsDialog } from "./components/DecisionsDialog";
 import { keepMistake } from "./mistakes";
 import { recordGame, recordHand } from "./records";
 import { handCode, saveAt } from "./handcode";
+import { FinalReveal, TournamentDialog } from "./components/Tournament";
+import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament } from "./tournament";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -167,6 +169,15 @@ export function App() {
    * in a replay counts (no saving, grades, records or progress). */
   const replayRef = useRef<{ resume: string } | null>(null);
   const [replaying, setReplaying] = useState<string | null>(null);
+  /** The tournament (saved in this browser), whether the game on the table is its current round,
+   * its dialog (`after`: the round just played) and the final reveal. */
+  const [tour, setTour] = useState<Tournament | null>(loadTournament);
+  const tourRef = useRef(tour);
+  const [inTour, setInTour] = useState(false);
+  const [tourDialog, setTourDialog] = useState<{ after?: number } | null>(null);
+  const [showFinal, setShowFinal] = useState(false);
+  const simRef = useRef<Simulator | null>(null);
+  const simsRunning = useRef(new Set<string>());
   /** A hand code being shown (and copied). */
   const [codeShown, setCodeShown] = useState<string | null>(null);
   /** A record you just set ("highest bid made: 9♥"), shown for a moment at the top. */
@@ -299,6 +310,7 @@ export function App() {
       saveSettings(chosen);
       setSettings(chosen);
       toSolo();
+      setInTour(false);
       savedGrades.clear();
       setGrades([]);
       hintedRef.current.clear();
@@ -313,6 +325,105 @@ export function App() {
     [request, toSolo, clearTable],
   );
 
+  /** Changes the tournament and keeps it saved. */
+  const updateTour = useCallback((change: (t: Tournament) => void) => {
+    const t = tourRef.current;
+    if (!t) return;
+    const next = structuredClone(t);
+    change(next);
+    tourRef.current = next;
+    setTour(next);
+    saveTournament(next);
+  }, []);
+
+  /** Plays out the current round's other tables in their own worker, one at a time. */
+  const runSims = useCallback(() => {
+    const t = tourRef.current;
+    if (!t || t.current >= ROUNDS) return;
+    const r = t.current;
+    simRef.current ??= new Simulator();
+    t.rounds[r].tables.forEach((table, i) => {
+      const key = `${t.id}:${r}:${i}`;
+      if (table.result || table.seats.includes(0) || simsRunning.current.has(key)) return;
+      simsRunning.current.add(key);
+      const players = table.seats.map((id) => t.participants[id].persona) as [string, string, string, string];
+      void simRef.current!.simulate(table.seed, players, HANDS)
+        .then((result) => updateTour((next) => {
+          if (next.id === t.id) next.rounds[r].tables[i].result = result;
+        }))
+        .catch(() => {})
+        .finally(() => simsRunning.current.delete(key));
+    });
+  }, [updateTour]);
+
+  /** Deals your table's game for the tournament's current round (and starts the other tables). */
+  const startTourRound = useCallback(() => {
+    const t = tourRef.current;
+    if (!t || t.current >= ROUNDS) return;
+    const table = t.rounds[t.current].tables[yourTable(t, t.current)];
+    const [, west, north, east] = table.seats.map((id) => t.participants[id]);
+    toSolo();
+    savedGrades.clear();
+    setGrades([]);
+    hintedRef.current.clear();
+    clearTable();
+    setShowNewGame(false);
+    setTourDialog(null);
+    setScreen("table");
+    setInTour(true);
+    void request((engine) =>
+      engine.create(table.seed, { west: west.persona, north: north.persona, east: east.persona, hands: HANDS, names: [west.name, north.name, east.name] }),
+    ).then(() => setMessage(`Tournament round ${t.current + 1} of ${ROUNDS}: you partner ${north.name}.`));
+    runSims();
+  }, [request, toSolo, clearTable, runSims]);
+
+  /** Your round is over: record your table's result, and show the tournament. */
+  const finishTourRound = () => {
+    const t = tourRef.current;
+    if (!t || !view || t.current >= ROUNDS) return;
+    const r = t.current;
+    updateTour((next) => {
+      next.rounds[r].tables[yourTable(next, r)].result = {
+        scores: [view.scores[0], view.scores[1]],
+        hands: view.history.filter((h) => !h.passedOut).map((h) => h.scoreChange),
+      };
+      next.current = r + 1;
+    });
+    setResult(null);
+    setInTour(false);
+    setTourDialog({ after: r });
+  };
+
+  /** From the menu: the tournament in progress, or a new one. */
+  const openTournament = () => {
+    if (!tourRef.current || tourRef.current.finished) {
+      const t = newTournament(randomSeed());
+      tourRef.current = t;
+      setTour(t);
+      saveTournament(t);
+    }
+    setTourDialog({});
+  };
+
+  /** Play the tournament's current round: pick up its game if it's the one saved, else deal it. */
+  const playTourRound = () => {
+    const t = tourRef.current;
+    if (!t) return;
+    if (t.current >= ROUNDS) {
+      setTourDialog(null);
+      setShowFinal(true);
+      return;
+    }
+    const save = savedGame.load();
+    const seed = t.rounds[t.current].tables[yourTable(t, t.current)].seed;
+    if (save && (JSON.parse(save) as { seed: number }).seed === seed) {
+      setTourDialog(null);
+      void continueSolo();
+      return;
+    }
+    startTourRound();
+  };
+
   /** Picks up the game saved on this device, or offers a new one. */
   const continueSolo = useCallback(async () => {
     setScreen("table");
@@ -324,6 +435,11 @@ export function App() {
       try {
         handle(await engineRef.current.load(save));
         setMessage("Welcome back: your game was restored.");
+        const t = tourRef.current;
+        if (t && t.current < ROUNDS && t.rounds[t.current].tables[yourTable(t, t.current)].seed === (JSON.parse(save) as { seed: number }).seed) {
+          setInTour(true);
+          runSims();
+        }
         return;
       } catch {
         savedGame.clear();
@@ -339,6 +455,7 @@ export function App() {
     if (modeRef.current === "lan" && netRef.current) return;
     modeRef.current = "lan";
     setMode("lan");
+    setInTour(false);
     clearTable();
     setGrades([]);
     setShowNewGame(false);
@@ -431,7 +548,7 @@ export function App() {
   // At a LAN table, nobody moves until everyone has seen the last hand's result.
   const waitingOnOthers = lan && !!lobby && lobby.waiting.length > 0;
   const paused =
-    !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers;
+    !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers || !!tourDialog || showFinal;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -744,6 +861,8 @@ export function App() {
           hostAvailable={!!host}
           atTable={lan}
           onContinue={() => void continueSolo()}
+          tournament={tour && !tour.finished ? { round: Math.min(tour.current + 1, ROUNDS) } : null}
+          onTournament={openTournament}
           onSolo={() => setShowNewGame(true)}
           onFriends={joinHost}
           onLearn={() => setShowLearn(true)}
@@ -780,6 +899,9 @@ export function App() {
                 onClick={() => setShowLearn(true)}
               />
               <NavButton icon="📋" label="Score pad" tip="Score pad: every hand so far, and a review of each one" onClick={() => setShowScores(true)} disabled={!view} />
+              {inTour && tour && (
+                <NavButton icon="🏆" label="Standings" tip={`Tournament, round ${tour.current + 1} of ${ROUNDS}: everyone's totals so far`} onClick={() => setTourDialog({})} />
+              )}
               {mode === "solo" && view && (
                 <NavButton icon="🔗" label="Code" tip="A code for this exact moment of the game, copied for you: give it to Claude with a question" onClick={() => showCode(view.actionCount)} />
               )}
@@ -932,6 +1054,10 @@ export function App() {
               <button type="button" className="primary" onClick={endReplay} autoFocus>
                 Back to the game
               </button>
+            ) : inTour && view.phase === "gameOver" ? (
+              <button type="button" className="primary" onClick={finishTourRound} autoFocus>
+                Round results
+              </button>
             ) : view.phase === "gameOver" ? (
               <button
                 type="button"
@@ -985,6 +1111,38 @@ export function App() {
           onClose={() => setShowDecisions(false)}
           onReplay={mode === "solo" ? startReplay : undefined}
           onCode={mode === "solo" ? showCode : undefined}
+        />
+      )}
+      {tourDialog && tour && (
+        <TournamentDialog
+          t={tour}
+          personas={personas}
+          after={tourDialog.after}
+          onPlay={playTourRound}
+          onClose={() => setTourDialog(null)}
+          onRestart={
+            tourDialog.after === undefined && !inTour
+              ? () => {
+                  const t = newTournament(randomSeed());
+                  tourRef.current = t;
+                  setTour(t);
+                  saveTournament(t);
+                }
+              : undefined
+          }
+        />
+      )}
+      {showFinal && tour && (
+        <FinalReveal
+          t={tour}
+          personas={personas}
+          onDone={() => {
+            updateTour((t) => {
+              t.finished = true;
+            });
+            setShowFinal(false);
+            setScreen("menu");
+          }}
         />
       )}
       {codeShown && (

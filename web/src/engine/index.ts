@@ -13,6 +13,8 @@ export interface Seating {
   east: string;
   /** A short game's number of hands, or 0 for a game to 500. */
   hands: number;
+  /** Display names for West, North and East (a tournament's players). */
+  names?: [string, string, string];
 }
 
 type Pending = { resolve: (value: unknown) => void; reject: (error: Error) => void };
@@ -59,8 +61,8 @@ export class Engine extends WorkerClient {
   }
 
   create(seed: number, seating: Seating): Promise<Snapshot> {
-    const { west, north, east, hands } = seating;
-    return this.call("create", { seed, west, north, east, hands }) as Promise<Snapshot>;
+    const { west, north, east, hands, names } = seating;
+    return this.call("create", { seed, west, north, east, hands, names }) as Promise<Snapshot>;
   }
 
   /** Rebuilds a saved game; rejects if the save is unreadable. */
@@ -132,5 +134,18 @@ export class CoachClient extends WorkerClient implements Coach {
   /** A card-play puzzle: a position with one clearly best play. */
   drillPlay(seed: number): Promise<DrillView> {
     return this.call("drillPlay", { seed }) as Promise<DrillView>;
+  }
+}
+
+/** A tournament table played out by four bots: each side's final score, and every hand's. */
+export interface SimulatedGame {
+  scores: [number, number];
+  hands: [number, number][];
+}
+
+/** A third worker for a tournament's other tables, so they never slow the game you're playing. */
+export class Simulator extends WorkerClient {
+  simulate(seed: number, players: [string, string, string, string], hands: number): Promise<SimulatedGame> {
+    return this.call("simulate", { seed, players, hands }) as Promise<SimulatedGame>;
   }
 }

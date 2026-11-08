@@ -360,6 +360,8 @@ impl View {
             let id = &table.players()[i];
             if i == 0 {
                 "You".to_string()
+            } else if let Some(names) = table.names() {
+                names[i].clone()
             } else {
                 persona(id).map_or(id.clone(), |p| p.name.to_string())
             }

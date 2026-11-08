@@ -4,7 +4,8 @@ import type { EventView, View } from "./types";
 
 export type Request =
   | { id: number; op: "personas" }
-  | { id: number; op: "create"; seed: number; west: string; north: string; east: string; hands: number }
+  | { id: number; op: "create"; seed: number; west: string; north: string; east: string; hands: number; names?: [string, string, string] }
+  | { id: number; op: "simulate"; seed: number; players: [string, string, string, string]; hands: number }
   | { id: number; op: "load"; save: string }
   | { id: number; op: "act"; index: number }
   | { id: number; op: "stepBot" }

@@ -10,12 +10,15 @@ interface Props {
   onFriends: () => void;
   onLearn: () => void;
   onSettings: () => void;
+  /** A tournament in progress (its round), or null. */
+  tournament: { round: number } | null;
+  onTournament: () => void;
 }
 
 const SUITS = ["♠", "♥", "♣", "♦"];
 
 /** The first screen: pick how to play, learn, or change settings. */
-export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSolo, onFriends, onLearn, onSettings }: Props) {
+export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSolo, onFriends, onLearn, onSettings, tournament, onTournament }: Props) {
   return (
     <main className="main-menu">
       <div className="menu-card">
@@ -55,6 +58,10 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
               </small>
             </button>
           )}
+          <button type="button" onClick={onTournament}>
+            Tournament
+            <small>{tournament ? `Round ${tournament.round} of 8: pick up where you left off` : "12 players, 8 rounds of 4 hands, a new partner every round"}</small>
+          </button>
           <button type="button" onClick={onLearn}>
             Learn
             <small>Lessons, a bidding trainer and play puzzles</small>
