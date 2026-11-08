@@ -1,6 +1,9 @@
 //! wasm-bindgen bindings for the web app. All game logic lives in [`table`] and [`view`].
 
 pub mod coach;
+/// The worker's requests answered natively, for a host thinking on behalf of a phone.
+#[cfg(not(target_arch = "wasm32"))]
+pub mod service;
 pub mod table;
 pub mod view;
 

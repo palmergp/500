@@ -7,6 +7,11 @@
   `crates/host` (`fh-host`, wifi play: serves `web/dist`, one table in `room.rs`, WebSocket JSON protocol).
 - Views are built for a viewer seat (`view::Lens`): seat 0 is always the viewer and team 0 their side. Solo play is
   South's lens; the host builds one per person. The host never sends a save (it would reveal every hand).
+- Solo play from a browser that loaded the app from a host: the host's computer does the engine's work. Each client
+  (play, coach, tournament simulator) sends the worker's requests over `/engine` (`crates/wasm/src/service.rs`, one
+  thread per connection), resyncing the game from its last save on a new connection and falling back to its own
+  worker if the host can't be reached (`web/src/engine/index.ts`; `?local` forces the worker). That's the browser's
+  own game, so saves may travel there; the shared table's room still never sends one.
 - `web/`: Vite + React + TypeScript app. `web/src/engine/types.ts` mirrors `crates/wasm/src/view.rs` — keep them in sync.
 - Bots and hints must only use `Game::observe(seat)`, never `Game::hand` of another seat. The coach's advice must
   also never depend on who the other players are (their personas): it reads every player's calls and cards the

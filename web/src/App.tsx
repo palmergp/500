@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { ActionView, CardView, Coach, GradeView, HandView, HintView, Persona, Snapshot, TrickView, View } from "./engine";
-import { CoachClient, Engine, SUIT_SYMBOL, Simulator } from "./engine";
+import { CoachClient, Engine, setHostEngine, SUIT_SYMBOL, Simulator } from "./engine";
 import { detectHost, NetClient, savedName, type HostInfo, type Lobby as LobbyState } from "./net";
 import { Lobby } from "./components/Lobby";
 import { BiddingBox } from "./components/BiddingBox";
@@ -475,16 +475,19 @@ export function App() {
   }, [handle, clearTable]);
 
   // Start the engine, then go back to the game this tab was in (after a reload), or the menu.
+  // Loaded from a host, the host's computer does the engine's thinking (a phone's own is far
+  // slower; `?local` keeps it on this device).
+  const startedRef = useRef(false);
   useEffect(() => {
-    if (engineRef.current) return;
-    const engine = new Engine();
-    engineRef.current = engine;
-    coachRef.current = new CoachClient();
-    engine
-      .personas()
-      .then(async (list) => {
-        setPersonas(list);
-        const info = await detectHost();
+    if (startedRef.current) return;
+    startedRef.current = true;
+    detectHost()
+      .then(async (info) => {
+        setHostEngine(!!info && !new URLSearchParams(location.search).has("local"));
+        const engine = new Engine();
+        engineRef.current = engine;
+        coachRef.current = new CoachClient();
+        setPersonas(await engine.personas());
         setHost(info);
         const last = tabGame.get();
         if (last === "lan" && info) joinHost();

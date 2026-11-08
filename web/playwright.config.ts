@@ -19,8 +19,8 @@ export default defineConfig({
     },
   ],
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: "lan.spec.ts" },
-    { name: "phone", use: { ...devices["Pixel 7"] }, testIgnore: "lan.spec.ts" },
-    { name: "lan", use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:5599" }, testMatch: "lan.spec.ts" },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /lan.*\.spec\.ts/ },
+    { name: "phone", use: { ...devices["Pixel 7"] }, testIgnore: /lan.*\.spec\.ts/ },
+    { name: "lan", use: { ...devices["Desktop Chrome"], baseURL: "http://localhost:5599" }, testMatch: /lan.*\.spec\.ts/ },
   ],
 });

@@ -20,11 +20,13 @@ use axum::extract::State;
 use axum::http::header;
 use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
+use axum::serve::ListenerExt;
 use axum::{Json, Router};
 use futures_util::{SinkExt, StreamExt};
 use qrcode::render::{svg, unicode};
 use qrcode::QrCode;
 use room::RoomHandle;
+use tower_http::compression::CompressionLayer;
 use tower_http::services::{ServeDir, ServeFile};
 
 const USAGE: &str = "\
@@ -242,13 +244,18 @@ async fn main() {
         .route("/api/info", get(info))
         .route("/api/qr.svg", get(qr_svg))
         .route("/api/hands", post(save_hand))
-        .route("/ws", get(upgrade));
+        .route("/ws", get(upgrade))
+        .route("/engine", get(engine_upgrade));
     let app = match &files {
-        Files::Disk(dist) => app.fallback_service(ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html")))),
+        Files::Disk(dist) => app
+            .fallback_service(ServeDir::new(dist).fallback(ServeFile::new(dist.join("index.html"))))
+            .layer(axum::middleware::from_fn(cache_assets)),
         #[cfg(feature = "embed")]
         Files::Embedded => app.fallback(embedded),
     };
-    let app = app.with_state(state);
+    // Text compresses to a third (the app's script, the engine's WebAssembly for a phone that
+    // falls back to its own, the views); a game's small messages are left alone.
+    let app = app.layer(CompressionLayer::new()).with_state(state);
 
     println!("500 is running.\n");
     if options.browser {
@@ -276,6 +283,11 @@ async fn main() {
     let shutdown = async {
         let _ = tokio::signal::ctrl_c().await;
     };
+    // Each card played is a small message: send it at once rather than waiting to batch it with
+    // the next (Nagle's algorithm, which with delayed acknowledgements can hold it a fifth of a second).
+    let listener = listener.tap_io(|tcp| {
+        let _ = tcp.set_nodelay(true);
+    });
     if let Err(e) = axum::serve(listener, app).with_graceful_shutdown(shutdown).await {
         eprintln!("server error: {e}");
     }
@@ -292,6 +304,17 @@ async fn embedded(uri: axum::http::Uri) -> Response {
     // Built assets have content hashes in their names, so they never change.
     let cache = if path.starts_with("assets/") { "public, max-age=31536000, immutable" } else { "no-cache" };
     ([(header::CONTENT_TYPE, mime), (header::CACHE_CONTROL, cache.to_string())], file.contents()).into_response()
+}
+
+/// Built assets have content hashes in their names, so they never change: a phone keeps them
+/// rather than asking again on every visit.
+async fn cache_assets(request: axum::extract::Request, next: axum::middleware::Next) -> Response {
+    let immutable = request.uri().path().starts_with("/assets/");
+    let mut response = next.run(request).await;
+    if immutable && response.status().is_success() {
+        response.headers_mut().insert(header::CACHE_CONTROL, header::HeaderValue::from_static("public, max-age=31536000, immutable"));
+    }
+    response
 }
 
 /// A hand code from the web app, with the game it names. Kept in the user's app-data folder by
@@ -361,4 +384,58 @@ async fn connection(socket: WebSocket, room: RoomHandle) {
         _ = reader => {}
     }
     room.disconnect(conn);
+}
+
+async fn engine_upgrade(ws: WebSocketUpgrade) -> Response {
+    ws.on_upgrade(engine_connection)
+}
+
+/// A browser's engine, run here: a phone playing solo hands its requests (bots' moves, the coach)
+/// to this computer, which is many times faster. Each connection is one browser worker's worth:
+/// its own game, its requests answered in order on its own thread (the bots aren't `Send`). Pings
+/// are answered at once, even mid-request, so the page can tell a slow answer from a lost connection.
+async fn engine_connection(socket: WebSocket) {
+    let (mut sink, mut stream) = socket.split();
+    let (out, mut outbox) = tokio::sync::mpsc::unbounded_channel::<String>();
+    let (jobs, inbox) = std::sync::mpsc::channel::<String>();
+    let replies = out.clone();
+    let worker = std::thread::Builder::new().name("engine".into()).spawn(move || {
+        let mut service = fh_wasm::service::Service::default();
+        // Ends when the connection does (the sender is dropped), after any request in progress.
+        while let Ok(text) = inbox.recv() {
+            if replies.send(service.handle_json(&text)).is_err() {
+                break;
+            }
+        }
+    });
+    if worker.is_err() {
+        return;
+    }
+    let writer = async {
+        while let Some(text) = outbox.recv().await {
+            if sink.send(Message::Text(text.into())).await.is_err() {
+                break;
+            }
+        }
+        let _ = sink.close().await;
+    };
+    let reader = async {
+        while let Some(Ok(message)) = stream.next().await {
+            match message {
+                Message::Text(text) => {
+                    if let Some(ping) = text.strip_prefix("{\"ping\":") {
+                        let _ = out.send(format!("{{\"pong\":{ping}"));
+                    } else if jobs.send(text.to_string()).is_err() {
+                        break;
+                    }
+                }
+                Message::Close(_) => break,
+                _ => {}
+            }
+        }
+    };
+    tokio::select! {
+        _ = writer => {}
+        _ = reader => {}
+    }
 }
