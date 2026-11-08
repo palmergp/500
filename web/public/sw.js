@@ -3,8 +3,9 @@
 // from the network when it's available (so updates arrive), otherwise from the cache; hashed
 // assets come from the cache first.
 
+// The build adds its own name to this (vite.config.ts), so each release gets a fresh cache.
 const CACHE = "fh500-v2";
-const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png"];
+const SHELL = ["./", "./index.html", "./manifest.webmanifest", "./icon.svg", "./icon-192.png", "./icon-512.png", "./apple-touch-icon.png"];
 
 async function precache() {
   const cache = await caches.open(CACHE);

@@ -87,6 +87,8 @@ button:focus-visible {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
+  /* On a phone with a notch or a home bar (full screen from the home screen), stay clear of them. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);
   background: radial-gradient(ellipse at center, var(--felt) 0%, var(--felt-dark) 85%);
 }
 
@@ -524,7 +526,7 @@ button:focus-visible {
   background: var(--panel);
   color: var(--panel-ink);
   width: min(440px, calc(100vw - 32px));
-  max-height: calc(100dvh - 32px);
+  max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 .dialog.wide {
   width: min(820px, calc(100vw - 32px));
@@ -1900,7 +1902,7 @@ button.danger {
   display: grid;
   place-items: center;
   padding: 24px 16px;
-  min-height: 100dvh;
+  min-height: calc(100dvh - env(safe-area-inset-top) - env(safe-area-inset-bottom));
 }
 .menu-card {
   width: min(420px, 100%);
@@ -2153,7 +2155,7 @@ button.danger {
   inset: auto;
   margin: 0;
   border: none;
-  top: 60px;
+  top: calc(60px + env(safe-area-inset-top));
   left: 50%;
   transform: translateX(-50%);
   z-index: 60;
@@ -2274,4 +2276,118 @@ button.danger {
 }
 .podium-name {
   font-weight: 600;
+}
+
+/* ---- Short screens (a phone on its side): the narrow screens' compact top bar ------------- */
+
+@media (max-height: 500px) {
+  .topbar {
+    gap: 8px;
+    padding: 4px 10px;
+  }
+  .topbar h1 {
+    font-size: 1.1rem;
+  }
+  .nav-label {
+    display: none;
+  }
+  .topbar nav {
+    gap: 4px;
+  }
+  .topbar nav button,
+  .nav-button {
+    padding: 3px 7px;
+    font-size: 0.85rem;
+  }
+  .scores {
+    font-size: 0.85rem;
+    gap: 10px;
+    flex-wrap: nowrap;
+  }
+  .scores .long {
+    display: none;
+  }
+  .scores .short {
+    display: inline;
+  }
+  .play-area > .table {
+    margin: 4px 0;
+    gap: 4px 8px;
+  }
+  /* The info panel and the other players' plates stay small, so the middle keeps its room. */
+  .table-info .info-panel {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 2px 8px;
+    font-size: 0.7rem;
+    padding: 4px 8px;
+  }
+  .table-info .info-panel .contract {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 2px 8px;
+  }
+  .table-info .auction ol {
+    display: none;
+  }
+  .table-info .info-buttons button {
+    font-size: 0.7rem;
+    padding: 2px 8px;
+  }
+  /* The other three players in a row across the top; the info panel beside the middle. */
+  .play-area > .table {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    grid-template-areas:
+      "west  north  east"
+      "info  center ."
+      "south south  south";
+  }
+  .play-area > .table .seat-west,
+  .play-area > .table .seat-east,
+  .play-area > .table .seat-north {
+    align-self: stretch;
+    justify-self: stretch;
+  }
+  .play-area > .table .seat-north {
+    text-align: center;
+  }
+  .play-area > .table .seat-north .seat-name,
+  .play-area > .table .seat-north .piles {
+    justify-content: center;
+  }
+  .table-info {
+    align-self: stretch;
+    min-height: 0;
+    overflow-y: auto;
+  }
+  /* Calls sit inside each player's plate, so nothing covers the middle. */
+  .play-area .bubble,
+  .play-area .seat-west .bubble,
+  .play-area .seat-east .bubble,
+  .play-area .seat-south .bubble {
+    position: static;
+    transform: none;
+    display: inline-block;
+    margin-top: 2px;
+  }
+  .play-area .seat-south .bubble {
+    margin: 0 0 0 6px;
+  }
+  .dock {
+    max-height: 34%;
+  }
+  .seat {
+    padding: 3px 8px;
+  }
+  .seat-name {
+    font-size: 0.8rem;
+  }
+  .seat-sub {
+    display: none;
+  }
+  .backs {
+    --card-w: clamp(18px, 6dvh, 28px);
+    margin-top: 2px;
+  }
 }

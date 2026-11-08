@@ -386,6 +386,10 @@ export function App() {
       next.rounds[r].tables[yourTable(next, r)].result = {
         scores: [view.scores[0], view.scores[1]],
         hands: view.history.filter((h) => !h.passedOut).map((h) => h.scoreChange),
+        // You sit South, so the view's seats are the table's.
+        bids: view.history
+          .filter((h) => !h.passedOut && h.contract)
+          .map((h) => ({ seat: h.contract!.declarer, label: h.contract!.label, made: !!h.made })),
       };
       next.current = r + 1;
     });

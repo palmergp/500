@@ -21,6 +21,15 @@ export interface TableResult {
   scores: [number, number];
   /** Each hand's score changes, North–South and East–West. */
   hands: [number, number][];
+  /** Each of those hands' bid (absent in tournaments saved before bids were kept). */
+  bids?: HandBid[];
+}
+
+/** A hand's bid: the declarer's seat at the table (0 South, 1 West, 2 North, 3 East), "8♥", made. */
+export interface HandBid {
+  seat: number;
+  label: string;
+  made: boolean;
 }
 
 /** One table in a round: participant ids by seat (South, West, North, East). */
@@ -149,6 +158,8 @@ export interface Award {
   score: number;
   players: [number, number];
   round: number;
+  /** For a high hand: its bid, with the participant who declared it. */
+  bid?: { label: string; by: number; made: boolean };
 }
 
 /** The High Game (a side's score at the end of a round) and the High Hand (a side's best single
@@ -163,9 +174,11 @@ export function awards(t: Tournament): { highGame: Award | null; highHand: Award
         const players: [number, number] = [table.seats[side], table.seats[side + 2]];
         const game = table.result.scores[side];
         if (!highGame || game > highGame.score) highGame = { score: game, players, round: r };
-        for (const hand of table.result.hands) {
-          if (!highHand || hand[side] > highHand.score) highHand = { score: hand[side], players, round: r };
-        }
+        table.result.hands.forEach((hand, i) => {
+          if (highHand && hand[side] <= highHand.score) return;
+          const bid = table.result!.bids?.[i];
+          highHand = { score: hand[side], players, round: r, bid: bid && { label: bid.label, by: table.seats[bid.seat], made: bid.made } };
+        });
       }
     }
   });

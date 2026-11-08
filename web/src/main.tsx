@@ -13,5 +13,7 @@ createRoot(document.getElementById("root")!).render(
 if ("serviceWorker" in navigator && import.meta.env.PROD) {
   window.addEventListener("load", () => {
     navigator.serviceWorker.register("./sw.js").catch(() => {});
+    // Ask the browser to keep saved games and records even when the device is short of space.
+    navigator.storage?.persist?.().catch(() => {});
   });
 }

@@ -45,6 +45,7 @@ test("a tournament round: play your table, see the standings, a new partner next
   await expect(next).toBeEnabled({ timeout: 600_000 });
   await expect(after.locator(".round-tables li")).toHaveCount(3);
   await expect(after.getByText(/High game:/)).toBeVisible();
+  await expect(after.locator(".award", { hasText: "High hand:" })).toContainText(/(on|defending) .+ bid/);
   await expect(after.getByText(/You scored/)).toBeVisible();
   await page.screenshot({ path: "test-results/tournament-round.png", fullPage: true });
   await next.click();
@@ -87,7 +88,7 @@ test("the final results: third, second, then the winner, then the awards", async
     round.tables.forEach((table, i) => {
       const a = 100 + 37 * ((r + i) % 5);
       const b = 60 + 23 * ((r * 3 + i) % 7);
-      table.result = { scores: [a, b], hands: [[a, 0], [0, b]] };
+      table.result = { scores: [a, b], hands: [[a, 0], [0, b]], bids: [{ seat: 2, label: "8♥", made: true }, { seat: 3, label: "7♠", made: true }] };
     }),
   );
   t.current = ROUNDS;
@@ -104,9 +105,21 @@ test("the final results: third, second, then the winner, then the awards", async
   await final.getByRole("button", { name: "Reveal the winner" }).click();
   await expect(final.locator(".podium-step.place-1")).toBeVisible();
   await expect(final.getByText(/High game:/)).toBeVisible();
-  await expect(final.getByText(/High hand:/)).toBeVisible();
+  // The high hand names its bid and who made it.
+  await expect(final.locator(".award", { hasText: "High hand:" })).toContainText(/on .+'s (8♥|7♠) bid/);
   await page.waitForTimeout(800);
   await page.screenshot({ path: "test-results/tournament-final.png", fullPage: true });
   await final.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("navigation", { name: "Main menu" })).toBeVisible();
+});
+
+test("the best hand record says which bid it was", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  await freshStart(page);
+  const records = { highGame: 420, bestHand: { points: 300, label: "9♠", declarer: 1, made: false }, highBid: null, gamesPlayed: 1, gamesWon: 1, bids: {}, counted: [] };
+  await page.evaluate((r) => localStorage.setItem("fh500.records", r), JSON.stringify(records));
+  await page.reload();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Learn/ }).click();
+  await page.getByRole("tab", { name: /Progress/ }).click();
+  await expect(page.locator(".stat", { hasText: "+300" })).toContainText("best hand: defending West's 9♠ bid");
 });

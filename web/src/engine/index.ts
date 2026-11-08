@@ -289,6 +289,8 @@ export class CoachClient extends WorkerClient implements Coach {
 export interface SimulatedGame {
   scores: [number, number];
   hands: [number, number][];
+  /** Each hand's bid: the declarer's seat (0 South, 1 West, 2 North, 3 East), its label, made. */
+  bids: { seat: number; label: string; made: boolean }[];
 }
 
 /** A third worker for a tournament's other tables, so they never slow the game you're playing. */

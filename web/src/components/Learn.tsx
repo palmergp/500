@@ -3,7 +3,7 @@ import type { ActionView, CardView, CoachClient, DrillView, GradeView } from "..
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { LESSONS, type Lesson } from "../learn/lessons";
 import { leaks, loadProgress, recordScore, resetProgress, type Progress } from "../progress";
-import { loadRecords, resetRecords, type Records } from "../records";
+import { bestHandBid, loadRecords, resetRecords, type Records } from "../records";
 import { PATTERNS } from "../learn/patterns";
 import { loadMistakes, solveMistake, type Mistake } from "../mistakes";
 import { BiddingBox } from "./BiddingBox";
@@ -471,7 +471,7 @@ function RecordsView({ records }: { records: Records }) {
         </div>
         <div className="stat">
           <span className="stat-value">{records.bestHand ? `+${records.bestHand.points}` : "—"}</span>
-          <span className="stat-label">best hand{records.bestHand ? ` (${records.bestHand.label})` : ""}</span>
+          <span className="stat-label">best hand{records.bestHand ? `: ${bestHandBid(records.bestHand)}` : ""}</span>
         </div>
         <div className="stat">
           <span className="stat-value">{records.highBid?.label ?? "—"}</span>

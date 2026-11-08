@@ -23,7 +23,21 @@ function AwardLine({ t, label, award, personas }: { t: Tournament; label: string
     <p className="award">
       <strong>{label}:</strong> {award.score} points, <Who t={t} id={award.players[0]} personas={personas} /> and <Who t={t} id={award.players[1]} personas={personas} /> (round{" "}
       {award.round + 1})
+      {award.bid && <BidLine t={t} award={award} />}
     </p>
+  );
+}
+
+/** A high hand's bid: "on Ada's 10♥ bid" for the declarers, "defending Finn's 8♠ bid (set)" for the defenders. */
+function BidLine({ t, award }: { t: Tournament; award: Award }) {
+  const bid = award.bid!;
+  const declared = award.players.includes(bid.by);
+  return (
+    <span className="award-bid">
+      , {declared ? "on" : "defending"}{" "}
+      {bid.by === 0 ? "your" : `${t.participants[bid.by].name}'s`}{" "}
+      <strong>{bid.label}</strong> bid{!declared && !bid.made && " (set)"}
+    </span>
   );
 }
 

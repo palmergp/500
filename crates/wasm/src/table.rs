@@ -265,6 +265,16 @@ fn make_bot(id: &str, seed: u64, seat: Seat) -> Result<Option<Box<dyn Bot>>, Str
 pub struct Simulated {
     pub scores: [i32; 2],
     pub hands: Vec<[i32; 2]>,
+    /// Each of those hands' bid: who declared it, and whether it made.
+    pub bids: Vec<SimulatedBid>,
+}
+
+/// A simulated hand's bid: the declarer's seat (0 South, 1 West, 2 North, 3 East), "8♥", made.
+#[derive(Clone, Debug, serde::Serialize)]
+pub struct SimulatedBid {
+    pub seat: usize,
+    pub label: String,
+    pub made: bool,
 }
 
 /// Plays a whole game between the personas in `players` (South, West, North, East), for a
@@ -277,8 +287,17 @@ pub fn simulate(seed: u64, players: [String; 4], hands: u8) -> Result<Simulated,
         }
     }
     let game = table.game();
-    let hands = game.history().iter().filter(|h| h.contract.is_some()).map(|h| h.score_change).collect();
-    Ok(Simulated { scores: game.scores(), hands })
+    let played: Vec<_> = game.history().iter().filter_map(|h| h.contract.map(|c| (h, c))).collect();
+    let hands = played.iter().map(|(h, _)| h.score_change).collect();
+    let bids = played
+        .iter()
+        .map(|(h, (seat, contract))| SimulatedBid {
+            seat: seat.index(),
+            label: contract.to_string(),
+            made: h.tricks_won[seat.team().index()] >= contract.level,
+        })
+        .collect();
+    Ok(Simulated { scores: game.scores(), hands, bids })
 }
 
 /// Where hand codes' games are kept on this computer: `%LOCALAPPDATA%/500/hands` (or `~/500/hands`).
@@ -339,6 +358,12 @@ mod tests {
         assert!(result.hands.len() >= 4);
         let sums = result.hands.iter().fold([0, 0], |acc, h| [acc[0] + h[0], acc[1] + h[1]]);
         assert_eq!(sums, result.scores);
+        // Each hand's bid: a declarer whose side made it scores its value.
+        assert_eq!(result.bids.len(), result.hands.len());
+        for (bid, hand) in result.bids.iter().zip(&result.hands) {
+            assert!(bid.seat < 4 && !bid.label.is_empty());
+            assert_eq!(bid.made, hand[bid.seat % 2] > 0, "{bid:?} {hand:?}");
+        }
     }
 
     /// Plays the human seat with the first legal action until the game ends.

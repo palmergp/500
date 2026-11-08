@@ -12,8 +12,9 @@ export interface BidStat {
 export interface Records {
   /** Your side's highest final score in a finished game. */
   highGame: number | null;
-  /** Most points your side scored on one hand. */
-  bestHand: { points: number; label: string } | null;
+  /** Most points your side scored on one hand, with its bid: who declared it (0 you, 1 left,
+   * 2 partner, 3 right; absent in records kept before it was noted) and whether it made. */
+  bestHand: { points: number; label: string; declarer?: number; made?: boolean } | null;
   /** Your highest bid that made (by its value). */
   highBid: { label: string; value: number } | null;
   gamesPlayed: number;
@@ -57,8 +58,9 @@ export function recordHand(game: string, hand: HandView): string[] {
   const broken: string[] = [];
   const points = hand.scoreChange[0];
   if (points > 0 && (records.bestHand === null || points > records.bestHand.points)) {
-    if (records.bestHand !== null) broken.push(`best hand: ${points} points`);
-    records.bestHand = { points, label: hand.contract.label };
+    const first = records.bestHand === null;
+    records.bestHand = { points, label: hand.contract.label, declarer: hand.contract.declarer, made: !!hand.made };
+    if (!first) broken.push(`best hand: ${points} points (${bestHandBid(records.bestHand)})`);
   }
   if (hand.contract.declarer === 0) {
     const stat = (records.bids[hand.contract.label] ??= { bids: 0, made: 0 });
@@ -73,6 +75,13 @@ export function recordHand(game: string, hand: HandView): string[] {
   }
   save(records);
   return broken;
+}
+
+/** A best hand's bid in words: "your 10♥ bid", "partner's 8♦ bid", "defending East's 7♠ bid". */
+export function bestHandBid(best: NonNullable<Records["bestHand"]>): string {
+  const by = [`your ${best.label} bid`, `West's ${best.label} bid`, `partner's ${best.label} bid`, `East's ${best.label} bid`];
+  if (best.declarer === undefined) return best.label;
+  return best.declarer % 2 === 0 ? by[best.declarer] : `defending ${by[best.declarer]}`;
 }
 
 /** Counts a finished game: your side's final score and whether you won. Returns the records it broke. */
