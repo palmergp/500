@@ -526,6 +526,8 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
   const decisions = games.reduce((s, g) => s + g.decisions, 0);
   const totals = VERDICTS.map((v) => games.reduce((s, g) => s + g.verdicts[v], 0));
   const lossPer = (g: { loss: number; decisions: number }) => (g.decisions ? g.loss / g.decisions : 0);
+  const gameTip = (g: (typeof games)[number]) =>
+    `${g.date}: ${lossPer(g).toFixed(1)} points per decision over ${g.decisions} decisions${g.finished ? (g.won ? ", won" : ", lost") : ""}`;
   const recent = games.slice(-12);
   const maxLoss = Math.max(1, ...recent.map(lossPer));
   const pct = (s: { asked: number; correct: number }) => (s.asked ? `${Math.round((100 * s.correct) / s.asked)}%` : "—");
@@ -615,14 +617,15 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
               <div
                 key={g.id}
                 className="trend-col"
-                onMouseEnter={() => setTip(`${g.date}: ${lossPer(g).toFixed(1)} points per decision over ${g.decisions} decisions${g.finished ? (g.won ? ", won" : ", lost") : ""}`)}
+                onMouseEnter={() => setTip(gameTip(g))}
+                onClick={() => setTip(gameTip(g))}
               >
                 <span className="trend-bar" style={{ height: `${(100 * lossPer(g)) / maxLoss}%` }} />
                 <span className="trend-label">{i + 1}</span>
               </div>
             ))}
           </div>
-          <p className="coach-foot">{tip ?? "Lower is better. Hover a bar for that game."}</p>
+          <p className="coach-foot">{tip ?? "Lower is better. Hover over or tap a bar for that game."}</p>
           <table className="score-pad">
             <thead>
               <tr>

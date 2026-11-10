@@ -2391,3 +2391,29 @@ button.danger {
     margin-top: 2px;
   }
 }
+
+/* Touch screens: press and hold for a tooltip (components/TouchTips.tsx). */
+.touch-tip {
+  position: fixed;
+  inset: auto;
+  margin: 0;
+  border: none;
+  z-index: 70;
+  max-width: min(320px, calc(100vw - 16px));
+  padding: 8px 12px;
+  border-radius: 8px;
+  background: #1d2420;
+  color: #f4f1e8;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.45);
+  pointer-events: none;
+  white-space: pre-line;
+}
+/* So holding a card or button shows its tip rather than selecting text or opening the system menu. */
+.app button,
+.app [title] {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+}

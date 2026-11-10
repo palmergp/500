@@ -24,6 +24,7 @@ import { keepMistake } from "./mistakes";
 import { recordGame, recordHand } from "./records";
 import { handCode, saveAt } from "./handcode";
 import { FinalReveal, TournamentDialog } from "./components/Tournament";
+import { TouchTips } from "./components/TouchTips";
 import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament } from "./tournament";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
@@ -861,6 +862,7 @@ export function App() {
       <div className="visually-hidden" aria-live="polite" aria-atomic="true">
         {announcement}
       </div>
+      <TouchTips />
 
       {screen === "menu" && (
         <MainMenu

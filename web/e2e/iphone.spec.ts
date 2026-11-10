@@ -66,3 +66,51 @@ test("home-screen tags and icon", async ({ page }, info) => {
   const sw = await (await page.request.get("/sw.js")).text();
   expect(sw).toMatch(/const CACHE = "fh500-v2-[0-9a-f]{10}"/);
 });
+
+test("touch: press and hold shows a tooltip without pressing; a tap on a label shows its tooltip", async ({ browser, browserName }, info) => {
+  test.skip(info.project.name !== "desktop" || browserName !== "chromium", "Chromium sends the touches");
+  const { context, page } = await iphone(browser, SHAPES[0]);
+  const cdp = await context.newCDPSession(page);
+  const centre = async (selector: string) => {
+    const box = (await page.locator(selector).first().boundingBox())!;
+    return { x: box.x + box.width / 2, y: box.y + box.height / 2 };
+  };
+  const touch = async (selector: string, ms: number) => {
+    const point = await centre(selector);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchStart", touchPoints: [point] });
+    await page.waitForTimeout(ms);
+    await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+  };
+  await startGame(page);
+  const tip = page.locator(".touch-tip");
+
+  // Holding the Menu button reads its tooltip, and letting go doesn't open the menu.
+  await touch('button[aria-label="Menu"]', 800);
+  await expect(tip).toContainText("Main menu");
+  await page.waitForTimeout(300);
+  await expect(page.getByRole("navigation", { name: "Main menu" })).toHaveCount(0);
+  const bubble = (await tip.boundingBox())!;
+  expect(bubble.x).toBeGreaterThanOrEqual(0);
+  expect(bubble.x + bubble.width).toBeLessThanOrEqual(393);
+
+  // A tap on a player's name plate (no button there) shows their style.
+  const blurb = await page.locator(".seat-west").getAttribute("title");
+  expect(blurb).toBeTruthy();
+  await touch(".seat-west .seat-name", 60);
+  await expect(tip).toHaveText(blurb!);
+
+  // The next touch puts it away, and a quick tap on a button still presses it.
+  await touch('button[aria-label="Menu"]', 60);
+  await expect(tip).toHaveCount(0);
+  await page.getByRole("navigation", { name: "Main menu" }).waitFor();
+
+  // In a dialog too: the bubble shows on top of it (dialogs sit in the browser's top layer).
+  await page.getByRole("button", { name: /^Play solo/ }).click();
+  await page.getByRole("dialog", { name: "New game" }).waitFor();
+  await touch('.dialog label.inline[title]', 800);
+  await expect(tip).toBeVisible();
+  // Opened after the dialog, in the top layer, so it's drawn above it.
+  expect(await tip.evaluate((el) => el.matches(":popover-open"))).toBe(true);
+  await page.screenshot({ path: "test-results/iphone-touch-tip.png" });
+  await context.close();
+});
