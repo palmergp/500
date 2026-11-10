@@ -87,7 +87,7 @@ test("the final results: third, second, then the winner, then the awards", async
   t.rounds.forEach((round, r) =>
     round.tables.forEach((table, i) => {
       const a = 100 + 37 * ((r + i) % 5);
-      const b = 60 + 23 * ((r * 3 + i) % 7);
+      const b = 60 + 23 * ((r * 3 + i) % 7) - (r === 2 && i === 1 ? 300 : 0);
       table.result = { scores: [a, b], hands: [[a, 0], [0, b]], bids: [{ seat: 2, label: "8♥", made: true }, { seat: 3, label: "7♠", made: true }] };
     }),
   );
@@ -107,8 +107,31 @@ test("the final results: third, second, then the winner, then the awards", async
   await expect(final.getByText(/High game:/)).toBeVisible();
   // The high hand names its bid and who made it.
   await expect(final.locator(".award", { hasText: "High hand:" })).toContainText(/on .+'s (8♥|7♠) bid/);
+  // Every player's game in every round: a row each in final order, the round's best starred, and
+  // choosing a player lists their games.
+  const grid = final.locator(".game-grid table");
+  await expect(grid.locator("tbody tr")).toHaveCount(12);
+  await expect(grid.locator("thead th")).toHaveCount(2 + ROUNDS + 1);
+  const { standings: order } = await import("../src/tournament");
+  await expect(grid.locator("tbody tr").first().locator(".game-total")).toHaveText(String(order(t)[0].total));
+  await expect(grid.locator(".best-mark")).not.toHaveCount(0);
+  await expect(grid.locator(".game-cell").first()).toHaveAttribute("title", /^Round 1: with .+ against .+ and .+, -?\d+ to -?\d+, (won|lost|tied)$/);
+  await expect(final.getByRole("heading", { name: "Your games" })).toBeVisible();
+  await expect(final.locator(".player-games li")).toHaveCount(ROUNDS);
+  const other = grid.locator("tbody th button", { hasNotText: "You" }).first();
+  const otherName = (await other.innerText()).trim();
+  await other.click();
+  await expect(final.getByRole("heading", { name: new RegExp(`^${otherName}.*'s games$`) })).toBeVisible();
+  await expect(final.locator(".player-games li").first()).toContainText(/^R1/);
+  await expect(grid.locator(".game-cell", { hasText: /^-\d+/ })).not.toHaveCount(0);
   await page.waitForTimeout(800);
   await page.screenshot({ path: "test-results/tournament-final.png", fullPage: true });
+  // On a phone the grid scrolls sideways inside the dialog; the page doesn't.
+  await page.setViewportSize({ width: 393, height: 852 });
+  await grid.scrollIntoViewIfNeeded();
+  expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  await page.screenshot({ path: "test-results/tournament-final-phone.png" });
+  await page.setViewportSize({ width: 1280, height: 720 });
   await final.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("navigation", { name: "Main menu" })).toBeVisible();
 

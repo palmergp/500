@@ -65,7 +65,8 @@
   names and personas), 3 tables, 8 rounds of a 4-hand game; a side's final score goes to both partners' totals, and
   partners never repeat (circle-method schedule). You play one table (names via `SaveData.names`); the other two are
   played out by `simulateGame` in a third worker (`Simulator`). Saved in local storage; standings after each round,
-  then a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand.
+  then a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand, and every player's score in every round
+  (`GameGrid`: tinted cells, the round's best starred, a player's games listed when chosen).
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
   worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save

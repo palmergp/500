@@ -44,7 +44,7 @@ class AudioEngine {
     this.sfxBus = this.ctx.createGain();
     this.sfxBus.connect(this.master);
     this.musicBus = this.ctx.createGain();
-    this.musicBus.gain.value = 0.22;
+    this.musicBus.gain.value = 0.28; // about as loud as the old lounge loop (measured offline)
     this.musicBus.connect(this.master);
     if (this.musicOn) this.startMusic();
   }
@@ -143,7 +143,7 @@ class AudioEngine {
     src.start(at);
   }
 
-  // ---- Music: a slow jazz-lounge loop -----------------------------------------------------
+  // ---- Music: a gentle bossa nova -----------------------------------------------------------
 
   private startMusic() {
     if (!this.ctx || this.musicTimer !== null) return;
@@ -163,44 +163,151 @@ class AudioEngine {
     this.musicTimer = null;
   }
 
+  /** One bar: bass and soft kick, nylon-guitar comping on the two-bar bossa pattern, rim clicks on
+   * the clave, a shaker on the eighths, and now and then a vibraphone phrase. */
   private scheduleBar(at: number, bar: number) {
     const bus = this.musicBus!;
     const chord = PROGRESSION[bar % PROGRESSION.length];
-    // Soft electric-piano chord on beats 1 and 3 (a little later on 3 for swing).
-    for (const beat of [0, 2.15]) {
-      chord.notes.forEach((n) => this.epiano(at + beat * BEAT, midi(n), BEAT * 1.8, 0.05, bus));
-    }
-    // Walking bass: root, third, fifth, approach note.
-    const walk = [chord.root, chord.root + 4 - (chord.minor ? 1 : 0), chord.root + 7, chord.root + 6];
-    walk.forEach((n, i) => this.tone(at + i * BEAT, midi(n - 12), BEAT * 0.9, 0.09, "sine", bus));
-    // Brushed hi-hat on the offbeats.
-    for (let i = 0; i < 4; i++) this.snap(at + (i + 0.66) * BEAT, 0.06, bus);
-    // An occasional melody note.
-    if (bar % 2 === 1) {
-      const top = chord.notes[chord.notes.length - 1] + 12;
-      this.epiano(at + 1.5 * BEAT, midi(top), BEAT * 1.5, 0.035, bus);
-      this.epiano(at + 3 * BEAT, midi(top - 3), BEAT, 0.03, bus);
+    const next = PROGRESSION[(bar + 1) % PROGRESSION.length];
+    const second = bar % 2 === 1;
+    const e = (eighth: number) => at + eighth * EIGHTH;
+
+    // Bass: root on 1, the fifth on the and of 2 held through 3, the root again on the and of 4.
+    const fifth = chord.root + 7 > 50 ? chord.root - 5 : chord.root + 7;
+    this.bass(e(0), midi(chord.root), 3 * EIGHTH, 0.13, bus);
+    this.bass(e(3), midi(fifth), 4 * EIGHTH, 0.11, bus);
+    this.bass(e(7), midi(chord.root), EIGHTH, 0.08, bus);
+    for (const [eighth, level] of [[0, 0.07], [3, 0.04], [4, 0.06], [7, 0.035]] as const) this.kick(e(eighth), level, bus);
+
+    // Guitar: the first bar of each pair on 1, the and of 2, and 4; the second on 2, the and of 3,
+    // and the and of 4, which anticipates the next bar's chord.
+    const hits: [number, Chord, number][] = second
+      ? [[2, chord, 0.032], [5, chord, 0.028], [7, next, 0.034]]
+      : [[0, chord, 0.036], [3, chord, 0.028], [6, chord, 0.03]];
+    for (const [eighth, c, level] of hits) this.strum(e(eighth), c.notes, level, bus);
+
+    // Cross-stick on the bossa clave (3 + 3 + 4 + 3 + 3 eighths over the two bars).
+    for (const eighth of second ? [2, 5] : [0, 3, 6]) this.rim(e(eighth), 0.05, bus);
+    // Shaker: every eighth, the offbeats a little louder.
+    for (let i = 0; i < 8; i++) this.shaker(e(i), i % 2 ? 0.035 : 0.02, bus);
+
+    // Vibraphone: a short phrase every other bar from the chord's tones, varied each pass.
+    const pass = Math.floor(bar / PROGRESSION.length) % MOTIFS.length;
+    const motif = MOTIFS[pass][bar % 4];
+    for (const [eighth, tone, length] of motif) {
+      const n = chord.notes[tone] + 12;
+      this.vibes(e(eighth), midi(n), length * EIGHTH, 0.032, bus);
     }
   }
 
-  /** A mellow keys tone: two slightly detuned sines with a bell-like attack. */
-  private epiano(at: number, freq: number, length: number, level: number, bus: GainNode) {
+  /** A plucked string: a triangle wave through a low-pass filter, with a quick, soft decay. */
+  private pluck(at: number, freq: number, length: number, level: number, bus: GainNode, cutoff = 2200) {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.type = "triangle";
+    osc.frequency.value = freq;
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.setValueAtTime(cutoff, at);
+    filter.frequency.exponentialRampToValueAtTime(cutoff * 0.35, at + length);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(0, at);
+    gain.gain.linearRampToValueAtTime(level, at + 0.004);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + length);
+    osc.connect(filter).connect(gain).connect(bus);
+    osc.start(at);
+    osc.stop(at + length + 0.05);
+  }
+
+  /** Nylon-string guitar: the chord's notes strummed upward with the thumb, a few ms apart. */
+  private strum(at: number, notes: number[], level: number, bus: GainNode) {
+    notes.forEach((n, i) => this.pluck(at + i * 0.012, midi(n), 0.42, level, bus));
+  }
+
+  /** Upright bass: a round sine with a little plucked edge. */
+  private bass(at: number, freq: number, length: number, level: number, bus: GainNode) {
     this.tone(at, freq, length, level, "sine", bus);
-    this.tone(at, freq * 1.003, length * 0.8, level * 0.6, "sine", bus);
-    this.tone(at, freq * 2, length * 0.25, level * 0.25, "sine", bus);
+    this.pluck(at, freq * 2, Math.min(length, 0.25), level * 0.25, bus, 900);
+  }
+
+  /** A soft kick (the surdo's part): a sine falling in pitch. */
+  private kick(at: number, level: number, bus: GainNode) {
+    const ctx = this.ctx!;
+    const osc = ctx.createOscillator();
+    osc.frequency.setValueAtTime(95, at);
+    osc.frequency.exponentialRampToValueAtTime(48, at + 0.12);
+    const gain = ctx.createGain();
+    gain.gain.setValueAtTime(level, at);
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.18);
+    osc.connect(gain).connect(bus);
+    osc.start(at);
+    osc.stop(at + 0.2);
+  }
+
+  /** A short burst of filtered noise. */
+  private noise(at: number, length: number, level: number, type: BiquadFilterType, freq: number, q: number, bus: GainNode) {
+    const ctx = this.ctx!;
+    const buffer = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * length), ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < data.length; i++) data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    const filter = ctx.createBiquadFilter();
+    filter.type = type;
+    filter.frequency.value = freq;
+    filter.Q.value = q;
+    const gain = ctx.createGain();
+    gain.gain.value = level;
+    src.connect(filter).connect(gain).connect(bus);
+    src.start(at);
+  }
+
+  /** Cross-stick on the snare's rim: a woody click. */
+  private rim(at: number, level: number, bus: GainNode) {
+    this.noise(at, 0.035, level, "bandpass", 1900, 4, bus);
+    this.tone(at, 820, 0.04, level * 0.5, "triangle", bus);
+  }
+
+  private shaker(at: number, level: number, bus: GainNode) {
+    this.noise(at, 0.05, level, "highpass", 6500, 0.7, bus);
+  }
+
+  /** Vibraphone: a sine with a soft bell partial and a slow fade. */
+  private vibes(at: number, freq: number, length: number, level: number, bus: GainNode) {
+    this.tone(at, freq, length + 0.6, level, "sine", bus);
+    this.tone(at, freq * 4, 0.3, level * 0.12, "sine", bus);
   }
 }
 
-const BEAT = 60 / 76;
+const BEAT = 60 / 128;
+const EIGHTH = BEAT / 2;
 const BAR = 4 * BEAT;
 const midi = (n: number) => 440 * Math.pow(2, (n - 69) / 12);
 
-// Fmaj7 – Dm7 – Gm7 – C7 (I–vi–ii–V in F), voiced around middle C.
-const PROGRESSION = [
-  { root: 53, minor: false, notes: [57, 60, 64, 65] },
-  { root: 50, minor: true, notes: [57, 60, 62, 65] },
-  { root: 55, minor: true, notes: [58, 62, 65, 67] },
-  { root: 48, minor: false, notes: [58, 60, 64, 67] },
+interface Chord {
+  /** The bass note (MIDI). */
+  root: number;
+  /** The guitar's voicing, low to high (MIDI), the root left to the bass. */
+  notes: number[];
+}
+
+// Eight bars in F: Fmaj9 – F6/9 – Gm9 – C13 – Am7 – D7♭9 – Gm9 – C7♭9.
+const PROGRESSION: Chord[] = [
+  { root: 41, notes: [57, 60, 64, 67] },
+  { root: 41, notes: [57, 62, 64, 67] },
+  { root: 43, notes: [58, 62, 65, 69] },
+  { root: 48, notes: [58, 62, 64, 69] },
+  { root: 45, notes: [55, 60, 64, 67] },
+  { root: 50, notes: [54, 57, 60, 63] },
+  { root: 43, notes: [58, 62, 65, 69] },
+  { root: 48, notes: [52, 55, 58, 61] },
+];
+
+/** Vibraphone phrases, by bar within four: [eighth, which chord tone (0 lowest), length in eighths]. */
+type Phrase = [number, number, number][];
+const MOTIFS: Phrase[][] = [
+  [[[1, 3, 2], [3, 2, 1], [4, 3, 4]], [], [[2, 1, 2], [4, 2, 2], [6, 3, 2]], []],
+  [[[0, 2, 3], [3, 3, 3]], [[1, 1, 6]], [[3, 3, 1], [4, 2, 1], [5, 1, 3]], []],
 ];
 
 export const audio = new AudioEngine();

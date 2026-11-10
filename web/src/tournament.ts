@@ -211,3 +211,32 @@ export function saveTournament(t: Tournament | null) {
 export function participantName(t: Tournament, id: number): string {
   return t.participants[id].name;
 }
+
+/** One player's game in one round: who they partnered and faced, and the final scores. */
+export interface GameLine {
+  partner: number;
+  opponents: [number, number];
+  /** Their side's final score, and the other side's. */
+  score: number;
+  against: number;
+}
+
+/** Each player's game in every round, by participant id (null where their table hasn't finished). */
+export function gamesByPlayer(t: Tournament): Map<number, (GameLine | null)[]> {
+  const games = new Map<number, (GameLine | null)[]>(t.participants.map((p) => [p.id, t.rounds.map(() => null)]));
+  t.rounds.forEach((round, r) => {
+    for (const table of round.tables) {
+      if (!table.result) continue;
+      table.seats.forEach((id, seat) => {
+        const side = seat % 2;
+        games.get(id)![r] = {
+          partner: table.seats[(seat + 2) % 4],
+          opponents: [table.seats[(seat + 1) % 4], table.seats[(seat + 3) % 4]],
+          score: table.result!.scores[side],
+          against: table.result!.scores[1 - side],
+        };
+      });
+    }
+  });
+  return games;
+}

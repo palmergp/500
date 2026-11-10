@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Persona } from "../engine";
-import { awards, HANDS, ROUNDS, roundComplete, roundPoints, standings, yourTable, type Award, type Tournament } from "../tournament";
+import { awards, gamesByPlayer, HANDS, ROUNDS, roundComplete, roundPoints, standings, yourTable, type Award, type GameLine, type Tournament } from "../tournament";
 import { Dialog } from "./Dialog";
 
 function styleName(personas: Persona[], id: string): string {
@@ -72,6 +72,118 @@ function StandingsTable({ t, personas }: { t: Tournament; personas: Persona[] })
   );
 }
 
+/** Every player's score in every round: a row each, best total first. Each score is tinted (blue
+ * for points, deeper for more; red below zero) and the round's best is starred; a score's tooltip
+ * names that table, and choosing a player lists their games underneath. */
+export function GameGrid({ t, personas }: { t: Tournament; personas: Persona[] }) {
+  const list = standings(t);
+  const games = gamesByPlayer(t);
+  const [chosen, setChosen] = useState(0);
+  const played = t.rounds.map((_, r) => list.some((s) => games.get(s.participant.id)![r] !== null));
+  const rounds = t.rounds.map((_, r) => r).filter((r) => played[r]);
+  const all = [...games.values()].flat().filter((g): g is GameLine => g !== null);
+  const high = Math.max(1, ...all.map((g) => g.score));
+  const low = Math.max(1, ...all.map((g) => -g.score));
+  const best = t.rounds.map((_, r) => Math.max(...list.map((s) => games.get(s.participant.id)![r]?.score ?? -Infinity)));
+  const name = (id: number) => (id === 0 ? "you" : t.participants[id].name);
+  const tint = (score: number) =>
+    score > 0
+      ? `color-mix(in srgb, var(--score-up) ${Math.round(8 + (40 * score) / high)}%, transparent)`
+      : score < 0
+        ? `color-mix(in srgb, var(--score-down) ${Math.round(8 + (40 * -score) / low)}%, transparent)`
+        : undefined;
+  const describe = (r: number, g: GameLine) =>
+    `Round ${r + 1}: with ${name(g.partner)} against ${name(g.opponents[0])} and ${name(g.opponents[1])}, ${g.score} to ${g.against}${g.score > g.against ? ", won" : g.score < g.against ? ", lost" : ", tied"}`;
+  const theirs = games.get(chosen)!;
+  if (rounds.length === 0) return <p className="note">No games finished yet.</p>;
+  return (
+    <div className="game-grid">
+      <p className="game-grid-key">
+        <span className="swatch up" aria-hidden="true" /> more points <span className="swatch down" aria-hidden="true" /> below zero <span aria-hidden="true">★</span> the round's best ·
+        choose a player for their games
+      </p>
+      <div className="game-grid-scroll">
+        <table className="score-pad">
+          <thead>
+            <tr>
+              <th scope="col" title="Place">
+                #
+              </th>
+              <th scope="col">Player</th>
+              <th scope="col">Total</th>
+              {rounds.map((r) => (
+                <th key={r} scope="col" title={`Round ${r + 1}`}>
+                  R{r + 1}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {list.map((s) => {
+              const id = s.participant.id;
+              return (
+                <tr key={id} className={`${id === 0 ? "you-row" : ""}${id === chosen ? " chosen" : ""}`}>
+                  <td>{s.place}</td>
+                  <th scope="row">
+                    <button type="button" className="link" aria-pressed={id === chosen} onClick={() => setChosen(id)}>
+                      {id === 0 ? "You" : s.participant.name}
+                    </button>
+                  </th>
+                  <td className="game-total">{s.total}</td>
+                  {rounds.map((r) => {
+                    const g = games.get(id)![r];
+                    return g ? (
+                      <td key={r} className="game-cell" style={{ background: tint(g.score) }} title={describe(r, g)}>
+                        {g.score}
+                        {g.score === best[r] && <span className="best-mark">★</span>}
+                      </td>
+                    ) : (
+                      <td key={r} className="game-cell">
+                        —
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+      <h4>
+        {chosen === 0 ? "Your games" : (
+          <>
+            <Who t={t} id={chosen} personas={personas} />
+            's games
+          </>
+        )}
+      </h4>
+      <ol className="player-games">
+        {rounds.map((r) => {
+          const g = theirs[r];
+          if (!g) return null;
+          const result = g.score > g.against ? "won" : g.score < g.against ? "lost" : "tied";
+          return (
+            <li key={r}>
+              <span className="pg-round">R{r + 1}</span>
+              <span className="pg-who">
+                with <strong>{name(g.partner)}</strong> against {name(g.opponents[0])} and {name(g.opponents[1])}
+              </span>
+              <span className={`pg-score ${result}`}>
+                {g.score}–{g.against} {result}
+                {g.score === best[r] && " ★"}
+              </span>
+            </li>
+          );
+        })}
+      </ol>
+    </div>
+  );
+}
+
+function roundPointsAny(t: Tournament): boolean {
+  return t.rounds.some((_, r) => roundPoints(t, r).size > 0);
+}
+
 /** Your table in round `r`: who partners you and who you face. */
 export function YourTable({ t, r, personas }: { t: Tournament; r: number; personas: Persona[] }) {
   const table = t.rounds[r].tables[yourTable(t, r)];
@@ -128,6 +240,12 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
       )}
       <h3>Standings</h3>
       <StandingsTable t={t} personas={personas} />
+      {roundPointsAny(t) && (
+        <details className="game-grid-details">
+          <summary>Every game so far</summary>
+          <GameGrid t={t} personas={personas} />
+        </details>
+      )}
       <AwardLine t={t} label="High game" award={highGame} personas={personas} />
       <AwardLine t={t} label="High hand" award={highHand} personas={personas} />
       {!done && !waiting && <YourTable t={t} r={t.current} personas={personas} />}
@@ -191,8 +309,8 @@ export function FinalReveal({ t, personas, onDone }: { t: Tournament; personas: 
           <p>
             You finished <strong>{ordinal(you.place)}</strong> of 12 with {you.total} points.
           </p>
-          <h3>Final standings</h3>
-          <StandingsTable t={t} personas={personas} />
+          <h3>Final standings, game by game</h3>
+          <GameGrid t={t} personas={personas} />
         </>
       )}
       <div className="actions">
