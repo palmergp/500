@@ -110,10 +110,12 @@ impl Units {
 }
 
 /// Whether the coach plays for the game rather than for points: in a game to 500, once either side
-/// is within 160 of it. In a short game (H25) it always plays for points (your score less theirs,
-/// hand by hand): there's no target to race to, so sacrifices that throw away points don't pay.
+/// is within 160 of 500, or of −500 (where a set bid loses the game, H24). In a short game (H25) it
+/// always plays for points (your score less theirs, hand by hand): there's no target to race to,
+/// so sacrifices that throw away points don't pay.
 pub fn plays_for_the_game(obs: &Observation) -> bool {
-    obs.rules.hand_limit.is_none() && obs.scores.iter().any(|&s| s >= obs.rules.target_score - 160)
+    let near = |s: i32| s >= obs.rules.target_score - 160 || obs.rules.losing_score.is_some_and(|floor| s <= floor + 160);
+    obs.rules.hand_limit.is_none() && obs.scores.iter().any(|&s| near(s))
 }
 
 #[derive(Clone, Debug)]

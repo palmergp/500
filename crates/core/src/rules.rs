@@ -126,8 +126,11 @@ pub struct Rules {
     pub slam_score: i32,
     /// Points defenders earn per trick (H21).
     pub defender_points_per_trick: i32,
-    /// Whether defensive points can take a team to the target (H23). If not, they stop 10 short.
+    /// Whether a team can win on defensive points (the old US rule). Off (H23): only declarers
+    /// who make their bid can win; defenders keep their points, whatever the total.
     pub defenders_can_win: bool,
+    /// A team at or below this score at the end of a hand loses (H24); `None` for no floor.
+    pub losing_score: Option<i32>,
     /// Short game (H25): play this many hands (deals that are bid and played) instead of playing to
     /// the target; the higher score wins, and a tie plays on one hand at a time.
     pub hand_limit: Option<u8>,
@@ -142,7 +145,8 @@ impl Default for Rules {
             redeals_before_forced_bid: 2,
             slam_score: 250,
             defender_points_per_trick: 10,
-            defenders_can_win: true,
+            defenders_can_win: false,
+            losing_score: Some(-500),
             hand_limit: None,
         }
     }

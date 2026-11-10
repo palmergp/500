@@ -143,9 +143,9 @@ may prefer either for a particular hand.
 
 | Score | Bid |
 |---|---|
-| They're near 500 (say 460) and you're not | Bid even a light hand (a count of 6½), at the cheapest level that takes you to 500 if you make it. Passing lets them win on defense with four tricks. |
-| You're near 500 and they're not | 7 is enough: any made bid wins. Over an opponent's bid you can pass, since four defensive tricks win too. |
-| Both near 500 | Bid 7 even with a light hand: any made bid wins, and the declarers count first. |
+| They're near 500 (say 460) and you're not | Bid even a light hand (a count of 6½). From a count of 7½, bid the level that takes you to 500 if you make it. They can't win on defense, but any bid they make will. |
+| You're near 500 and they're not | 7 is enough: any made bid wins. Over an opponent's bid, bid 8 rather than pass: defensive tricks don't win. |
+| Both near 500 | Bid 7 even with a light hand: any made bid wins. |
 
 ---
 

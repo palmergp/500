@@ -69,12 +69,15 @@ This is the authoritative spec for the rules engine. Each rule has an ID; the te
   they fall short they lose its value.
 - **H21. Defenders** score 10 points for every trick they take, whether or not the contract is made.
 - **H22. Slam.** Declarers who take all 10 tricks score 250, or the contract's value if that is higher.
-- **H23. Winning.** The first team to reach 500 wins, defensive points included. Points are counted at the end of
-  the hand, the declarers' first: if both teams reach 500 on the same hand, the declarers win.
-- **H24. No floor.** A team can go any distance below zero without losing.
+- **H23. Winning.** A team wins only on a hand it bids: declarers who make their bid and have 500 or more at the
+  end of the hand win. Defensive points count toward the score but never win the game: a team can pass 500 on
+  defense and play on (it then wins by making any bid). There is no cap on defensive points.
+- **H24. Out the back door.** A team at −500 or worse at the end of a hand loses. Only declarers lose points, so
+  only the declarers can go out this way, and at most one team meets a win or loss condition on any hand.
 - **H25. Short game (optional).** Instead of playing to 500, play a set number of hands (four at our table). Deals
   that are passed out and redealt don't count. After the last hand the higher score wins, defensive points
-  included; if the scores are tied, play one more hand at a time until they aren't.
+  included; if the scores are tied, play one more hand at a time until they aren't. H23 and H24 don't apply:
+  reaching 500 or −500 doesn't end a short game.
 
 ## Assumptions to confirm
 

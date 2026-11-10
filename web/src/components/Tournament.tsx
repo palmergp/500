@@ -278,6 +278,19 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
 /** After the last round: third place, then second, then the winner, then the awards. */
 export function FinalReveal({ t, personas, onDone }: { t: Tournament; personas: Persona[]; onDone: () => void }) {
   const [step, setStep] = useState(0);
+  // Straight from your last game: the other two tables may still be playing out.
+  if (!t.rounds.every((round) => round.tables.every((table) => table.result))) {
+    return (
+      <Dialog title="Tournament results" wide>
+        <p className="waiting-text">The other tables are finishing their last games…</p>
+        <div className="actions">
+          <button type="button" className="primary" disabled>
+            Reveal third place
+          </button>
+        </div>
+      </Dialog>
+    );
+  }
   const list = standings(t);
   const at = (place: number) => list.filter((s) => s.place === place);
   const { highGame, highHand } = awards(t);

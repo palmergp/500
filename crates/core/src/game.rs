@@ -412,9 +412,10 @@ impl Game {
             score_change: change,
             scores: self.scores,
         });
+        let made = self.tricks_won[team.index()] >= contract.level;
         let winner = match self.rules.hand_limit {
             Some(limit) => short_game_winner(limit, self.hands_played(), self.scores),
-            None => game_winner(&self.rules, self.scores, team),
+            None => game_winner(&self.rules, self.scores, team, made),
         };
         if let Some(winner) = winner {
             self.winner = Some(winner);
@@ -478,9 +479,9 @@ impl Game {
     }
 }
 
-/// The score change for both teams after a hand (H20–H22). Applies the defensive cap when
-/// `rules.defenders_can_win` is off.
-pub fn score_hand(rules: &Rules, contract: Contract, declarers: Team, tricks_won: [u8; 2], scores: [i32; 2]) -> [i32; 2] {
+/// The score change for both teams after a hand (H20–H22). Defenders always keep their points
+/// (`scores` is unused, kept for callers that pass the score before the hand).
+pub fn score_hand(rules: &Rules, contract: Contract, declarers: Team, tricks_won: [u8; 2], _scores: [i32; 2]) -> [i32; 2] {
     let (d, o) = (declarers.index(), declarers.other().index());
     let mut change = [0; 2];
     change[d] = if tricks_won[d] >= contract.level {
@@ -492,13 +493,7 @@ pub fn score_hand(rules: &Rules, contract: Contract, declarers: Team, tricks_won
     } else {
         -contract.value()
     };
-    let defence = rules.defender_points_per_trick * tricks_won[o] as i32;
-    change[o] = if rules.defenders_can_win {
-        defence
-    } else {
-        let cap = (rules.target_score - 10).max(scores[o]);
-        (scores[o] + defence).min(cap) - scores[o]
-    };
+    change[o] = rules.defender_points_per_trick * tricks_won[o] as i32;
     change
 }
 
@@ -514,13 +509,31 @@ pub fn short_game_winner(limit: u8, hands: u8, scores: [i32; 2]) -> Option<Team>
     }
 }
 
-/// The winning team after a hand, counting the declarers first (H23).
-pub fn game_winner(rules: &Rules, scores: [i32; 2], declarers: Team) -> Option<Team> {
-    if scores[declarers.index()] >= rules.target_score {
-        Some(declarers)
-    } else if scores[declarers.other().index()] >= rules.target_score {
-        Some(declarers.other())
-    } else {
-        None
+/// The winning team after a hand in a game to the target, from the scores after it, the
+/// declarers, and whether they made their bid. Declarers who make their bid and reach the target
+/// win (H23); defensive points never win, however high they take a team. A team at or below the
+/// losing score loses (H24): only declarers lose points, so only they can. Under the old US rule
+/// (`defenders_can_win`) the first team to the target wins, declarers counted first.
+pub fn game_winner(rules: &Rules, scores: [i32; 2], declarers: Team, made: bool) -> Option<Team> {
+    let (d, o) = (declarers, declarers.other());
+    let target = rules.target_score;
+    if rules.defenders_can_win {
+        if scores[d.index()] >= target {
+            return Some(d);
+        }
+        if scores[o.index()] >= target {
+            return Some(o);
+        }
+    } else if made && scores[d.index()] >= target {
+        return Some(d);
     }
+    if let Some(floor) = rules.losing_score {
+        if scores[d.index()] <= floor {
+            return Some(o);
+        }
+        if scores[o.index()] <= floor {
+            return Some(d);
+        }
+    }
+    None
 }

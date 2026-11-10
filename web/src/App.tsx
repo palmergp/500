@@ -331,7 +331,7 @@ export function App() {
       setScreen("table");
       // "any" seats are filled at random by the engine.
       void request((engine) => engine.create(randomSeed(), chosen)).then(() =>
-        setMessage(chosen.hands ? `New game: ${chosen.hands} hands, highest score wins.` : "New game. First to 500 wins."),
+        setMessage(chosen.hands ? `New game: ${chosen.hands} hands, highest score wins.` : "New game to 500: make a bid that takes you there to win. −500 loses."),
       );
     },
     [request, toSolo, clearTable],
@@ -348,13 +348,13 @@ export function App() {
     saveTournament(next);
   }, []);
 
-  /** Plays out the current round's other tables in their own worker, one at a time. */
+  /** Plays out the other tables, in their own worker, one at a time: the current round's, and any
+   * earlier round's still missing (a reload while they played, say after the last round). */
   const runSims = useCallback(() => {
     const t = tourRef.current;
-    if (!t || t.current >= ROUNDS) return;
-    const r = t.current;
+    if (!t) return;
     simRef.current ??= new Simulator();
-    t.rounds[r].tables.forEach((table, i) => {
+    t.rounds.slice(0, Math.min(t.current + 1, ROUNDS)).forEach((round, r) => round.tables.forEach((table, i) => {
       const key = `${t.id}:${r}:${i}`;
       if (table.result || table.seats.includes(0) || simsRunning.current.has(key)) return;
       simsRunning.current.add(key);
@@ -365,7 +365,7 @@ export function App() {
         }))
         .catch(() => {})
         .finally(() => simsRunning.current.delete(key));
-    });
+    }));
   }, [updateTour]);
 
   /** Deals your table's game for the tournament's current round (and starts the other tables). */
@@ -407,7 +407,12 @@ export function App() {
     });
     setResult(null);
     setInTour(false);
-    setTourDialog({ after: r });
+    // After the last round, straight to the reveal: a recap first would give the results away.
+    if (r === ROUNDS - 1) {
+      setShowFinal(true);
+      runSims();
+    }
+    else setTourDialog({ after: r });
   };
 
   /** From the menu: the tournament in progress, or a new one. */
@@ -428,6 +433,7 @@ export function App() {
     if (t.current >= ROUNDS) {
       setTourDialog(null);
       setShowFinal(true);
+      runSims();
       return;
     }
     const save = savedGame.load();
@@ -1115,7 +1121,7 @@ export function App() {
               </button>
             ) : inTour && view.phase === "gameOver" ? (
               <button type="button" className="primary" onClick={finishTourRound} autoFocus>
-                Round results
+                {tour && tour.current === ROUNDS - 1 ? "Final results" : "Round results"}
               </button>
             ) : view.phase === "gameOver" ? (
               <button

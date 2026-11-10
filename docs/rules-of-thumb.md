@@ -491,14 +491,15 @@ The game can show who is out of each suit, and a tracker of what's still out. Th
 
 ### 18. Near the end, bid to the score
 
-Each option was played out over 6,000 deals at each score, and valued by your side's chance of winning the game
-(`fh-lab levels --us N --them N`; `docs/lab/README.md`, finding 20).
+Only a made bid wins the game, and −500 loses (H23–H24). Each option was played out over 6,000 deals at each score,
+and valued by your side's chance of winning the game (`fh-lab levels --us N --them N`; `docs/lab/README.md`,
+finding 48).
 
 | Score | Best bid | Why |
 |---|---|---|
-| **They're at 460, you're at 300** | **Bid even a light hand** (count 6½), at the **cheapest level that takes you to 500** if made | Passing lets them win on defense with 4 tricks. Bidding raised your chances from about 32% to 43% at a count of 6½, and from 39% to 66% at 8 |
-| **You're at 460, they're at 300** | **7 is enough**; over an opponent's bid, pass unless strong | Any made bid wins, and so do 4 defensive tricks |
-| **Both at 450** | **Bid 7, even light** | Any made bid wins, and the declarers count first: 52% against 43% for passing at a count of 6½ |
+| **They're at 460, you're at 300** | **Bid even a light hand** (count 6½); from a count of 7½, at the **level that takes you to 500** if made | They can't go out on defense, but they will on any bid they make. Bidding raised your chances from about 35% to 43% at a count of 6½, and from 43% to 67% at 8 (bidding 8) |
+| **You're at 460, they're at 300** | **7 is enough**; over an opponent's bid, **bid 8** rather than pass | Any made bid wins, but defensive tricks don't: at a count of 7, bidding 8 over them won 56% against 53% for passing |
+| **Both at 450** | **Bid 7, even light** | Any made bid wins: 52% against 44% for passing at a count of 6½ |
 
 Away from the end, the usual levels (rule 2) apply.
 

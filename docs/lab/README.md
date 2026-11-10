@@ -346,6 +346,8 @@ the worst lead whenever you hold the top trumps.
 
 ### 20. Bidding to the score
 
+*Superseded by finding 48: these were measured when defensive points could win the game.*
+
 *Measured by `fh-lab levels --us N --them N`, 6,000 deals at each score.* As finding 14, but each option is
 valued by the bidder's side's chance of winning the game (certain when the hand takes someone to 500, otherwise
 estimated from the score gap).
@@ -914,11 +916,42 @@ point through the measured stated-to-actual table, and checked on fresh deals (s
 Every band with a few hundred predictions now matches within about 5 points. The coach's choices don't change:
 it ranks options by expected points; the curves only translate its chances for display.
 
+### 48. Bidding to the score, when only a made bid wins
+
+*Measured by `fh-lab levels --deals 6000 --us N --them N` (seed 300,000) after the winning rules changed (H23–H24,
+2026-11-09): only declarers who make their bid win at 500, defensive points never win, and −500 loses.* As finding
+20, each option valued by the bidder's side's chance of winning the game. All positions:
+
+| Count | 300 vs 460: pass / 7 / 8 | 460 vs 300: pass / 7 / 8 | 450 vs 450: pass / 7 / 8 |
+|---|---|---|---|
+| 6½ | 35 / **43** / 42 | 54 / **59** / 54 | 44 / **52** / 45 |
+| 7 | 38 / **49** / 48 | 61 / **66** / 59 | 49 / **60** / 51 |
+| 7½ | 43 / 56 / **59** | 70 / **74** / 68 | 57 / **69** / 61 |
+| 8 | 43 / 61 / **67** | 73 / **80** / 74 | 60 / **76** / 69 |
+| 9 | 46 / 68 / **82** | 79 / **88** / 86 | 66 / **85** / 83 |
+
+After an opponent's bid (7 is no longer available), at counts 6½ / 7 / 7½:
+
+| | pass | bid 8 |
+|---|---|---|
+| 300 vs 460 | 24 / 32 / 36 | **31 / 44 / 57** |
+| 460 vs 300 | 41 / 53 / 65 | **44 / 56 / 68** |
+| 450 vs 450 | 31 / 43 / 48 | **35 / 48 / 61** |
+
+- **Behind, with the opponents near 500:** still bid even light hands (passing is worth a little more than before,
+  35% against 32% at 6½, since they can no longer go out on defense). With a light hand 7 is as good as 8; from a
+  count of 7½ the level that reaches 500 if made (8 here) is clearly best.
+- **Ahead, near 500:** 7 is enough. Over an opponent's bid, **bid 8 rather than pass**, the reverse of finding 20:
+  defensive tricks no longer win, so letting them play gives them the chance to go out on their bid.
+- **Both near 500:** bid 7 even light, as before.
+- 9 and 10 were never best at these scores. Only 267 decisions came after an opponent's bid, so that table is the
+  rougher one.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
 - **Signals:** what a mention or a 6-call is worth, compared with what it tells the opponents.
 - **Seat position:** what a once-around auction implies for each seat. Partly answered for bid levels (finding 14).
 - **The forced dealer:** strategy on the third deal.
-- **Score-aware bidding:** when defenders can go out on tricks. Answered for bid levels (finding 20).
+- **Score-aware bidding:** answered for bid levels (finding 48, which replaces 20 under the made-bid rule).
 - **The playbook:** the 30 hypotheses in `docs/research/02-strategy-playbook.md` still need checking under these rules.

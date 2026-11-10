@@ -237,7 +237,8 @@ impl SearchBot {
             Goal::WinChance => {
                 let after = [obs.scores[0] + change[0], obs.scores[1] + change[1]];
                 let hands_left = rules.hand_limit.map(|n| n.saturating_sub(obs.hands_played + 1));
-                1000.0 * win_chance(rules, after, side, obs.seat.team(), hands_left)
+                let made = declarer_tricks >= contract.level;
+                1000.0 * win_chance(rules, after, side, made, obs.seat.team(), hands_left)
             }
         }
     }
@@ -630,14 +631,15 @@ pub fn opponents_make(level: u8, ours: f64) -> f64 {
     1.0 / (1.0 + (-(4.694 - 1.015 * above - 0.898 * ours)).exp())
 }
 
-/// A rough chance that `team` wins the game from scores `after` this hand. Terminal positions
-/// follow the rules (declarers count first); otherwise a logistic curve in the score gap, steeper
-/// as the leader nears the target. The lab will replace this with measured values.
+/// A rough chance that `team` wins the game from scores `after` this hand, declared by `declarers`
+/// (who `made` it or not). Terminal positions follow the rules (H23: only a made bid wins; H24:
+/// −500 loses); otherwise a logistic curve in the score gap, steeper as the leader nears the
+/// target. The lab will replace this with measured values.
 ///
 /// In a short game (H25) `hands_left` is the number of hands still to come after this one: with
 /// none left the higher score wins (a tie plays on, so it is even); otherwise the gap counts for
 /// less the more hands remain.
-pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team, hands_left: Option<u8>) -> f64 {
+pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, made: bool, team: Team, hands_left: Option<u8>) -> f64 {
     let (us, them) = (after[team.index()] as f64, after[1 - team.index()] as f64);
     if let Some(left) = hands_left {
         if left == 0 {
@@ -646,12 +648,8 @@ pub fn win_chance(rules: &Rules, after: [i32; 2], declarers: Team, team: Team, h
         return 1.0 / (1.0 + (-(us - them) / (160.0 * (left as f64).sqrt())).exp());
     }
     let target = rules.target_score;
-    let d = declarers.index();
-    if after[d] >= target {
-        return if team == declarers { 1.0 } else { 0.0 };
-    }
-    if after[1 - d] >= target {
-        return if team == declarers { 0.0 } else { 1.0 };
+    if let Some(winner) = fh_core::game::game_winner(rules, after, declarers, made) {
+        return if winner == team { 1.0 } else { 0.0 };
     }
     let closeness = 1.0 + (us.max(them).max(0.0) / target as f64);
     1.0 / (1.0 + (-(us - them) * closeness / 250.0).exp())
@@ -748,21 +746,23 @@ mod tests {
     fn win_chance_follows_the_rules_at_the_target() {
         let rules = Rules::default();
         let ns = Team::NorthSouth;
-        assert_eq!(win_chance(&rules, [510, 520], ns, ns, None), 1.0, "declarers count first");
-        assert_eq!(win_chance(&rules, [480, 500], ns, ns, None), 0.0, "defenders can win");
-        let even = win_chance(&rules, [200, 200], ns, ns, None);
+        assert_eq!(win_chance(&rules, [510, 520], ns, true, ns, None), 1.0, "a made bid to 500 wins");
+        let defended = win_chance(&rules, [480, 500], ns, true, ns, None);
+        assert!(defended > 0.0 && defended < 1.0, "defensive points don't end the game");
+        assert_eq!(win_chance(&rules, [-500, 200], ns, false, ns, None), 0.0, "-500 loses");
+        let even = win_chance(&rules, [200, 200], ns, true, ns, None);
         assert!((even - 0.5).abs() < 1e-9);
-        assert!(win_chance(&rules, [400, 100], ns, ns, None) > 0.8);
+        assert!(win_chance(&rules, [400, 100], ns, true, ns, None) > 0.8);
     }
 
     #[test]
     fn win_chance_in_a_short_game_counts_the_hands_left() {
         let rules = Rules { hand_limit: Some(4), ..Rules::default() };
         let ns = Team::NorthSouth;
-        assert_eq!(win_chance(&rules, [30, 20], ns, ns, Some(0)), 1.0, "last hand: ahead wins");
-        assert_eq!(win_chance(&rules, [30, 30], ns, ns, Some(0)), 0.5, "a tie plays on");
-        let late = win_chance(&rules, [200, 0], ns, ns, Some(1));
-        let early = win_chance(&rules, [200, 0], ns, ns, Some(3));
+        assert_eq!(win_chance(&rules, [30, 20], ns, true, ns, Some(0)), 1.0, "last hand: ahead wins");
+        assert_eq!(win_chance(&rules, [30, 30], ns, true, ns, Some(0)), 0.5, "a tie plays on");
+        let late = win_chance(&rules, [200, 0], ns, true, ns, Some(1));
+        let early = win_chance(&rules, [200, 0], ns, true, ns, Some(3));
         assert!(late > early && early > 0.5);
     }
 }

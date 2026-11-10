@@ -13,7 +13,7 @@ pub struct Options {
     pub threads: u64,
 }
 
-/// Cap per game: a game between reckless bots can sink forever because there is no losing floor.
+/// Cap per game: a safety net (games end at 500 on a made bid or at -500, H23–H24).
 const MAX_HANDS: usize = 200;
 
 #[derive(Default)]

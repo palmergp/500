@@ -377,29 +377,69 @@ fn h22_slam_scores_250_or_more() {
 }
 
 #[test]
-fn h23_defenders_can_win_and_declarers_count_first() {
+fn h23_only_a_made_bid_wins() {
     let rules = Rules::default();
-    assert_eq!(game_winner(&rules, [480, 500], NS), Some(Team::EastWest), "defensive points win");
-    assert_eq!(game_winner(&rules, [520, 510], NS), Some(NS), "both over 500: declarers first");
-    assert_eq!(game_winner(&rules, [499, 450], NS), None);
-}
-
-#[test]
-fn h24_no_losing_floor() {
-    assert_eq!(game_winner(&Rules::default(), [-900, 300], NS), None);
-}
-
-#[test]
-fn defensive_cap_variant() {
-    let rules = Rules { defenders_can_win: false, ..Rules::default() };
+    assert_eq!(game_winner(&rules, [520, 300], NS, true), Some(NS), "made their bid and reached 500");
+    assert_eq!(game_winner(&rules, [480, 500], NS, true), None, "defensive points don't win");
+    assert_eq!(game_winner(&rules, [300, 640], NS, false), None, "however far past 500");
+    assert_eq!(game_winner(&rules, [560, 200], NS, false), None, "over 500 but set: not a win");
+    assert_eq!(game_winner(&rules, [520, 510], NS, true), Some(NS));
+    assert_eq!(game_winner(&rules, [499, 450], NS, true), None);
+    // Defenders keep every point: no cap short of 500.
     let seven = Contract::new(7, Strain::Spades);
-    assert_eq!(score_hand(&rules, seven, NS, [5, 5], [0, 470]), [-140, 20], "stops at 490");
-    assert_eq!(score_hand(&rules, seven, NS, [5, 5], [0, -100]), [-140, 50]);
+    assert_eq!(score_hand(&rules, seven, NS, [5, 5], [0, 470]), [-140, 50]);
+}
+
+#[test]
+fn h24_minus_500_loses() {
+    let rules = Rules::default();
+    assert_eq!(game_winner(&rules, [-500, 300], NS, false), Some(Team::EastWest), "out the back door at -500");
+    assert_eq!(game_winner(&rules, [-640, 100], NS, false), Some(Team::EastWest));
+    assert_eq!(game_winner(&rules, [-490, 300], NS, false), None);
+    assert_eq!(game_winner(&rules, [100, -520], NS, true), Some(NS), "the other side below -500");
+}
+
+#[test]
+fn old_us_rule_defenders_can_win() {
+    let rules = Rules { defenders_can_win: true, losing_score: None, ..Rules::default() };
+    assert_eq!(game_winner(&rules, [480, 500], NS, true), Some(Team::EastWest), "defensive points win");
+    assert_eq!(game_winner(&rules, [520, 510], NS, true), Some(NS), "both over 500: declarers first");
+    assert_eq!(game_winner(&rules, [-900, 300], NS, false), None, "no floor");
+}
+
+#[test]
+fn whole_game_ends_only_on_a_made_bid_or_at_minus_500() {
+    let mut finished = 0;
+    for seed in 0..200 {
+        let mut game = Game::new(Rules::default(), seed);
+        let mut rng = Rng::new(seed + 7_000_000);
+        for _ in 0..6_000 {
+            if game.phase() == Phase::GameOver {
+                let last = game.history().last().unwrap();
+                let (declarer, contract) = last.contract.unwrap();
+                let side = declarer.team();
+                let winner = game.winner().unwrap();
+                let scores = game.scores();
+                if winner == side {
+                    assert!(last.tricks_won[side.index()] >= contract.level, "seed {seed}: declarers won without making their bid");
+                    assert!(scores[side.index()] >= 500 || scores[side.other().index()] <= -500);
+                } else {
+                    assert!(scores[side.index()] <= -500, "seed {seed}: defenders won without the declarers at -500");
+                }
+                finished += 1;
+                break;
+            }
+            let legal = game.legal_actions();
+            let action = legal[rng.below(legal.len())];
+            game.apply(action).unwrap();
+        }
+    }
+    assert!(finished >= 150, "only {finished} of 200 random games finished");
 }
 
 // ---- Whole games ----------------------------------------------------------------------------
 
-/// Random play overbids and, with no losing floor (H24), rarely finishes a game, so this caps the length.
+/// Random play overbids, so most games end at -500 (H24); this caps the length anyway.
 /// Finished games are checked by the bot simulations in `fh-lab`.
 #[test]
 fn random_play_stays_legal() {
@@ -409,7 +449,7 @@ fn random_play_stays_legal() {
         for _ in 0..3_000 {
             if game.phase() == Phase::GameOver {
                 let winner = game.winner().unwrap();
-                assert!(game.scores()[winner.index()] >= 500);
+                assert!(game.scores()[winner.index()] >= 500 || game.scores()[1 - winner.index()] <= -500);
                 assert!(game.apply(Action::Call(Call::Pass)).is_err());
                 break;
             }

@@ -20,7 +20,7 @@ export const RANDOM_BLURB = "A different player each game, picked at random from
 
 /** The game's length: to 500, or a short game of four hands. */
 export const LENGTHS: { hands: number; label: string; detail: string }[] = [
-  { hands: 0, label: "First to 500", detail: "The usual game." },
+  { hands: 0, label: "First to 500", detail: "The usual game: win by making a bid that takes you to 500. −500 loses." },
   { hands: 4, label: "4 hands", detail: "Play four hands; the higher score wins. A tie plays one more hand." },
 ];
 

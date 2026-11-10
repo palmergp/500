@@ -168,3 +168,31 @@ test("the best hand record says which bid it was", async ({ page }, info) => {
   await page.getByRole("tab", { name: /Progress/ }).click();
   await expect(page.locator(".stat", { hasText: "+300" })).toContainText("best hand: defending West's 9♠ bid");
 });
+
+test("the reveal waits for the other tables' last games, and plays them out if they never finished", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(300_000);
+  const { newTournament, ROUNDS, yourTable } = await import("../src/tournament");
+  const t = newTournament(11);
+  t.rounds.forEach((round, r) =>
+    round.tables.forEach((table, i) => {
+      // The last round: only your table finished (the page was closed while the others played).
+      if (r === ROUNDS - 1 && i !== yourTable(t, r)) return;
+      table.result = { scores: [150 + 10 * i, 120], hands: [[150 + 10 * i, 0], [0, 120]] };
+    }),
+  );
+  t.current = ROUNDS;
+  await freshStart(page);
+  await page.evaluate((saved) => localStorage.setItem("fh500.tournament", saved), JSON.stringify(t));
+  await page.reload();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Final results" }).click();
+  const final = page.getByRole("dialog", { name: "Tournament results" });
+  // Nothing given away while they play.
+  await expect(final.getByText("The other tables are finishing their last games…")).toBeVisible();
+  await expect(final.locator(".podium-step, .game-grid")).toHaveCount(0);
+  const reveal = final.getByRole("button", { name: "Reveal third place" });
+  await expect(reveal).toBeEnabled({ timeout: 240_000 });
+  await reveal.click();
+  await expect(final.locator(".podium-step")).toHaveCount(1);
+});

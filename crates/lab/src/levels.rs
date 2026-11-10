@@ -157,7 +157,7 @@ pub(crate) fn finish(start: &Game, option: Action, seat: Seat, seed: u64, by_win
     while game.phase() == Phase::Bidding {
         if !game.history().is_empty() {
             // Passed out: redealt, the score unchanged.
-            return Some(if by_win_chance { win_percent(game.scores(), None, seat) } else { 0.0 });
+            return Some(if by_win_chance { win_percent(game.scores(), None, false, seat) } else { 0.0 });
         }
         let to_act = game.to_act()?;
         let action = bidders[to_act.index()].choose(&game.observe(to_act), &game.legal_actions());
@@ -184,7 +184,7 @@ pub(crate) fn finish(start: &Game, option: Action, seat: Seat, seed: u64, by_win
         total += 0.5
             * if by_win_chance {
                 let before = game.scores();
-                win_percent([before[0] + change[0], before[1] + change[1]], Some(side), seat)
+                win_percent([before[0] + change[0], before[1] + change[1]], Some(side), real >= contract.level, seat)
             } else {
                 (change[us] - change[1 - us]) as f64
             };
@@ -193,9 +193,10 @@ pub(crate) fn finish(start: &Game, option: Action, seat: Seat, seed: u64, by_win
 }
 
 /// The chance (percent) that `seat`'s side wins the game from `scores` after a hand declared by
-/// `declarers` (declarers count first at 500); a thrown-in deal has no declarers.
-fn win_percent(scores: [i32; 2], declarers: Option<fh_core::Team>, seat: Seat) -> f64 {
+/// `declarers`, who `made` their bid or not (only a made bid wins); a thrown-in deal has no
+/// declarers and ends nothing.
+fn win_percent(scores: [i32; 2], declarers: Option<fh_core::Team>, made: bool, seat: Seat) -> f64 {
     let rules = Rules::default();
     let first = declarers.unwrap_or(seat.team());
-    100.0 * fh_ai::search_bot::win_chance(&rules, scores, first, seat.team(), None)
+    100.0 * fh_ai::search_bot::win_chance(&rules, scores, first, made && declarers.is_some(), seat.team(), None)
 }

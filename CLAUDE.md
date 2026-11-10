@@ -35,7 +35,9 @@
 - The coach's card-play analysis takes a closer look (up to 64 more deals) when its best play isn't clearly ahead of
   the next different play, and reports plays it still can't separate as close calls (`Analysis::close`), so a near
   tie never reads as a firm answer. Its significance test weights deals as the averages do (effective sample size).
-- Near the end of a game to 500 (either side within 160 of it) the coach plays for the game
+- Winning (H23–H24, games to 500 only): declarers who make their bid and reach 500 win; defensive points never win
+  (no cap, they just keep counting); −500 or worse loses. `game_winner(rules, scores, declarers, made)`.
+- Near the end of a game to 500 (either side within 160 of 500 or of −500) the coach plays for the game
   (`plays_for_the_game`, `Units::WinChance`): values are tenths of a percent of the chance to win, and grades
   carry `units: "win"`. Four-hand games are always played for points (the user's rule: no race to 500, so no
   sacrifices). Displayed make chances go through the measured real-play curves (`real_play_chance`).
@@ -65,7 +67,7 @@
   names and personas), 3 tables, 8 rounds of a 4-hand game; a side's final score goes to both partners' totals, and
   partners never repeat (circle-method schedule). You play one table (names via `SaveData.names`); the other two are
   played out by `simulateGame` in a third worker (`Simulator`). Saved in local storage; standings after each round,
-  then a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand, and every player's score in every round
+  then (straight after your last game, waiting for the other tables if need be) a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand, and every player's score in every round
   (`GameGrid`: tinted cells, the round's best starred, a player's games listed when chosen).
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
   worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
