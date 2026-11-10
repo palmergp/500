@@ -2417,3 +2417,79 @@ button.danger {
   user-select: none;
   -webkit-touch-callout: none;
 }
+
+/* Learn → Achievements. */
+.achievement-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 8px;
+}
+.achievement {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+.achievement.done {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+}
+.achievement-icon {
+  font-size: 1.6rem;
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+.achievement.done .achievement-icon {
+  filter: none;
+  opacity: 1;
+}
+.achievement-body {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.achievement-text {
+  font-size: 0.85rem;
+  opacity: 0.8;
+}
+.achievement-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8rem;
+  opacity: 0.85;
+  margin-top: 2px;
+}
+.achievement.done .achievement-meta {
+  color: var(--accent);
+  opacity: 1;
+  font-weight: 600;
+}
+.achievement-bar {
+  flex: 1;
+  max-width: 140px;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--panel-line);
+  overflow: hidden;
+}
+.achievement-bar > span {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+}
+/* The banner can carry a record and an achievement, a line each. (Not display on the banner
+   itself: that would override the browser hiding a closed popover.) */
+.record-toast {
+  text-align: center;
+}
+.record-toast > span {
+  display: block;
+}

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import type { View } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { recordScore } from "../progress";
+import { checkAchievements } from "../achievements";
 
 const SUITS = ["S", "C", "D", "H"] as const;
 
@@ -82,6 +83,7 @@ export function CountingQuiz({ view, onDone }: { view: View; onDone: () => void 
     if (picked) return;
     setPicked(option);
     recordScore("quiz", option === question.answer);
+    checkAchievements();
   };
   return (
     <div className="coach-panel quiz" role="dialog" aria-label="Counting quiz">

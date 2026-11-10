@@ -57,5 +57,23 @@ export function keepMistake(grade: GradeView, save: string) {
 
 /** Solved: off the list. */
 export function solveMistake(save: string) {
-  store(loadMistakes().filter((m) => m.save !== save));
+  const list = loadMistakes();
+  if (!list.some((m) => m.save === save)) return;
+  store(list.filter((m) => m.save !== save));
+  try {
+    localStorage.setItem(SOLVED_KEY, String(solvedMistakes() + 1));
+  } catch {
+    // Not counted.
+  }
+}
+
+const SOLVED_KEY = "fh500.mistakesSolved";
+
+/** How many of your own mistakes you've since solved as puzzles. */
+export function solvedMistakes(): number {
+  try {
+    return Number(localStorage.getItem(SOLVED_KEY) ?? 0) || 0;
+  } catch {
+    return 0;
+  }
 }

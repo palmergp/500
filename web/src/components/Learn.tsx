@@ -2,8 +2,9 @@ import { useEffect, useRef, useState } from "react";
 import type { ActionView, CardView, CoachClient, DrillView, GradeView } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { LESSONS, type Lesson } from "../learn/lessons";
-import { leaks, loadProgress, recordScore, resetProgress, type Progress } from "../progress";
-import { bestHandBid, loadRecords, resetRecords, type Records } from "../records";
+import { leaks, loadLessonsDone, loadProgress, recordScore, resetProgress, saveLessonsDone, type Progress } from "../progress";
+import { bestHandBid, loadRecords, ordinal, resetRecords, type Records } from "../records";
+import { achievements, checkAchievements, doneDate, GROUPS, resetAchievements, type Status } from "../achievements";
 import { PATTERNS } from "../learn/patterns";
 import { loadMistakes, solveMistake, type Mistake } from "../mistakes";
 import { BiddingBox } from "./BiddingBox";
@@ -12,25 +13,7 @@ import { VerdictChip } from "./Coach";
 import { Dialog } from "./Dialog";
 import { TableView } from "./TableView";
 
-type Tab = "lessons" | "bidding" | "puzzles" | "mistakes" | "progress";
-
-const DONE_KEY = "fh500.lessonsDone";
-
-function loadDone(): string[] {
-  try {
-    return JSON.parse(localStorage.getItem(DONE_KEY) ?? "[]") as string[];
-  } catch {
-    return [];
-  }
-}
-
-function saveDone(done: string[]) {
-  try {
-    localStorage.setItem(DONE_KEY, JSON.stringify(done));
-  } catch {
-    // Optional.
-  }
-}
+type Tab = "lessons" | "bidding" | "puzzles" | "mistakes" | "progress" | "achievements";
 
 function randomSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
@@ -47,6 +30,7 @@ export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: 
     ["puzzles", "Play puzzles"],
     ["mistakes", "Your mistakes"],
     ["progress", "Progress"],
+    ["achievements", "Achievements"],
   ];
   return (
     <Dialog title="Learn" wide onClose={onClose}>
@@ -61,6 +45,7 @@ export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: 
       {tab === "bidding" && <BiddingTrainer coach={coach} />}
       {tab === "puzzles" && <Puzzles coach={coach} />}
       {tab === "mistakes" && <MyMistakes coach={coach} />}
+      {tab === "achievements" && <AchievementsView />}
       {tab === "progress" && (
         <ProgressView
           onLesson={(id) => {
@@ -76,7 +61,7 @@ export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: 
 // ---- Lessons --------------------------------------------------------------------------------
 
 function Lessons({ initial }: { initial?: string | null }) {
-  const [done, setDone] = useState<string[]>(loadDone);
+  const [done, setDone] = useState<string[]>(loadLessonsDone);
   const [open, setOpen] = useState<Lesson | null>(() => LESSONS.find((l) => l.id === initial) ?? null);
   if (open) {
     return (
@@ -86,7 +71,8 @@ function Lessons({ initial }: { initial?: string | null }) {
         onComplete={() => {
           const next = [...new Set([...done, open.id])];
           setDone(next);
-          saveDone(next);
+          saveLessonsDone(next);
+          checkAchievements();
         }}
         done={done.includes(open.id)}
       />
@@ -275,6 +261,7 @@ function BiddingTrainer({ coach }: { coach: CoachClient | null }) {
         if (g) {
           setGrade(g);
           recordScore("bidding", g.verdict === "best" || g.verdict === "good");
+          checkAchievements();
         }
       })
       .finally(() => setBusy(false));
@@ -311,6 +298,7 @@ function Puzzles({ coach }: { coach: CoachClient | null }) {
       if (g) {
         setGrade(g);
         recordScore("puzzles", g.verdict === "best" || g.verdict === "good");
+        checkAchievements();
       }
     });
   };
@@ -397,6 +385,7 @@ function MyMistakes({ coach }: { coach: CoachClient | null }) {
       setGrade(g);
       recordScore("puzzles", g.verdict === "best" || g.verdict === "good");
       if (g.verdict === "best" || g.verdict === "good") solveMistake(current.save);
+      checkAchievements();
     });
   };
   const next = () => {
@@ -482,6 +471,7 @@ function RecordsView({ records }: { records: Records }) {
           <span className="stat-label">games won</span>
         </div>
       </div>
+      <TournamentRecords records={records} />
       <h4>Your bids</h4>
       {declared === 0 ? (
         <p className="note">Win an auction and play the hand: each bid you declare, and whether you made it, shows here.</p>
@@ -514,6 +504,99 @@ function RecordsView({ records }: { records: Records }) {
         </>
       )}
     </>
+  );
+}
+
+function TournamentRecords({ records }: { records: Records }) {
+  const t = records.tournaments;
+  return (
+    <>
+      <h4>Tournaments</h4>
+      {t.played === 0 ? (
+        <p className="note">Finish a tournament (Tournament, on the main menu): your wins, average place and best total show here.</p>
+      ) : (
+        <div className="stat-tiles">
+          <div className="stat">
+            <span className="stat-value">
+              {t.won} of {t.played}
+            </span>
+            <span className="stat-label">tournaments won</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{(t.placeSum / t.played).toFixed(1)}</span>
+            <span className="stat-label">average place (of 12)</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{t.high?.score ?? "—"}</span>
+            <span className="stat-label">highest tournament score{t.high ? ` (finished ${ordinal(t.high.place)})` : ""}</span>
+          </div>
+          <div className="stat">
+            <span className="stat-value">{t.podiums}</span>
+            <span className="stat-label">top-3 finishes</span>
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ---- Achievements ---------------------------------------------------------------------------
+
+function AchievementsView() {
+  // Everything that changes progress checks for new achievements as it happens, so this only reads.
+  const [list] = useState<Status[]>(() => achievements(true));
+  const done = list.filter((s) => s.done).length;
+  return (
+    <div className="achievements">
+      <p>
+        <strong>
+          {done} of {list.length}
+        </strong>{" "}
+        achievements done. Challenges to try at the table, in tournaments and in Learn; past games count.
+      </p>
+      {GROUPS.map((group) => (
+        <section key={group}>
+          <h4>{group}</h4>
+          <ul className="achievement-list">
+            {list
+              .filter((s) => s.achievement.group === group)
+              .map(({ achievement: a, value, done }) => (
+                <li key={a.id} className={`achievement${done ? " done" : ""}`}>
+                  <span className="achievement-icon" aria-hidden="true">
+                    {a.icon}
+                  </span>
+                  <span className="achievement-body">
+                    <strong>
+                      {a.title}
+                      {done && <span className="visually-hidden"> (done)</span>}
+                    </strong>
+                    <span className="achievement-text">{a.text}</span>
+                    {done ? (
+                      <span className="achievement-meta">✓ Done {doneDate(done)}</span>
+                    ) : (
+                      a.target > 1 && (
+                        <span className="achievement-meta">
+                          <span
+                            className="achievement-bar"
+                            role="progressbar"
+                            aria-label={`${a.title} progress`}
+                            aria-valuemin={0}
+                            aria-valuemax={a.target}
+                            aria-valuenow={value}
+                          >
+                            <span style={{ width: `${(100 * value) / a.target}%` }} />
+                          </span>
+                          {value} of {a.target}
+                        </span>
+                      )
+                    )}
+                  </span>
+                </li>
+              ))}
+          </ul>
+        </section>
+      ))}
+    </div>
   );
 }
 
@@ -657,9 +740,10 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
         <button
           type="button"
           onClick={() => {
-            if (confirm("Clear all progress, records and bid stats?")) {
+            if (confirm("Clear all progress, records, bid stats and achievements?")) {
               resetProgress();
               resetRecords();
+              resetAchievements();
               setProgress(loadProgress());
               setRecords(loadRecords());
             }

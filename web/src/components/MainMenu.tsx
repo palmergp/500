@@ -64,7 +64,7 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
           </button>
           <button type="button" onClick={onLearn}>
             Learn
-            <small>Lessons, a bidding trainer and play puzzles</small>
+            <small>Lessons, trainers, your stats and achievements</small>
           </button>
           <button type="button" onClick={onSettings}>
             Settings

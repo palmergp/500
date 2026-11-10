@@ -21,7 +21,8 @@ import { InfoPanel, TableView } from "./components/TableView";
 import { TricksDialog } from "./components/TricksDialog";
 import { DecisionsDialog } from "./components/DecisionsDialog";
 import { keepMistake } from "./mistakes";
-import { recordGame, recordHand } from "./records";
+import { recordGame, recordHand, recordTournament } from "./records";
+import { achievements, checkAchievements, noteGame, noteGrades, noteHand, noteTournament } from "./achievements";
 import { handCode, saveAt } from "./handcode";
 import { FinalReveal, TournamentDialog } from "./components/Tournament";
 import { TouchTips } from "./components/TouchTips";
@@ -183,6 +184,8 @@ export function App() {
   const [codeShown, setCodeShown] = useState<string | null>(null);
   /** A record you just set ("highest bid made: 9♥"), shown for a moment at the top. */
   const [recordToast, setRecordToast] = useState<string | null>(null);
+  /** Achievements just done ("Slam · Hot streak"), shown the same way, wherever you are. */
+  const [achievementToast, setAchievementToast] = useState<string | null>(null);
   const [quizzed, setQuizzed] = useState<number | null>(null);
   const [showLearn, setShowLearn] = useState(false);
   const [showTricks, setShowTricks] = useState<{ focus?: number } | null>(null);
@@ -237,11 +240,19 @@ export function App() {
         audio.play(hand && ours === !!hand.made ? "made" : "set");
         const broken = hand && gameRef.current && !replay ? recordHand(gameRef.current, hand) : [];
         if (broken.length) setRecordToast(broken.join(" · "));
+        if (hand && gameRef.current && !replay) {
+          noteHand(gameRef.current, hand);
+          checkAchievements();
+        }
       } else if (e.kind === "gameWon") {
         audio.play(next.winner === 0 ? "win" : "lose");
         if (!replay) recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
         const broken = gameRef.current && !replay ? recordGame(gameRef.current, next.scores[0], next.winner === 0) : [];
         if (broken.length) setRecordToast((t) => [t, ...broken].filter(Boolean).join(" · "));
+        if (gameRef.current && !replay) {
+          noteGame(gameRef.current, next);
+          checkAchievements();
+        }
       }
     }
     // Screen readers hear every call, card, trick and score as it happens.
@@ -514,15 +525,45 @@ export function App() {
     return () => clearTimeout(timer);
   }, [recordToast]);
   useEffect(() => {
+    if (!achievementToast) return;
+    const timer = setTimeout(() => setAchievementToast(null), 6000);
+    return () => clearTimeout(timer);
+  }, [achievementToast]);
+  // Achievements are checked wherever they happen (a drill in Learn too): they announce themselves.
+  useEffect(() => {
+    const announce = (e: Event) => {
+      const titles = (e as CustomEvent<string[]>).detail;
+      setAchievementToast((t) => [t, ...titles].filter(Boolean).join(" · "));
+    };
+    window.addEventListener("fh500:achievements", announce);
+    // On start, quietly: a tournament finished before it could be counted, and anything already
+    // reached (play from before achievements existed counts).
+    const t = tourRef.current;
+    if (t?.finished) {
+      recordTournament(t);
+      noteTournament(t);
+    }
+    achievements(true);
+    return () => window.removeEventListener("fh500:achievements", announce);
+  }, []);
+  // Clean sheet: judged once the coach has graded every decision of a finished game.
+  useEffect(() => {
+    if (mode !== "solo" || replayRef.current || view?.phase !== "gameOver" || grading > 0 || !gameRef.current) return;
+    noteGrades(gameRef.current, grades);
+    checkAchievements();
+  }, [mode, view, grading, grades]);
+  // Records show at the table; achievements anywhere.
+  const showRecordToast = !!recordToast && screen === "table";
+  useEffect(() => {
     const el = toastRef.current;
-    if (!el || !recordToast) return;
+    if (!el || (!showRecordToast && !achievementToast)) return;
     try {
       if (el.matches(":popover-open")) el.hidePopover();
       el.showPopover();
     } catch {
       // No popover support: it shows in the page instead.
     }
-  }, [recordToast, resultOpen]);
+  }, [recordToast, achievementToast, showRecordToast, resultOpen]);
 
   // Show a finished trick for a moment before play continues.
   useEffect(() => {
@@ -1045,9 +1086,18 @@ export function App() {
         </>
       )}
 
-      {recordToast && atTable && (
+      {(showRecordToast || achievementToast) && (
         <div ref={toastRef} popover="manual" className="record-toast" role="status">
-          <span aria-hidden="true">🏆</span> New record! {recordToast}
+          {showRecordToast && (
+            <span>
+              <span aria-hidden="true">🏆</span> New record! {recordToast}
+            </span>
+          )}
+          {achievementToast && (
+            <span>
+              <span aria-hidden="true">🏅</span> Achievement: {achievementToast}
+            </span>
+          )}
         </div>
       )}
       {result && !held && view && atTable && (
@@ -1149,6 +1199,12 @@ export function App() {
             updateTour((t) => {
               t.finished = true;
             });
+            if (tourRef.current) {
+              const broken = recordTournament(tourRef.current);
+              if (broken.length) setRecordToast(broken.join(" · "));
+              noteTournament(tourRef.current);
+              checkAchievements();
+            }
             setShowFinal(false);
             setScreen("menu");
           }}

@@ -3,6 +3,7 @@
 // so every access is guarded.
 
 import type { HandView } from "./engine";
+import { standings, type Tournament } from "./tournament";
 
 export interface BidStat {
   bids: number;
@@ -21,12 +22,24 @@ export interface Records {
   gamesWon: number;
   /** Bids you declared, by label ("8♦"). */
   bids: Record<string, BidStat>;
+  /** Finished tournaments: how many, won (first place, shared or not), on the podium (top 3), the
+   * sum of your places (for the average), and your highest total with the place it earned. */
+  tournaments: { played: number; won: number; podiums: number; placeSum: number; high: { score: number; place: number } | null; ids: string[] };
   /** Hands and games already counted ("game:hand", "game:end"), so a reload or undo can't count one twice. */
   counted: string[];
 }
 
 const KEY = "fh500.records";
-const EMPTY: Records = { highGame: null, bestHand: null, highBid: null, gamesPlayed: 0, gamesWon: 0, bids: {}, counted: [] };
+const EMPTY: Records = {
+  highGame: null,
+  bestHand: null,
+  highBid: null,
+  gamesPlayed: 0,
+  gamesWon: 0,
+  bids: {},
+  tournaments: { played: 0, won: 0, podiums: 0, placeSum: 0, high: null, ids: [] },
+  counted: [],
+};
 
 export function loadRecords(): Records {
   try {
@@ -99,4 +112,32 @@ export function recordGame(game: string, score: number, won: boolean): string[] 
   }
   save(records);
   return broken;
+}
+
+/** Counts a finished tournament: your place among the 12 and your total. Returns the records it broke. */
+export function recordTournament(t: Tournament): string[] {
+  const records = loadRecords();
+  const stats = records.tournaments;
+  // Tournaments keep their own list: a finished one stays in storage until the next one starts.
+  if (stats.ids.includes(t.id)) return [];
+  stats.ids = [...stats.ids, t.id].slice(-100);
+  const you = standings(t).find((s) => s.participant.id === 0)!;
+  stats.played++;
+  if (you.place === 1) stats.won++;
+  if (you.place <= 3) stats.podiums++;
+  stats.placeSum += you.place;
+  const broken: string[] = [];
+  if (stats.high === null || you.total > stats.high.score) {
+    if (stats.high !== null) broken.push(`highest tournament score: ${you.total} points`);
+    stats.high = { score: you.total, place: you.place };
+  }
+  save(records);
+  return broken;
+}
+
+/** "1st", "2nd", "3rd", "4th"… */
+export function ordinal(n: number): string {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
 }

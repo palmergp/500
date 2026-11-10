@@ -111,6 +111,23 @@ test("the final results: third, second, then the winner, then the awards", async
   await page.screenshot({ path: "test-results/tournament-final.png", fullPage: true });
   await final.getByRole("button", { name: "Done" }).click();
   await expect(page.getByRole("navigation", { name: "Main menu" })).toBeVisible();
+
+  // Counted in your stats, and it's an achievement.
+  await expect(page.locator(".record-toast")).toContainText("Achievement: Tournament player");
+  const { standings } = await import("../src/tournament");
+  const you = standings(t).find((s) => s.participant.id === 0)!;
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Learn/ }).click();
+  await page.getByRole("tab", { name: /Progress/ }).click();
+  await expect(page.locator(".stat", { hasText: "tournaments won" })).toContainText(`${you.place === 1 ? 1 : 0} of 1`);
+  await expect(page.locator(".stat", { hasText: "average place" })).toContainText(`${you.place}.0`);
+  await expect(page.locator(".stat", { hasText: "highest tournament score" })).toContainText(String(you.total));
+  await page.getByRole("tab", { name: "Achievements" }).click();
+  await expect(page.locator(".achievement.done", { hasText: "Tournament player" })).toBeVisible();
+
+  // A reload doesn't count it again.
+  await page.reload();
+  const records = await page.evaluate(() => JSON.parse(localStorage.getItem("fh500.records")!).tournaments.played);
+  expect(records).toBe(1);
 });
 
 test("the best hand record says which bid it was", async ({ page }, info) => {

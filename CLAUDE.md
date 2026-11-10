@@ -46,8 +46,13 @@
   `features::play_features`, cards in role-based slots `features::play_slot`), then
   `train/.venv/Scripts/python train/train_play.py` writes `crates/ai/models/play.fhnn`; `neural_play.rs` plays with it
   (persona id `neural`). Changing the inputs means regenerating the data and retraining.
-- Records and bid stats (`web/src/records.ts`): high game, best hand (with its bid and who declared it), highest bid made, and each bid you declared;
+- Records and bid stats (`web/src/records.ts`): high game, best hand (with its bid and who declared it), highest bid made, each bid you declared,
+  and tournaments (won, podiums, average place, highest total; counted when the final reveal is done);
   counted once per game and hand, shown on Learn → Progress, with a popover banner when you set one.
+- Achievements (`web/src/achievements.ts`, Learn → Achievements): measured mostly from what's already kept (records, drill
+  scores, lessons, solved mistakes), so past play counts; moments the records don't keep (slams, sets, streaks, comebacks,
+  clean games) are noted as they happen. Anything that changes progress calls `checkAchievements()`, which announces new
+  ones with a `fh500:achievements` window event (App shows the banner); the start-up check is quiet.
 - Hand codes (`web/src/handcode.ts`): the top bar's Code button (and Code in reviews and decision lists) names an
   exact moment of a solo game. With a host the code is short (`XXXX-XXXX`) and the host saves the game in
   `%LOCALAPPDATA%/500/hands/` (`POST /api/hands`); without one it's `500:` plus the game. **When the user gives a

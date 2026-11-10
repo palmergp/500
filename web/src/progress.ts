@@ -116,3 +116,22 @@ export function leaks(progress: Progress, games = 20): { pattern: string; slips:
 export function resetProgress() {
   save(structuredClone(EMPTY));
 }
+
+const LESSONS_KEY = "fh500.lessonsDone";
+
+/** The lessons you've finished, by id. */
+export function loadLessonsDone(): string[] {
+  try {
+    return JSON.parse(localStorage.getItem(LESSONS_KEY) ?? "[]") as string[];
+  } catch {
+    return [];
+  }
+}
+
+export function saveLessonsDone(done: string[]) {
+  try {
+    localStorage.setItem(LESSONS_KEY, JSON.stringify(done));
+  } catch {
+    // Optional.
+  }
+}
