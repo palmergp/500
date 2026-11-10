@@ -18,26 +18,31 @@ $root = Split-Path -Parent $PSScriptRoot
 $web = Join-Path $root "web"
 # Pinned, so a new release can't change what this does.
 $wrangler = @("--yes", "wrangler@4.151.2")
+# npx.cmd, not npx: in PowerShell "npx" is npm's npx.ps1, which rereads the calling line's text
+# instead of taking its arguments, so a splatted @args arrives empty (wrangler then just prints
+# its help and "succeeds"). Same for npm.
+$npx = "npx.cmd"
+$npm = "npm.cmd"
 
 function Wrangler {
-    & npx @wrangler @args
+    & $npx @wrangler @args
     if ($LASTEXITCODE -ne 0) { throw "wrangler $($args -join ' ') failed" }
 }
 
 Push-Location $web
 try {
     Write-Host "Building the app..."
-    & npm run build
+    & $npm run build
     if ($LASTEXITCODE -ne 0) { throw "the build failed" }
 
     # Signed in? If not, Cloudflare's sign-in page opens in the browser.
-    $whoami = (& npx @wrangler whoami 2>&1) -join "`n"
+    $whoami = (& $npx @wrangler whoami 2>&1) -join "`n"
     if ($whoami -match "not authenticated") {
         Write-Host "Sign in to Cloudflare in the browser window that opens..."
         Wrangler login
     }
 
-    $projects = (& npx @wrangler pages project list 2>&1) -join "`n"
+    $projects = (& $npx @wrangler pages project list 2>&1) -join "`n"
     if ($projects -notmatch "(?m)\b$([regex]::Escape($Project))\b") {
         Write-Host "Creating the Pages project '$Project'..."
         Wrangler pages project create $Project --production-branch main
