@@ -130,6 +130,11 @@ test("the final results: third, second, then the winner, then the awards", async
   await page.setViewportSize({ width: 393, height: 852 });
   await grid.scrollIntoViewIfNeeded();
   expect(await page.evaluate(() => document.scrollingElement!.scrollWidth - window.innerWidth)).toBeLessThanOrEqual(0);
+  // Scrolled to the last round, place, name and total stay put.
+  const firstRow = grid.locator("tbody tr").first();
+  const totalBefore = (await firstRow.locator(".game-total").boundingBox())!.x;
+  await final.locator(".game-grid-scroll").evaluate((el) => (el.scrollLeft = el.scrollWidth));
+  expect((await firstRow.locator(".game-total").boundingBox())!.x).toBeCloseTo(totalBefore, 0);
   await page.screenshot({ path: "test-results/tournament-final-phone.png" });
   await page.setViewportSize({ width: 1280, height: 720 });
   await final.getByRole("button", { name: "Done" }).click();

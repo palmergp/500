@@ -2540,20 +2540,34 @@ button.danger {
   white-space: nowrap;
 }
 .game-grid tr > :first-child,
-.game-grid tr > :nth-child(2) {
+.game-grid tr > :nth-child(2),
+.game-grid tr > :nth-child(3) {
   position: sticky;
   background: var(--panel);
   z-index: 1;
+  /* Covers the 2px gaps between cells, so scrolled scores don't show through. */
+  box-shadow:
+    -2px 0 0 var(--panel),
+    2px 0 0 var(--panel);
 }
+/* Offsets match where the cells sit anyway (2px border-spacing), so nothing shifts on scroll. */
 .game-grid tr > :first-child {
-  left: 0;
+  left: 2px;
   width: 2.2em;
   min-width: 2.2em;
   text-align: center;
 }
 .game-grid tr > :nth-child(2) {
-  left: calc(2.2em + 2px);
+  left: calc(2.2em + 4px);
+  width: 4.8em;
+  min-width: 4.8em;
+  max-width: 4.8em;
+  overflow: hidden;
+  text-overflow: ellipsis;
   text-align: left;
+}
+.game-grid tr > :nth-child(3) {
+  left: calc(7em + 6px);
 }
 .game-grid tbody th {
   font-weight: 500;
