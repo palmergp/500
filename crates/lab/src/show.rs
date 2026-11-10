@@ -92,6 +92,14 @@ pub fn run(code: &str) {
                 if !h.plays.is_empty() {
                     println!("  Every card: {}", h.plays.iter().map(|o| format!("{} ({})", chance(o), o.note.clone().unwrap_or_default())).collect::<Vec<_>>().join("; "));
                 }
+                // In the auction, what the expert's own bidding weighed: the best bid against the
+                // baseline (letting the current high bid stand), which the hint doesn't list.
+                if game.phase() == fh_core::Phase::Bidding {
+                    use fh_ai::Bot;
+                    let mut oracle = fh_ai::search_bot::SearchBot::new("The Oracle", fh_ai::search_bot::SearchConfig::ORACLE, save.seed);
+                    let action = oracle.choose(&game.observe(Seat::SOUTH), &game.legal_actions());
+                    println!("  The Oracle would {action}: {}", oracle.note().unwrap_or("(no note)"));
+                }
             }
             Err(e) => println!("\n(no hint: {e})"),
         },
