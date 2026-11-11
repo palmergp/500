@@ -2,7 +2,7 @@
 // to act, the bid off to the side, trick piles, past tricks, short games and random opponents.
 
 import { expect, test, type Page } from "@playwright/test";
-import { freshStart, startGame, takeTurn } from "./helpers";
+import { freshStart, startGame, takeTurn, topBarControl } from "./helpers";
 
 /** Whether the page scrolls: it never should while playing. */
 async function scrolls(page: Page): Promise<string | null> {
@@ -30,6 +30,35 @@ test("the main menu, and tooltips on the table's buttons", async ({ page }) => {
   await page.getByRole("button", { name: "Menu" }).click();
   await page.getByRole("button", { name: /^Continue/ }).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
+});
+
+test("on a phone the top bar fits, with sound, music, settings and the code in its More menu", async ({ page }, info) => {
+  test.skip(info.project.name !== "phone", "the phone's bar");
+  await startGame(page);
+  const bar = page.locator(".topbar");
+  // Nothing runs off the screen, in either orientation.
+  for (const size of [{ width: 360, height: 740 }, { width: 740, height: 360 }]) {
+    await page.setViewportSize(size);
+    const last = await bar.locator("nav > *").last().boundingBox();
+    expect(last!.x + last!.width, `${size.width}×${size.height}`).toBeLessThanOrEqual(size.width);
+  }
+  await page.setViewportSize({ width: 360, height: 740 });
+  // Speed stays in the bar; music is in the menu, and a choice closes it.
+  await expect(bar.getByRole("button", { name: /^Speed/ })).toBeVisible();
+  await expect(bar.getByRole("button", { name: "Music", exact: true })).toHaveCount(0);
+  await bar.getByRole("button", { name: "More" }).click();
+  const menu = page.getByRole("menu", { name: "More" });
+  for (const name of [/^Code/, /^Settings/, /^Sound effects on/, /^Music off/]) await expect(menu.getByRole("menuitem", { name })).toBeVisible();
+  await page.screenshot({ path: "test-results/phone-more-menu.png" });
+  await menu.getByRole("menuitem", { name: /^Music/ }).click();
+  await expect(menu).toHaveCount(0);
+  await bar.getByRole("button", { name: "More" }).click();
+  await expect(menu.getByRole("menuitem", { name: /^Music on/ })).toBeVisible();
+  // A tap elsewhere closes it.
+  await page.locator(".play-area").click({ position: { x: 5, y: 200 } });
+  await expect(menu).toHaveCount(0);
+  await (await topBarControl(page, "Settings")).click();
+  await expect(page.getByRole("dialog", { name: "Settings" })).toBeVisible();
 });
 
 test("a whole hand fits on the screen, with the coach's panels open", async ({ page }, info) => {

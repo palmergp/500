@@ -1,13 +1,13 @@
 import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { startGame, takeTurn } from "./helpers";
+import { startGame, takeTurn, topBarControl } from "./helpers";
 
 test("plays a hand through to the score", async ({ page }, info) => {
   const errors: string[] = [];
   page.on("pageerror", (e) => errors.push(e.message));
   await startGame(page);
   // Turn music on too, so the audio engine is exercised (sound effects are on by default).
-  await page.getByRole("button", { name: "Music" }).click();
+  await (await topBarControl(page, "Music")).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   await page.screenshot({ path: `test-results/${info.project.name}-1-deal.png` });
 

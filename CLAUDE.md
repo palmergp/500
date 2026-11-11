@@ -55,6 +55,8 @@
   scores, lessons, solved mistakes), so past play counts; moments the records don't keep (slams, sets, streaks, comebacks,
   clean games) are noted as they happen. Anything that changes progress calls `checkAchievements()`, which announces new
   ones with a `fh500:achievements` window event (App shows the banner); the start-up check is quiet.
+- Top bar: on small screens (`COMPACT` in App.tsx, where its labels hide) Code, Settings, sound and music go in its
+  "More" menu (`components/MoreMenu.tsx`; e2e helper `topBarControl`); speed and the rest stay in the bar.
 - Hand codes (`web/src/handcode.ts`): the top bar's Code button (and Code in reviews and decision lists) names an
   exact moment of a solo game. With a host the code is short (`XXXX-XXXX`) and the host saves the game in
   `%LOCALAPPDATA%/500/hands/` (`POST /api/hands`); without one it's `500:` plus the game. **When the user gives a

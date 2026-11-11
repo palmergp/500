@@ -2631,3 +2631,58 @@ button.danger {
   font-weight: 600;
   margin: 8px 0 4px;
 }
+
+/* ---- The top bar's "More" menu (small screens) ------------------------------------------------ */
+
+.more-menu {
+  position: relative;
+  display: flex;
+}
+.more-menu > .nav-button {
+  font-weight: 700;
+}
+.more-items {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 12em;
+  padding: 6px;
+  background: var(--panel);
+  color: var(--panel-ink);
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+.topbar nav .more-items button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.95rem;
+  text-align: left;
+  border: none;
+  background: transparent;
+  color: inherit;
+  border-radius: 6px;
+}
+.topbar nav .more-items button:hover,
+.topbar nav .more-items button:focus-visible {
+  background: color-mix(in srgb, var(--panel-ink) 8%, transparent);
+}
+.more-icon {
+  width: 1.4em;
+  text-align: center;
+}
+.more-state {
+  margin-left: auto;
+  opacity: 0.65;
+  font-size: 0.85em;
+}
+.more-items button.off .more-icon {
+  opacity: 0.45;
+}

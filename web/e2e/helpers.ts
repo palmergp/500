@@ -11,6 +11,17 @@ async function tryClick(target: Locator): Promise<boolean> {
   }
 }
 
+/** A top-bar control by name: a button, or on small screens an item in the "More" menu (opened
+ * for you). */
+export async function topBarControl(page: Page, name: string): Promise<Locator> {
+  const more = page.getByRole("button", { name: "More", exact: true });
+  if (await more.isVisible()) {
+    if ((await more.getAttribute("aria-expanded")) !== "true") await more.click();
+    return page.getByRole("menu", { name: "More" }).getByRole("menuitem", { name: new RegExp(`^${name}`) });
+  }
+  return page.getByRole("button", { name, exact: true });
+}
+
 /** Takes the human's turn with a simple policy: pass if allowed, otherwise the first legal option. */
 export async function takeTurn(page: Page): Promise<boolean> {
   if (await tryClick(page.locator(".bidding-box .call.pass:not([disabled])"))) return true;

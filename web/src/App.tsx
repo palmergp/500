@@ -26,6 +26,7 @@ import { achievements, checkAchievements, noteGame, noteGrades, noteHand, noteTo
 import { handCode, saveAt } from "./handcode";
 import { FinalReveal, TournamentDialog } from "./components/Tournament";
 import { TouchTips } from "./components/TouchTips";
+import { MoreItem, MoreMenu } from "./components/MoreMenu";
 import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament } from "./tournament";
 import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
@@ -37,6 +38,9 @@ const SPEEDS: Speed[] = ["slow", "normal", "fast"];
 const SPEED_ICON: Record<Speed, string> = { slow: "🐢", normal: "▶", fast: "⏩" };
 /** Wide enough for a side rail beside the table (the auction, the bid and the coach). */
 const WIDE = "(min-width: 1100px)";
+/** Screens where the top bar's labels hide (styles.css): too narrow for every button, so the less
+ * used ones go in the "More" menu. */
+const COMPACT = "(max-width: 760px), (max-height: 500px)";
 
 /** Identifies a game for the progress record: its seed. */
 function gameId(save: string): string {
@@ -132,6 +136,9 @@ function prompt(view: View): string {
   }
 }
 
+const CODE_TIP = "A code for this exact moment of the game, copied for you: give it to Claude with a question";
+const SETTINGS_TIP = "Settings: coach, counting aids, sound, speed and display";
+
 /** A top-bar button: an icon, and a label that hides on small screens. The tooltip says what it does. */
 function NavButton({ icon, label, tip, onClick, disabled, className }: { icon: string; label: string; tip: string; onClick: () => void; disabled?: boolean; className?: string }) {
   return (
@@ -209,6 +216,7 @@ export function App() {
   const [name, setName] = useState(savedName);
   const [showLobby, setShowLobby] = useState(false);
   const wide = useMediaQuery(WIDE);
+  const compact = useMediaQuery(COMPACT);
   const lan = mode === "lan";
   useEffect(() => {
     gradesRef.current = grades;
@@ -958,11 +966,7 @@ export function App() {
               {inTour && tour && (
                 <NavButton icon="🏆" label="Standings" tip={`Tournament, round ${tour.current + 1} of ${ROUNDS}: everyone's totals so far`} onClick={() => setTourDialog({})} />
               )}
-              {mode === "solo" && view && (
-                <NavButton icon="🔗" label="Code" tip="A code for this exact moment of the game, copied for you: give it to Claude with a question" onClick={() => showCode(view.actionCount)} />
-              )}
               {lan && <NavButton icon="👥" label="Table" tip="Who's sitting where; leave or end the game" onClick={() => setShowLobby(true)} />}
-              <NavButton icon="⚙" label="Settings" tip="Settings: coach, counting aids, sound, speed and display" onClick={() => setShowSettings(true)} />
               {!lan && (
                 <button
                   type="button"
@@ -974,26 +978,53 @@ export function App() {
                   {SPEED_ICON[settings.speed]}
                 </button>
               )}
-              <button
-                type="button"
-                className="icon-toggle"
-                aria-pressed={settings.sound}
-                title={settings.sound ? "Sound on (click to mute)" : "Sound off (click to turn on)"}
-                aria-label="Sound effects"
-                onClick={() => changeSettings({ ...settings, sound: !settings.sound })}
-              >
-                {settings.sound ? "🔊" : "🔇"}
-              </button>
-              <button
-                type="button"
-                className={`icon-toggle${settings.music ? "" : " off"}`}
-                aria-pressed={settings.music}
-                title={settings.music ? "Music on (click to stop)" : "Music off (click to play)"}
-                aria-label="Music"
-                onClick={() => changeSettings({ ...settings, music: !settings.music })}
-              >
-                🎵
-              </button>
+              {compact ? (
+                <MoreMenu>
+                  {mode === "solo" && view && <MoreItem icon="🔗" label="Code" tip={CODE_TIP} onClick={() => showCode(view.actionCount)} />}
+                  <MoreItem icon="⚙" label="Settings" tip={SETTINGS_TIP} onClick={() => setShowSettings(true)} />
+                  <MoreItem
+                    icon={settings.sound ? "🔊" : "🔇"}
+                    label="Sound effects"
+                    state={settings.sound ? "on" : "off"}
+                    off={!settings.sound}
+                    tip={settings.sound ? "Sound on (tap to mute)" : "Sound off (tap to turn on)"}
+                    onClick={() => changeSettings({ ...settings, sound: !settings.sound })}
+                  />
+                  <MoreItem
+                    icon="🎵"
+                    label="Music"
+                    state={settings.music ? "on" : "off"}
+                    off={!settings.music}
+                    tip={settings.music ? "Music on (tap to stop)" : "Music off (tap to play)"}
+                    onClick={() => changeSettings({ ...settings, music: !settings.music })}
+                  />
+                </MoreMenu>
+              ) : (
+                <>
+                  {mode === "solo" && view && <NavButton icon="🔗" label="Code" tip={CODE_TIP} onClick={() => showCode(view.actionCount)} />}
+                  <NavButton icon="⚙" label="Settings" tip={SETTINGS_TIP} onClick={() => setShowSettings(true)} />
+                  <button
+                    type="button"
+                    className="icon-toggle"
+                    aria-pressed={settings.sound}
+                    title={settings.sound ? "Sound on (click to mute)" : "Sound off (click to turn on)"}
+                    aria-label="Sound effects"
+                    onClick={() => changeSettings({ ...settings, sound: !settings.sound })}
+                  >
+                    {settings.sound ? "🔊" : "🔇"}
+                  </button>
+                  <button
+                    type="button"
+                    className={`icon-toggle${settings.music ? "" : " off"}`}
+                    aria-pressed={settings.music}
+                    title={settings.music ? "Music on (click to stop)" : "Music off (click to play)"}
+                    aria-label="Music"
+                    onClick={() => changeSettings({ ...settings, music: !settings.music })}
+                  >
+                    🎵
+                  </button>
+                </>
+              )}
             </nav>
           </header>
 
