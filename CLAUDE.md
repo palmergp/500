@@ -85,7 +85,9 @@
   (and only over HTTPS or on localhost, so not from a host's wifi address).
 - iPhone: `publish.cmd` (→ `scripts/publish.ps1`) builds and uploads `web/dist` to Cloudflare Pages
   (`https://<project>.pages.dev`, wrangler pinned) for Add to Home Screen; `web/public/_headers` sets its caching.
-  Full screen it runs under the status bar: the layout pads by the safe-area insets (`e2e/iphone.spec.ts`), and
+  Full screen it runs below a solid black status bar (not black-translucent: iOS 26 blurs content drawn under
+  it; changing the tag needs the app re-added to the Home Screen); the layout pads by the safe-area insets
+  (`e2e/iphone.spec.ts`), and
   short screens (a phone on its side, `max-height: 500px`) put the other three players in a row across the top.
 - Touch screens have no hover: `components/TouchTips.tsx` shows any `title` on press-and-hold (and on a tap for plain
   labels), so put extra information in `title`, never in hover-only handlers.

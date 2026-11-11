@@ -1,5 +1,6 @@
-// Added to an iPhone's home screen, the app runs full screen under the status bar and above the
-// home bar: the layout must keep clear of both (safe-area insets, simulated here in Chromium), still
+// Added to an iPhone's home screen, the app runs full screen above the home bar (and below the
+// status bar, which is solid so iOS 26 doesn't blur the top bar; the insets are kept in case): the
+// layout must keep clear of both (safe-area insets, simulated here in Chromium), still
 // without scrolling the page. And the home-screen tags and icon must be there.
 
 import { expect, test, type Browser } from "@playwright/test";
@@ -53,7 +54,7 @@ test("home-screen tags and icon", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one pass is enough");
   await page.goto("/");
   await expect(page.locator('meta[name="apple-mobile-web-app-capable"]')).toHaveAttribute("content", "yes");
-  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "black-translucent");
+  await expect(page.locator('meta[name="apple-mobile-web-app-status-bar-style"]')).toHaveAttribute("content", "black");
   const href = await page.locator('link[rel="apple-touch-icon"]').getAttribute("href");
   const size = await page.evaluate(async (src) => {
     const image = new Image();

@@ -7,11 +7,13 @@
     <meta name="description" content="Play 500 against AI players and learn to play it well." />
     <link rel="icon" href="./icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="./apple-touch-icon.png" />
-    <!-- Added to an iPhone's home screen: full screen, the felt showing under the status bar
-         (the layout keeps clear of it with safe-area padding), and a short name under the icon. -->
+    <!-- Added to an iPhone's home screen: full screen below a solid black status bar, and a short
+         name under the icon. Not "black-translucent": with the page drawn under the status bar,
+         iOS 26 blurs the top of it (its scroll-edge effect), the top bar included. The layout still
+         pads by the safe-area insets for the home bar and a phone on its side. -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black" />
     <meta name="apple-mobile-web-app-title" content="500" />
     <link rel="manifest" href="./manifest.webmanifest" />
     <title>500</title>
