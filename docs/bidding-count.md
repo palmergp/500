@@ -41,6 +41,7 @@ Count these with the suit you're thinking of making trumps.
 | Each side king with just one guard (K-x) | ⅛ |
 | Each side void (no cards in a suit) | ⅕ |
 | Each side singleton (one card in a suit) | ⅛ |
+| A second short side suit (two voids or singletons, in any mix), once | ⅛ |
 
 A lone side king (no other card in the suit) counts nothing: it's usually caught by the ace. Side queens count
 nothing either, however they're guarded (under 0.1 of a trick each). See [how often side kings and queens win a
@@ -54,7 +55,7 @@ trick](#side-kings-and-queens-how-often-they-win-a-trick) below.
 
 ### Example
 
-You hold Joker, J♥ 9♥ 7♥ 5♥, A♠ 8♠ 6♠, 9♦ and 4♣, and you're counting hearts:
+You hold Joker, J♥ 9♥ 7♥ 5♥, A♠ 8♠ 6♠, 9♦ and 5♣, and you're counting hearts:
 
 | | |
 |---|---|
@@ -62,7 +63,7 @@ You hold Joker, J♥ 9♥ 7♥ 5♥, A♠ 8♠ 6♠, 9♦ and 4♣, and you're c
 | Right bower (J♥) | 1¼ |
 | Three other trumps (9♥ 7♥ 5♥), ½ each | 1½ |
 | Side ace (A♠) | ⅔ |
-| Two singletons (9♦, 4♣), ⅛ each | ¼ |
+| Two singletons (9♦, 5♣), ⅛ each, and ⅛ for having two | ⅜ |
 | Partner and kitty | 3 |
 | **Count** | **about 8: bid 7♥** (8♥ waits for about 8½) |
 

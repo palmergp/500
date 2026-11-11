@@ -17,7 +17,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 1. **Count your hand in the suit you'd name trumps:**
    - Joker 1½, right bower 1¼, left bower 1;
    - trump ace ¾, king ⅔, queen ½, each other trump ½;
-   - side ace ⅔ (but ¼ less for an ace with no other card in its suit), side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕;
+   - side ace ⅔ (but ¼ less for an ace with no other card in its suit), side king beside its ace ⅓, guarded side king ⅕ (⅛ with just one guard), void ⅕, singleton ⅛, and ⅛ more for a second short side suit;
    - then **add 3** for partner and the kitty.
 2. **Bid 7 when the count reaches about 7. Go up to 8 only at about 8½, and stop there: a 9 bid almost never
    pays, even at a count of 11.** Each extra level adds just 100 points, but falling one trick short costs both
@@ -87,6 +87,7 @@ For the suit you'd make trumps, add up:
 | Each side king with just one guard | **⅛** |
 | Each side void | **⅕** |
 | Each side singleton | **⅛** |
+| A second short side suit (void or singleton), once | **⅛** |
 
 Then **add 3** for your partner and the kitty. That total is roughly how many tricks your side will take if you declare.
 
@@ -95,6 +96,8 @@ Then **add 3** for your partner and the kitty. That total is roughly how many tr
 - **Trumps are what count.** Every trump is worth at least half a trick. A side king is worth less than a small trump.
 - **The two jacks are worth more than the ace of trumps.**
 - **Voids help less than you'd think** (⅕ of a trick), because you need spare trumps to use them.
+- **Two short side suits are worth more than the two apart:** about ⅛ more, more still with only 3–4 trumps
+  (finding 50). Doubletons count nothing, and in no trumps shortness counts nothing either.
 
 ### 2. Bid 7 at a count of about 7; go up to 8 at about 8½, and stop at 8
 

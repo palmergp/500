@@ -992,8 +992,8 @@ suits).* Tricks for the bidder's side in a suit bid, against a hand with no side
 - **Doubletons count nothing** (−0.01 to +0.05), alone or beside a singleton: a singleton with a doubleton is
   worth the singleton (+0.16 against +0.13).
 - **In no trumps shortness is worth nothing either way** (−0.04 to +0.07, all within the noise).
-- The count's values for one void (⅕) and one singleton (⅛) match. It has no term yet for a second short suit;
-  one of about ⅛ would come up on about 1 suit bid in 10.
+- The count's values for one void (⅕) and one singleton (⅛) match. The count now adds ⅛ once for a second short
+  side suit (void or singleton, any mix; `thumb.rs`), which comes up on about 1 suit bid in 10.
 
 ## Open questions for the lab
 

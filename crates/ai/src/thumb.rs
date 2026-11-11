@@ -98,6 +98,11 @@ fn card_parts(hand: CardSet, strain: Strain) -> Vec<(String, f32)> {
             add(plural_with(thin_kings, "side king", "with one guard"), 0.125 * thin_kings as f32);
             add(plural(voids, "side void"), 0.2 * voids as f32);
             add(plural(singles, "singleton"), 0.125 * singles as f32);
+            // Two short side suits are worth more than the two apart: trumping in both, crossing with
+            // partner (finding 50; about ⅛ more, once).
+            if voids + singles >= 2 {
+                add("second short side suit".into(), 0.125);
+            }
         }
         None => {
             if hand.contains(Card::JOKER) {
@@ -275,5 +280,18 @@ mod tests {
         assert_eq!(fraction(0.67), "⅔");
         assert_eq!(fraction(-0.9), "−0.9");
         assert_eq!(fraction(3.0), "3");
+    }
+
+    #[test]
+    fn a_second_short_side_suit_adds_an_eighth() {
+        let spades = |hand: &str| card_count(CardSet::parse(hand).unwrap(), Strain::Spades);
+        // One singleton (♦), the other side suits 2+.
+        let one = spades("JS 9S 7S 6S AH 8H 7C 6C 5C KD");
+        // Two singletons (♦ and ♣): ⅛ for the second singleton and ⅛ for having two.
+        let two = spades("JS 9S 7S 6S AH 8H 7H 6H 5C KD");
+        assert!((two - one - 0.25).abs() < 0.01, "{one} {two}");
+        // A void and a singleton: the void's ⅕ and the same ⅛.
+        let void = spades("JS 9S 7S 6S AH 8H 7H 6H 5H KD");
+        assert!((void - one - (0.2 + 0.125)).abs() < 0.01, "{one} {void}");
     }
 }

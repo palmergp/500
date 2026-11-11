@@ -79,7 +79,7 @@ export const LESSONS: Lesson[] = [
     body: [
       "Count your hand in the suit you'd make trumps. These values were measured from 64,000 solved bidding decisions:",
       "• Joker 1½ · right bower 1¼ · left bower 1 · trump ace ¾ · trump king ⅔ · trump queen ½ · each other trump ½",
-      "• Each side ace ⅔ · each side king beside its ace ⅓ · each guarded side king ⅕ (⅛ with just one guard) · each side void ⅕ · each singleton ⅛",
+      "• Each side ace ⅔ · each side king beside its ace ⅓ · each guarded side king ⅕ (⅛ with just one guard) · each side void ⅕ · each singleton ⅛ · ⅛ more for a second short side suit (void or singleton)",
       "Side queens count nothing in a suit bid: even guarded, one wins a trick only about one time in seven.",
       "• Then add 3 for your partner and the kitty.",
       "That total is roughly what your side will take as declarer. Bid 7 when it reaches about 7 (6¾ in a red suit or clubs): the bid is then made about 60% of the time, which is what the scoring needs to pay.",
@@ -292,10 +292,10 @@ export const LESSONS: Lesson[] = [
         explain: "A side ace was the best defensive lead 68% of the time; a low trump was the worst.",
       },
       {
-        q: "You can't follow suit for the first time and won't trump. You hold K Q 8 4 of clubs and 9 6 of hearts. Which card?",
-        options: ["9♥", "4♣", "K♣"],
+        q: "You can't follow suit for the first time and won't trump. You hold K Q 8 5 of clubs and 9 6 of hearts. Which card?",
+        options: ["9♥", "5♣", "K♣"],
         answer: 1,
-        explain: "Throw a low card from your strongest side suit: the 4♣ tells partner to lead clubs.",
+        explain: "Throw a low card from your strongest side suit: the 5♣ tells partner to lead clubs.",
       },
       {
         q: "Partner's A♦ is winning the trick for sure and you're out of diamonds. Trump it?",
