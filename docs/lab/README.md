@@ -969,6 +969,32 @@ so each king gets its own value.* Tricks for the bidder's side, everything else 
   ½ and ⅓), so **the count stays as it is**: counting every king at full value overstates only the rare third
   king, by about 0.1–0.2 of a trick.
 
+### 50. Short side suits: voids, singletons and the two together
+
+*Measured by `train/shortness.py` on the same solver data: the bidding count refitted with every mix of side voids
+and singletons as its own category (and each trump length its own value, since a long trump suit forces short side
+suits).* Tricks for the bidder's side in a suit bid, against a hand with no side suit shorter than two:
+
+| Shape | How often | Worth | The parts added up | Extra for having both |
+|---|---|---|---|---|
+| 1 singleton | 43% | +0.12 | | |
+| 1 void | 12% | +0.19 | | |
+| 2 singletons | 7% | +0.32 ± 0.03 | +0.24 | +0.08 |
+| 1 void + 1 singleton | 2% | +0.44 ± 0.04 | +0.31 | +0.13 |
+| 2 voids | 0.2% | +0.54 ± 0.15 | +0.38 | +0.16 |
+| 3 singletons | 0.1% | +0.47 ± 0.25 | +0.36 | +0.11 |
+
+- **Two short suits are worth more than the two apart.** A second short side suit adds about a tenth of a trick
+  beyond its own value: you can trump in both suits (a crossruff with partner), and the opponents can't cash a
+  side suit against you in either.
+- With 3–4 trumps, a singleton beside a void adds 0.24–0.30 (double its value alone); with 5–6 trumps it adds about
+  0.2. With 7 or more trumps every hand is short somewhere, and the shapes can't be told apart.
+- **Doubletons count nothing** (−0.01 to +0.05), alone or beside a singleton: a singleton with a doubleton is
+  worth the singleton (+0.16 against +0.13).
+- **In no trumps shortness is worth nothing either way** (−0.04 to +0.07, all within the noise).
+- The count's values for one void (⅕) and one singleton (⅛) match. It has no term yet for a second short suit;
+  one of about ⅛ would come up on about 1 suit bid in 10.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
