@@ -274,6 +274,10 @@ export function App() {
     if (snapshot.events.some((e) => e.kind === "handScored")) {
       setFinishing(false);
       setResult(next.history.filter((h) => !h.passedOut).at(-1) ?? null);
+    } else if (modeRef.current === "solo" && next.phase === "gameOver") {
+      // A finished game picked up again (a reload, Continue, back from a replay): nothing is left
+      // to play, so its last hand's result is the way on (New game, or the tournament's results).
+      setResult(next.history.filter((h) => !h.passedOut).at(-1) ?? null);
     }
   }, []);
 
@@ -1296,6 +1300,8 @@ export function App() {
           onCancel={() => {
             setShowNewGame(false);
             if (!view || mode !== "solo") setScreen("menu");
+            // Back at a finished game: its result again, the way on.
+            else if (view.phase === "gameOver") setResult(view.history.filter((h) => !h.passedOut).at(-1) ?? null);
           }}
         />
       )}

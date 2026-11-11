@@ -53,6 +53,35 @@ test("restores a game after reload", async ({ page }) => {
     .toEqual(before);
 });
 
+test("a finished game, reloaded, shows its last result and the way to a new game", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(300_000);
+  await startGame(page, { hands: "4 hands" });
+  const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+  const newGame = result.getByRole("button", { name: "New game" });
+  const finish = page.getByRole("button", { name: /^Finish hand/ });
+  for (let step = 0; step < 5000 && !(await newGame.isVisible()); step++) {
+    if (await result.isVisible()) {
+      await result.getByRole("button", { name: "Next hand" }).click().catch(() => {});
+      continue;
+    }
+    if (await finish.isVisible()) {
+      await finish.click().catch(() => {});
+      continue;
+    }
+    if (!(await takeTurn(page))) await page.waitForTimeout(100);
+  }
+  const last = page.getByRole("dialog", { name: "Hand 4" });
+  await expect(last.getByRole("button", { name: "New game" })).toBeVisible();
+  // Left with the result up, and picked up again: the result is back, not a table with nothing to do.
+  await page.reload();
+  await expect(last.getByRole("button", { name: "New game" })).toBeVisible();
+  // Closing the new game's dialog leads back to the result too.
+  await newGame.click();
+  await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Cancel" }).click();
+  await expect(newGame).toBeVisible();
+});
+
 test("finish the hand: a bot plays your cards quickly to the end", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one pass is enough");
   test.setTimeout(120_000);
