@@ -947,6 +947,28 @@ After an opponent's bid (7 is no longer available), at counts 6½ / 7 / 7½:
 - 9 and 10 were never best at these scores. Only 267 decisions came after an opponent's bid, so that table is the
   rougher one.
 
+### 49. Do guarded kings add up?
+
+*Measured by `train/kings.py` on the solver data (112,000 bidding decisions, `train/data/bid` and `bid_selfplay`):
+the bidding count refitted with guarded kings (no ace in the suit) entered as "exactly 1, 2, 3" rather than a count,
+so each king gets its own value.* Tricks for the bidder's side, everything else in the count held equal:
+
+| Guarded kings | Suit bid: in all | the king adds | No trumps: in all | the king adds |
+|---|---|---|---|---|
+| 1 (35% / 40% of hands) | +0.18 | +0.18 | +0.45 | +0.45 |
+| 2 (6% / 11%) | +0.33 ± 0.02 | +0.15 | +0.89 ± 0.05 | +0.44 |
+| 3 (0.3% / 1.2%) | +0.43 ± 0.10 | +0.10 | +1.18 ± 0.12 | +0.29 |
+
+- **The second king is worth about as much as the first.** In no trumps exactly so (0.45, then 0.44). In a suit bid
+  a little less (0.18, then 0.15). Kings with two or more guards drop most there (0.21, then 0.14): two long side
+  suits are two suits for the opponents to ruff.
+- **A third is worth less:** about ⅔ of the first in no trumps (0.29 against 0.45) and half in a suit bid, though
+  three guarded kings come up in about 1 hand in 100 (no trumps) or 300 (suits), so those numbers are rough.
+- Aces in no trumps behave the same way, gently: 1.02, 0.93, 0.91, then 0.79 for a fourth.
+- Fitted as a count, the values match the count's (suit ⅕ with 2+ guards, ⅛ with one, ⅓ beside the ace; no trumps
+  ½ and ⅓), so **the count stays as it is**: counting every king at full value overstates only the rare third
+  king, by about 0.1–0.2 of a trick.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
