@@ -524,6 +524,20 @@ impl SearchBot {
         Some(opponents_make(contract.level, ours))
     }
 
+    /// How often partner's high bid makes, from what this seat can see (the network's tricks in
+    /// partner's strain, less the play gap, as the bids are scored); `None` unless partner holds the
+    /// high bid.
+    pub fn partner_chance(&self, obs: &Observation, model: &Mlp) -> Option<f64> {
+        let (seat, contract) = obs.auction.high_bid()?;
+        if seat != obs.seat.partner() {
+            return None;
+        }
+        let logits = model.forward(&bid_features(obs));
+        let block = strain_block(contract.strain);
+        let dist = softmax(&logits[block..block + 11]);
+        Some(dist.iter().enumerate().filter(|&(t, _)| t as f64 - self.config.dd_bias >= contract.level as f64).map(|(_, p)| p).sum())
+    }
+
     fn neural_call(&mut self, obs: &Observation, legal: &[Action], model: &Mlp) -> Action {
         let (bids, baseline) = self.neural_values(obs, legal, model);
         let best = bids.iter().copied().max_by(|a, b| a.1.total_cmp(&b.1)).map(|(c, v, m)| (v, c, m));

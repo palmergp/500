@@ -433,10 +433,11 @@ mod tests {
             assert_eq!(hint.bids.len(), bids, "a make chance for each legal bid");
             assert!(hint.bids.iter().all(|b| b.makes.is_some_and(|m| (0.0..=1.0).contains(&m))));
             let obs = game.observe(HUMAN);
-            let opponent_bid = obs.auction.high_bid().is_some_and(|(s, _)| s.team() != HUMAN.team());
+            // Passing says what it leaves standing: an opponent's bid or partner's.
+            let high_bid = obs.auction.high_bid().is_some();
             for o in &hint.options {
                 let blank = o.makes.is_none() && o.note.is_none();
-                let quiet_pass = legal[o.index] == Action::Call(fh_core::Call::Pass) && !opponent_bid;
+                let quiet_pass = legal[o.index] == Action::Call(fh_core::Call::Pass) && !high_bid;
                 assert!(!blank || quiet_pass, "{} shows neither a chance nor a note", o.label);
             }
             // A mention says what it's worth to partner.
@@ -447,6 +448,21 @@ mod tests {
             }
         }
         assert!(checked > 0);
+    }
+
+    #[test]
+    fn a_bid_over_partners_says_what_passing_would_leave() {
+        // The user's hand: partner (North) bid 7♣, you hold no clubs, and the coach takes it out to 7♥
+        // though 7♥ makes well under half the time. The hint shows passing and why 7♥ beats it.
+        let save = r#"{"version":1,"seed":1999946729,"players":["human","rookie","oracle","natural"],"log":[0,1,0,13,6,6,2,9,0,0,2,4,0,0,0,4,0,0,1,6,0,0,4,3,0,0,0,1,0,0,0,0,0,0,0,1,0,0,0,0,0,0,0,0,0,0,0,12,0],"hands":4,"names":["You","Quinn","Dev","Ada"]}"#;
+        let hint = hint(save).unwrap();
+        assert_eq!(hint.best_label, "7♥");
+        let pass = hint.options.iter().find(|o| o.label == "Pass").expect("passing is listed");
+        assert!(pass.note.as_deref().is_some_and(|n| n.starts_with("leaves your partner in 7♣")), "{:?}", pass.note);
+        assert!(hint.options[0].ev > pass.ev);
+        assert!(hint.reasons[0].starts_with("Passing leaves your partner in 7♣, and none of your cards is a ♣ trump."), "{:?}", hint.reasons);
+        assert!(hint.reasons[0].contains("7♥ is worth about"));
+        assert!(!hint.reasons.iter().any(|r| r == "Your partner bid 7♣."), "said once");
     }
 
     #[test]

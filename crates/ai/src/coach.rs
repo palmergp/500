@@ -205,7 +205,11 @@ impl Coach {
             Call::Six(s) => Some(format!("shows the Joker: +{} trick to your partner's {s} count, less in other suits", crate::thumb::fraction(1.33))),
             Call::Pass => {
                 let (_, contract) = obs.auction.high_bid()?;
-                let chance = self.search.opponents_chance(obs, crate::models::bid_model()?)?;
+                let model = crate::models::bid_model()?;
+                if let Some(chance) = self.search.partner_chance(obs, model) {
+                    return Some(format!("leaves your partner in {contract}: it makes about {:.0}%", 100.0 * real_play_chance(chance, BID_CURVE)));
+                }
+                let chance = self.search.opponents_chance(obs, model)?;
                 Some(format!("they make {contract} about {:.0}% of the time", 100.0 * chance))
             }
             Call::Bid(_) => None,
@@ -422,10 +426,17 @@ impl Coach {
         if let Some(c) = chosen.filter(|&c| c != recommended) {
             options.push(eval(c));
         }
-        // Show the strongest alternative bids too.
+        // The strongest alternative bids too, and passing, which every bid is weighed against (it
+        // lets the current high bid stand), ranked by value behind the choices. The hint shows four.
         let mut others: Vec<OptionEval> = bids.iter().map(|&(c, _, _)| eval(Action::Call(Call::Bid(c)))).filter(|o| !options.iter().any(|x| x.action == o.action)).collect();
         others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
-        options.extend(others.into_iter().take(2));
+        others.truncate(4 - options.len() - 1);
+        let pass = Action::Call(Call::Pass);
+        if legal.contains(&pass) && !options.iter().any(|o| o.action == pass) {
+            others.push(eval(pass));
+        }
+        others.sort_by(|a, b| b.ev.total_cmp(&a.ev));
+        options.extend(others);
         let reasons = call_reasons(obs, recommended, chosen, &options, obs.auction.high_bid());
         Analysis { best: recommended, options, reasons, worlds: 0, close: vec![], close_note: None, units: Units::Points, play: None }
     }
@@ -861,6 +872,8 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
         }
     }
     let ev = |a: Action| options.iter().find(|o| o.action == a);
+    // A reason already weighs the bid against passing.
+    let mut weighed = false;
     match best {
         Action::Call(Call::Bid(c)) => {
             if let Some(o) = ev(best) {
@@ -879,6 +892,30 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
                                 pct(m)
                             ),
                         );
+                    }
+                    // What the bid is weighed against: passing, which lets the high bid stand. Over
+                    // partner's bid, or when the bid is more likely to go down than make, say so, so
+                    // a bid short of even odds reads as the lesser loss it is.
+                    let pass = options.iter().find(|p| p.action == Action::Call(Call::Pass));
+                    if let (Some(p), Some((seat, theirs))) = (pass, high) {
+                        let gain = o.ev - p.ev;
+                        let sacrifice = seat.team() != obs.seat.team() && plays_for_the_game(obs);
+                        if gain >= 1.0 && (seat == partner || (m < 0.5 && !sacrifice)) {
+                            let compare = Units::of(obs).compare(&c.to_string(), "passing", gain);
+                            let reason = if seat == partner {
+                                let support = theirs.strain.trump().map(|t| hand.iter().filter(|&card| is_trump(card, Some(t))).count());
+                                let help = match support {
+                                    Some(0) => format!(", and none of your cards is a {} trump", theirs.strain),
+                                    Some(1) => format!(", and only one of your cards is a {} trump", theirs.strain),
+                                    _ => String::new(),
+                                };
+                                format!("Passing leaves your partner in {theirs}{help}. {compare}.")
+                            } else {
+                                format!("Passing lets {seat}'s {theirs} play. {compare}.")
+                            };
+                            reasons.insert(0, reason);
+                            weighed = true;
+                        }
                     }
                     // A long shot over an opponent's bid near the end is a sacrifice: say so.
                     if let Some((seat, theirs)) = high.filter(|(s, _)| s.team() != obs.seat.team()) {
@@ -906,6 +943,12 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
             }
         }
     }
+    if weighed {
+        // The comparison names partner's bid already.
+        if let Some((_, theirs)) = high {
+            reasons.retain(|r| *r != format!("Your partner bid {theirs}."));
+        }
+    }
     if obs.auction.must_bid() {
         reasons.push("As dealer on the third deal, you must bid.".into());
     }
@@ -926,7 +969,7 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
     }
     if let (Some(c), Some(b)) = (chosen.filter(|&c| c != best), ev(best)) {
         if let Some(o) = ev(c) {
-            if b.ev - o.ev >= 5.0 {
+            if b.ev - o.ev >= 5.0 && !(weighed && o.action == Action::Call(Call::Pass)) {
                 reasons.push(format!("{} here.", Units::of(obs).compare(&call_label(best), &call_label(c), b.ev - o.ev)));
             }
         }
