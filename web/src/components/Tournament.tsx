@@ -1,6 +1,21 @@
 import { useState } from "react";
 import type { Persona } from "../engine";
-import { awards, gamesByPlayer, HANDS, ROUNDS, roundComplete, roundPoints, standings, yourTable, type Award, type GameLine, type Tournament } from "../tournament";
+import {
+  awards,
+  gamesByPlayer,
+  HANDS,
+  KINDS,
+  ROUNDS,
+  roundComplete,
+  roundPoints,
+  standings,
+  tournamentKind,
+  yourTable,
+  type Award,
+  type GameLine,
+  type Tournament,
+  type TournamentKind,
+} from "../tournament";
 import { Dialog } from "./Dialog";
 
 function styleName(personas: Persona[], id: string): string {
@@ -201,20 +216,75 @@ interface Props {
   personas: Persona[];
   /** Play the current round's game (or, once all rounds are in, see the final results). */
   onPlay: () => void;
+  /** Close the dialog: not offered after a round, whose only way on is the next round. */
   onClose: () => void;
   /** After a round: the round just played, to show its tables. */
   after?: number;
   /** Abandon this tournament and start a new one. */
   onRestart?: () => void;
+  /** The helpers on now (grading, the trump counter…), which would count as help. */
+  helpers?: string[];
+}
+
+/** Whether this tournament can still be won unaided, and what would spoil it. */
+function UnaidedNote({ t, helpers }: { t: Tournament; helpers: string[] }) {
+  if (t.assisted === undefined || t.current >= ROUNDS) return null;
+  if (t.assisted) return <p className="note">You've had help in this tournament (a hint, an undo, Finish hand or a helper), so it can't count as unaided.</p>;
+  return (
+    <p className="note unaided-note">
+      🙌 Unaided so far: no hints, undos or Finish hand.
+      {helpers.length > 0 && ` ${capitalize(listed(helpers))} ${helpers.length > 1 ? "are" : "is"} on in Settings: turn ${helpers.length > 1 ? "them off before you play, or they count" : "it off before you play, or it counts"} as help.`}
+    </p>
+  );
+}
+
+function listed(items: string[]): string {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
+function capitalize(text: string): string {
+  return text.charAt(0).toUpperCase() + text.slice(1);
+}
+
+/** A new tournament: who the other 11 players are. */
+export function NewTournamentDialog({ onStart, onCancel }: { onStart: (kind: TournamentKind) => void; onCancel: () => void }) {
+  return (
+    <Dialog title="New tournament" onClose={onCancel}>
+      <p>
+        12 players at 3 tables, {ROUNDS} rounds of {HANDS} hands, a new partner every round. Who are the other 11?
+      </p>
+      <div className="menu-buttons kind-choices">
+        {KINDS.map((k, i) => (
+          <button key={k.kind} type="button" onClick={() => onStart(k.kind)} autoFocus={i === 0}>
+            <span>
+              {k.icon} {k.title}
+            </span>
+            <small>{k.text}</small>
+          </button>
+        ))}
+      </div>
+      <div className="actions">
+        <button type="button" onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </Dialog>
+  );
 }
 
 /** The tournament's state: after a round, its results; always, the standings and the awards. */
-export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart }: Props) {
+export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [] }: Props) {
   const waiting = after !== undefined && !roundComplete({ ...t, current: after });
   const { highGame, highHand } = awards(t);
   const done = t.current >= ROUNDS;
+  const kind = KINDS.find((k) => k.kind === tournamentKind(t))!;
+  // After a round there's nowhere to go but the next one (closing it left a finished table).
+  const closable = after === undefined;
   return (
-    <Dialog title={after !== undefined ? `Tournament: round ${after + 1} of ${ROUNDS}` : "Tournament"} wide onClose={onClose}>
+    <Dialog title={after !== undefined ? `Tournament: round ${after + 1} of ${ROUNDS}` : "Tournament"} wide onClose={closable ? onClose : undefined}>
+      <p className="tournament-kind">
+        {kind.icon} <strong>{kind.title} tournament.</strong> {kind.text}
+      </p>
       {after !== undefined && (
         <>
           <h3>This round's tables</h3>
@@ -249,6 +319,7 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
       <AwardLine t={t} label="High game" award={highGame} personas={personas} />
       <AwardLine t={t} label="High hand" award={highHand} personas={personas} />
       {!done && !waiting && <YourTable t={t} r={t.current} personas={personas} />}
+      <UnaidedNote t={t} helpers={helpers} />
       <div className="actions">
         {onRestart && t.current > 0 && (
           <button
@@ -260,16 +331,18 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
             New tournament
           </button>
         )}
-        <button type="button" onClick={onClose}>
-          Close
-        </button>
+        {closable && (
+          <button type="button" onClick={onClose}>
+            Close
+          </button>
+        )}
         <button type="button" className="primary" onClick={onPlay} disabled={waiting} autoFocus>
           {done ? "Final results" : after !== undefined ? "Next round" : `Play round ${t.current + 1}`}
         </button>
       </div>
       <p className="note">
         12 players at 3 tables, {ROUNDS} rounds of {HANDS} hands. Your side's score each round is added to both partners' totals, and you have a different
-        partner every round. Each player has a randomly assigned playing style.
+        partner every round.
       </p>
     </Dialog>
   );

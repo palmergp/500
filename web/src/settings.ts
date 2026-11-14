@@ -48,6 +48,17 @@ export const DEFAULT_SETTINGS: Settings = {
   bigCards: false,
 };
 
+/** The helpers on in `settings` (for an unaided tournament they must all be off), named for people. */
+export function assistHelpers(settings: Settings): string[] {
+  const named: [boolean, string][] = [
+    [settings.grade, "grading"],
+    [settings.trumpCounter, "the trump counter"],
+    [settings.tracker, "the card tracker"],
+    [settings.voids, "out-of-suit marks"],
+  ];
+  return named.filter(([on]) => on).map(([, name]) => name);
+}
+
 const SETTINGS_KEY = "fh500.settings";
 const SAVE_KEY = "fh500.save";
 const GRADES_KEY = "fh500.grades";

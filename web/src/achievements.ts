@@ -8,8 +8,8 @@ import type { GradeView, HandView, View } from "./engine";
 import { LESSONS } from "./learn/lessons";
 import { solvedMistakes } from "./mistakes";
 import { loadLessonsDone, loadProgress } from "./progress";
-import { loadRecords } from "./records";
-import { awards, type Tournament } from "./tournament";
+import { loadRecords, tournamentsWon } from "./records";
+import { awards, EXPERT_STYLES, standings, type Tournament } from "./tournament";
 
 export type Group = "Bidding" | "Play and defence" | "Games" | "Tournaments" | "Learning";
 
@@ -60,6 +60,24 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "champion", group: "Tournaments", icon: "🏆", title: "Champion", text: "Win a tournament.", target: 1 },
   { id: "headliner", group: "Tournaments", icon: "📣", title: "Headliner", text: "Take a tournament's High Game or High Hand with your partner.", target: 1 },
   { id: "dynasty", group: "Tournaments", icon: "🏰", title: "Dynasty", text: "Win 3 tournaments.", target: 3 },
+  { id: "random-champion", group: "Tournaments", icon: "🎲", title: "Luck of the draw", text: "Win a Random tournament.", target: 1 },
+  {
+    id: "expert-champion",
+    group: "Tournaments",
+    icon: "🎓",
+    title: "Masterclass",
+    text: "Win an Expert tournament, where every other player is The Counter, The Shark, The Oracle or The Natural.",
+    target: 1,
+  },
+  { id: "chaos-champion", group: "Tournaments", icon: "🌪️", title: "Eye of the storm", text: "Win a Chaos tournament, where every other player is The Gambler.", target: 1 },
+  {
+    id: "unaided",
+    group: "Tournaments",
+    icon: "🙌",
+    title: "Unaided",
+    text: "Win a tournament with no hints, no undos, no Finish hand, and grading, the trump counter, the card tracker and out-of-suit marks all off.",
+    target: 1,
+  },
   { id: "scholar", group: "Learning", icon: "📚", title: "Scholar", text: "Finish every lesson.", target: LESSONS.length },
   { id: "card-counter", group: "Learning", icon: "🧮", title: "Card counter", text: "Answer 25 counting-quiz questions right.", target: 25 },
   { id: "auctioneer", group: "Learning", icon: "🔨", title: "Auctioneer", text: "Get 50 right in the bidding trainer.", target: 50 },
@@ -70,7 +88,7 @@ export const ACHIEVEMENTS: Achievement[] = [
 export const GROUPS: Group[] = ["Bidding", "Play and defence", "Games", "Tournaments", "Learning"];
 
 /** The strongest bots, for Giant killer. */
-const EXPERTS = new Set(["counter", "shark", "oracle", "natural"]);
+const EXPERTS = new Set(EXPERT_STYLES);
 
 /** Moments noted as they happen (what the records don't keep). */
 interface Moments {
@@ -86,6 +104,8 @@ interface Moments {
   giantKills: number;
   cleanGames: number;
   tourAwards: number;
+  /** Tournaments won with no help at all (`Tournament.assisted` false). */
+  unaidedWins: number;
 }
 
 interface Stored {
@@ -98,7 +118,7 @@ interface Stored {
 
 const KEY = "fh500.achievements";
 const EMPTY: Stored = {
-  moments: { slams: 0, sets: 0, bigSets: 0, streak: 0, bestStreak: 0, comebacks: 0, shutouts: 0, giantKills: 0, cleanGames: 0, tourAwards: 0 },
+  moments: { slams: 0, sets: 0, bigSets: 0, streak: 0, bestStreak: 0, comebacks: 0, shutouts: 0, giantKills: 0, cleanGames: 0, tourAwards: 0, unaidedWins: 0 },
   done: {},
   counted: [],
 };
@@ -180,6 +200,8 @@ export function noteTournament(t: Tournament) {
   if (!once(stored, `tour:${t.id}`)) return;
   const { highGame, highHand } = awards(t);
   if (highGame?.players.includes(0) || highHand?.players.includes(0)) stored.moments.tourAwards++;
+  const won = standings(t).find((s) => s.participant.id === 0)?.place === 1;
+  if (won && t.assisted === false) stored.moments.unaidedWins++;
   save(stored);
 }
 
@@ -223,6 +245,10 @@ function measure(m: Moments): Record<string, number> {
     champion: t.won,
     headliner: m.tourAwards,
     dynasty: t.won,
+    "random-champion": tournamentsWon(records, "random"),
+    "expert-champion": tournamentsWon(records, "expert"),
+    "chaos-champion": tournamentsWon(records, "chaos"),
+    unaided: m.unaidedWins,
     scholar: LESSONS.filter((l) => lessons.has(l.id)).length,
     "card-counter": progress.quiz.correct,
     auctioneer: progress.bidding.correct,

@@ -43,8 +43,23 @@ export interface Round {
   tables: Seating[];
 }
 
+/** Who the other 11 are: random styles, all experts, or all gamblers. */
+export type TournamentKind = "random" | "expert" | "chaos";
+
+export const KINDS: { kind: TournamentKind; icon: string; title: string; text: string }[] = [
+  { kind: "random", icon: "🎲", title: "Random", text: "Every other player gets a random playing style." },
+  { kind: "expert", icon: "🎓", title: "Expert", text: "Every other player is an expert: The Counter, The Shark, The Oracle or The Natural." },
+  { kind: "chaos", icon: "🌪️", title: "Chaos", text: "Every other player is The Gambler: big bids, all round." },
+];
+
 export interface Tournament {
   id: string;
+  /** Absent in tournaments started before there were kinds: those were all random. */
+  kind?: TournamentKind;
+  /** You've had help in one of its games: a hint, an undo, Finish hand, or a helper (grading, the
+   * trump counter, the card tracker, out-of-suit marks) on. Absent in tournaments started before
+   * this was kept, which can't count as unaided. */
+  assisted?: boolean;
   participants: Participant[];
   rounds: Round[];
   /** The round being played (0-based); ROUNDS once all are done. */
@@ -55,6 +70,8 @@ export interface Tournament {
 
 const NAMES = ["Ada", "Ben", "Cleo", "Dev", "Elena", "Finn", "Gus", "Hana", "Ivan", "June", "Kai", "Lena", "Milo", "Nora", "Otto", "Pia", "Quinn", "Rosa", "Sol", "Tess"];
 const STYLES = ["steady", "rookie", "rock", "gambler", "counter", "shark", "oracle", "natural"];
+/** The strongest bots (an Expert tournament's players; Giant killer's opponents). */
+export const EXPERT_STYLES = ["counter", "shark", "oracle", "natural"];
 const KEY = "fh500.tournament";
 
 /** A small seeded random number generator (mulberry32), so a tournament is reproducible. */
@@ -91,12 +108,17 @@ export function schedulePairs(random: () => number): [number, number][][] {
   return shuffle(rounds, random).slice(0, ROUNDS);
 }
 
-/** A new tournament: you and 11 bots with random names and styles, and the whole schedule. */
-export function newTournament(seed: number): Tournament {
+export function tournamentKind(t: Tournament): TournamentKind {
+  return t.kind ?? "random";
+}
+
+/** A new tournament: you and 11 bots with random names, styles for the kind, and the whole schedule. */
+export function newTournament(seed: number, kind: TournamentKind = "random"): Tournament {
   const random = rng(seed);
   const names = shuffle(NAMES, random);
+  const styles = kind === "expert" ? EXPERT_STYLES : kind === "chaos" ? ["gambler"] : STYLES;
   const participants: Participant[] = [{ id: 0, name: "You", persona: "human" }];
-  for (let i = 1; i < PLAYERS; i++) participants.push({ id: i, name: names[i - 1], persona: STYLES[Math.floor(random() * STYLES.length)] });
+  for (let i = 1; i < PLAYERS; i++) participants.push({ id: i, name: names[i - 1], persona: styles[Math.floor(random() * styles.length)] });
   const rounds: Round[] = schedulePairs(random).map((pairs) => {
     const grouped = shuffle(pairs, random);
     const tables: Seating[] = [];
@@ -109,7 +131,7 @@ export function newTournament(seed: number): Tournament {
     }
     return { tables };
   });
-  return { id: `t${seed}`, participants, rounds, current: 0, finished: false };
+  return { id: `t${seed}`, kind, assisted: false, participants, rounds, current: 0, finished: false };
 }
 
 /** The table you're at in round `r`. */

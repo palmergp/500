@@ -24,11 +24,11 @@ import { keepMistake } from "./mistakes";
 import { recordGame, recordHand, recordTournament } from "./records";
 import { achievements, checkAchievements, noteGame, noteGrades, noteHand, noteTournament } from "./achievements";
 import { handCode, saveAt } from "./handcode";
-import { FinalReveal, TournamentDialog } from "./components/Tournament";
+import { FinalReveal, NewTournamentDialog, TournamentDialog } from "./components/Tournament";
 import { TouchTips } from "./components/TouchTips";
 import { MoreItem, MoreMenu } from "./components/MoreMenu";
-import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament } from "./tournament";
-import { loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
+import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament, type TournamentKind } from "./tournament";
+import { assistHelpers, loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
 const TRICK_HOLD = 1300;
@@ -185,6 +185,8 @@ export function App() {
   const [inTour, setInTour] = useState(false);
   const [tourDialog, setTourDialog] = useState<{ after?: number } | null>(null);
   const [showFinal, setShowFinal] = useState(false);
+  /** Choosing a new tournament's kind. */
+  const [showNewTour, setShowNewTour] = useState(false);
   const simRef = useRef<Simulator | null>(null);
   const simsRunning = useRef(new Set<string>());
   /** A hand code being shown (and copied). */
@@ -427,16 +429,36 @@ export function App() {
     else setTourDialog({ after: r });
   };
 
-  /** From the menu: the tournament in progress, or a new one. */
+  /** From the menu: the tournament in progress, or a choice of new one. */
   const openTournament = () => {
-    if (!tourRef.current || tourRef.current.finished) {
-      const t = newTournament(randomSeed());
-      tourRef.current = t;
-      setTour(t);
-      saveTournament(t);
-    }
+    if (!tourRef.current || tourRef.current.finished) setShowNewTour(true);
+    else setTourDialog({});
+  };
+
+  /** Starts a new tournament of `kind` (replacing any other) and shows it. */
+  const beginTournament = (kind: TournamentKind) => {
+    const t = newTournament(randomSeed(), kind);
+    tourRef.current = t;
+    setTour(t);
+    saveTournament(t);
+    setShowNewTour(false);
     setTourDialog({});
   };
+
+  /** You've had help in a tournament game: it can't count as unaided any more. */
+  const markAssisted = useCallback(() => {
+    if (tourRef.current?.assisted === false && !replayRef.current) {
+      updateTour((t) => {
+        t.assisted = true;
+      });
+    }
+  }, [updateTour]);
+  const helpers = assistHelpers(settings);
+  const helped = helpers.length > 0;
+  useEffect(() => {
+    // Again when a replay ends: helpers turned on during one are still on in the real game.
+    if (inTour && helped) markAssisted();
+  }, [inTour, helped, replaying, markAssisted]);
 
   /** Play the tournament's current round: pick up its game if it's the one saved, else deal it. */
   const playTourRound = () => {
@@ -736,6 +758,7 @@ export function App() {
     (lookAhead.current?.save === save ? lookAhead.current.hint : coach.hint(save))
       .then((h) => {
         hintedRef.current.add(forAction);
+        if (inTour) markAssisted();
         setHint({ forAction, hint: h });
         audio.play("hint");
       })
@@ -750,6 +773,7 @@ export function App() {
     while (busy.current) await new Promise((r) => setTimeout(r, 50));
     const data = JSON.parse(save) as { log: number[] };
     data.log = data.log.slice(0, grade.actionNumber);
+    if (inTour) markAssisted();
     setHeld(null);
     setResult(null);
     setHint(null);
@@ -1072,6 +1096,7 @@ export function App() {
                           className="finish-button"
                           onClick={() => {
                             setHint(null);
+                            if (!finishing && inTour) markAssisted();
                             setFinishing((f) => !f);
                           }}
                           title={
@@ -1223,13 +1248,22 @@ export function App() {
           onRestart={
             tourDialog.after === undefined && !inTour
               ? () => {
-                  const t = newTournament(randomSeed());
-                  tourRef.current = t;
-                  setTour(t);
-                  saveTournament(t);
+                  setTourDialog(null);
+                  setShowNewTour(true);
                 }
               : undefined
           }
+          helpers={helpers}
+        />
+      )}
+      {showNewTour && (
+        <NewTournamentDialog
+          onStart={beginTournament}
+          onCancel={() => {
+            setShowNewTour(false);
+            // Backing out of replacing a tournament leads back to it.
+            if (tourRef.current && !tourRef.current.finished) setTourDialog({});
+          }}
         />
       )}
       {showFinal && tour && (

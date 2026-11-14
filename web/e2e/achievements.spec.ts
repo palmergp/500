@@ -26,7 +26,7 @@ test("past play counts toward achievements, quietly, and the page shows progress
   await expect(page.locator(".achievement", { hasText: "Full set" })).toContainText("2 of 5");
   await expect(page.locator(".achievement", { hasText: "Card counter" })).toContainText("5 of 25");
   await expect(page.locator(".achievement", { hasText: "Seasoned" })).toContainText("2 of 25");
-  await expect(page.getByText(/^5 of 26/)).toBeVisible();
+  await expect(page.getByText(/^5 of 30/)).toBeVisible();
   await page.screenshot({ path: "test-results/achievements.png", fullPage: true });
 });
 
@@ -72,4 +72,51 @@ test("moments: slams, sets, streaks, comebacks, shutouts, giant killing, a clean
   expect(status("clean-sheet").done).toBeNull();
   noteGrades("g4", Array.from({ length: 16 }, (_, i) => grade(i % 2 ? "inaccuracy" : "best")));
   expect(status("clean-sheet").done).not.toBeNull();
+});
+
+test("tournament wins by kind, and unaided", async ({}, info) => {
+  test.skip(info.project.name !== "desktop", "pure logic");
+  const store = new Map<string, string>();
+  Object.assign(globalThis, {
+    localStorage: { getItem: (k: string) => store.get(k) ?? null, setItem: (k: string, v: string) => store.set(k, v), removeItem: (k: string) => store.delete(k) },
+  });
+  const { achievements, noteTournament } = await import("../src/achievements");
+  const { recordTournament } = await import("../src/records");
+  const { newTournament, ROUNDS } = await import("../src/tournament");
+  const status = (id: string) => achievements(true).find((s) => s.achievement.id === id)!;
+  /** A finished tournament of `kind` in which you score most (or least) every round. */
+  const finished = (seed: number, kind: "random" | "expert" | "chaos" | undefined, win: boolean, assisted?: boolean) => {
+    const t = newTournament(seed, kind);
+    if (kind === undefined) delete t.kind;
+    t.assisted = assisted;
+    for (const round of t.rounds) {
+      for (const table of round.tables) {
+        const yours = table.seats.includes(0);
+        const scores: [number, number] = yours ? (win ? [400, 0] : [-200, 0]) : [100, 50];
+        table.result = { scores, hands: [scores] };
+      }
+    }
+    t.current = ROUNDS;
+    t.finished = true;
+    recordTournament(t);
+    noteTournament(t);
+    return t;
+  };
+
+  // Won from before there were kinds (no kind kept): a random one, and not unaided (unknown).
+  finished(1, undefined, true);
+  expect(status("random-champion").done).not.toBeNull();
+  expect(status("unaided").done).toBeNull();
+  // An expert tournament lost, then won with help.
+  finished(2, "expert", false, false);
+  expect(status("expert-champion").done).toBeNull();
+  finished(3, "expert", true, true);
+  expect(status("expert-champion").done).not.toBeNull();
+  expect(status("unaided").done).toBeNull();
+  expect(status("chaos-champion").done).toBeNull();
+  // A chaos tournament won unaided.
+  finished(4, "chaos", true, false);
+  expect(status("chaos-champion").done).not.toBeNull();
+  expect(status("unaided").done).not.toBeNull();
+  expect(status("dynasty").done).not.toBeNull();
 });

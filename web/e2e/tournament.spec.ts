@@ -9,8 +9,11 @@ test("a tournament round: play your table, see the standings, a new partner next
   test.setTimeout(900_000);
   await freshStart(page);
   await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  // First, who the other 11 are.
+  await page.getByRole("dialog", { name: "New tournament" }).getByRole("button", { name: /Random/ }).click();
   const dialog = page.getByRole("dialog", { name: "Tournament" });
   await expect(dialog.locator(".standings tbody tr")).toHaveCount(12);
+  await expect(dialog.getByText(/Random tournament/)).toBeVisible();
   await expect(dialog.getByText(/Round 1 of 8: you partner/)).toBeVisible();
   await dialog.getByRole("button", { name: "Play round 1" }).click();
 
@@ -47,6 +50,12 @@ test("a tournament round: play your table, see the standings, a new partner next
   await expect(after.getByText(/High game:/)).toBeVisible();
   await expect(after.locator(".award", { hasText: "High hand:" })).toContainText(/(on|defending) .+ bid/);
   await expect(after.getByText(/You scored/)).toBeVisible();
+  // The only way on is the next round: nothing closes it (closing it left a table with nothing to do).
+  await expect(after.getByRole("button", { name: "Close" })).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(after).toBeVisible();
+  // Grading was on, and Finish hand played your cards: that's help.
+  await expect(after.getByText(/You've had help in this tournament/)).toBeVisible();
   await page.screenshot({ path: "test-results/tournament-round.png", fullPage: true });
   await next.click();
 
@@ -54,6 +63,50 @@ test("a tournament round: play your table, see the standings, a new partner next
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   const partner2 = (await page.locator(".seat-north .seat-name").innerText()).replace(/partner|dealer/g, "").trim();
   expect(partner2).not.toBe(partner1);
+});
+
+test("kinds: random styles, all experts, or all gamblers", async ({}, info) => {
+  test.skip(info.project.name !== "desktop", "pure logic");
+  const { newTournament, EXPERT_STYLES } = await import("../src/tournament");
+  for (let seed = 1; seed <= 20; seed++) {
+    const bots = (kind?: "random" | "expert" | "chaos") => newTournament(seed, kind).participants.slice(1).map((p) => p.persona);
+    expect(bots("expert").every((p) => EXPERT_STYLES.includes(p))).toBe(true);
+    expect(bots("chaos").every((p) => p === "gambler")).toBe(true);
+    expect(bots()).toEqual(bots("random"));
+  }
+  const t = newTournament(3, "chaos");
+  expect(t.kind).toBe("chaos");
+  expect(t.assisted).toBe(false);
+});
+
+test("an unaided tournament: the dialog says what would count as help, and a hint does", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(120_000);
+  // Grading and the trump counter off; out-of-suit marks still on.
+  await freshStart(page, { grade: false, trumpCounter: false, tracker: false });
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  const choose = page.getByRole("dialog", { name: "New tournament" });
+  await expect(choose.locator(".kind-choices button")).toHaveCount(3);
+  await choose.getByRole("button", { name: /Expert/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Tournament" });
+  await expect(dialog.getByText(/Expert tournament/)).toBeVisible();
+  await expect(dialog.locator(".unaided-note")).toHaveText(/Unaided so far.*Out-of-suit marks is on in Settings: turn it off/);
+  // Closing it and coming back: the same tournament, no new choice.
+  await dialog.getByRole("button", { name: "Close", exact: true }).last().click();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Settings/ }).click();
+  await page.getByRole("dialog", { name: "Settings" }).getByText("Show who is out of a suit").click();
+  await page.getByRole("dialog", { name: "Settings" }).getByRole("button", { name: "Done" }).click();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  await expect(page.getByRole("dialog", { name: "New tournament" })).toHaveCount(0);
+  await expect(dialog.locator(".unaided-note")).toHaveText(/^🙌 Unaided so far: no hints, undos or Finish hand\.$/);
+  await dialog.getByRole("button", { name: "Play round 1" }).click();
+  await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
+  const hint = page.getByRole("button", { name: "Hint" });
+  for (let step = 0; step < 200 && !(await hint.isVisible()); step++) await page.waitForTimeout(100);
+  await hint.click();
+  await expect(page.getByRole("note", { name: "Coach's hint" })).toBeVisible({ timeout: 30_000 });
+  const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("fh500.tournament")!));
+  expect(saved.assisted).toBe(true);
 });
 
 test("the schedule: 8 rounds, a different partner every round, you always South", async ({}, info) => {

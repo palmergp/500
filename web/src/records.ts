@@ -3,7 +3,7 @@
 // so every access is guarded.
 
 import type { HandView } from "./engine";
-import { standings, type Tournament } from "./tournament";
+import { standings, tournamentKind, type Tournament, type TournamentKind } from "./tournament";
 
 export interface BidStat {
   bids: number;
@@ -23,8 +23,17 @@ export interface Records {
   /** Bids you declared, by label ("8♦"). */
   bids: Record<string, BidStat>;
   /** Finished tournaments: how many, won (first place, shared or not), on the podium (top 3), the
-   * sum of your places (for the average), and your highest total with the place it earned. */
-  tournaments: { played: number; won: number; podiums: number; placeSum: number; high: { score: number; place: number } | null; ids: string[] };
+   * sum of your places (for the average), and your highest total with the place it earned. `wonBy`
+   * splits the wins by kind; it began with the kinds, and every tournament before them was random. */
+  tournaments: {
+    played: number;
+    won: number;
+    wonBy?: Partial<Record<TournamentKind, number>>;
+    podiums: number;
+    placeSum: number;
+    high: { score: number; place: number } | null;
+    ids: string[];
+  };
   /** Hands and games already counted ("game:hand", "game:end"), so a reload or undo can't count one twice. */
   counted: string[];
 }
@@ -56,6 +65,12 @@ function save(records: Records) {
   } catch {
     // Records are a convenience; ignore failures.
   }
+}
+
+/** Tournaments you've won of a kind (the random ones include every win from before the kinds). */
+export function tournamentsWon(records: Records, kind: TournamentKind): number {
+  const by = records.tournaments.wonBy ?? {};
+  return kind === "random" ? records.tournaments.won - (by.expert ?? 0) - (by.chaos ?? 0) : (by[kind] ?? 0);
 }
 
 export function resetRecords() {
@@ -123,7 +138,11 @@ export function recordTournament(t: Tournament): string[] {
   stats.ids = [...stats.ids, t.id].slice(-100);
   const you = standings(t).find((s) => s.participant.id === 0)!;
   stats.played++;
-  if (you.place === 1) stats.won++;
+  if (you.place === 1) {
+    stats.won++;
+    const kind = tournamentKind(t);
+    stats.wonBy = { ...stats.wonBy, [kind]: (stats.wonBy?.[kind] ?? 0) + 1 };
+  }
   if (you.place <= 3) stats.podiums++;
   stats.placeSum += you.place;
   const broken: string[] = [];
