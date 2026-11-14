@@ -8,7 +8,7 @@ import { Card } from "./components/Card";
 import { CardTracker, GradeBar, HintPanel } from "./components/Coach";
 import { Celebration } from "./components/Celebration";
 import { CountingQuiz, quizDue } from "./components/CountingQuiz";
-import { Learn } from "./components/Learn";
+import { Learn, type LearnTab } from "./components/Learn";
 import { MainMenu } from "./components/MainMenu";
 import { recordGrades } from "./progress";
 import { audio } from "./audio";
@@ -25,6 +25,7 @@ import { recordGame, recordHand, recordTournament } from "./records";
 import { achievements, checkAchievements, noteGame, noteGrades, noteHand, noteTournament } from "./achievements";
 import { handCode, saveAt } from "./handcode";
 import { FinalReveal, NewTournamentDialog, TournamentDialog } from "./components/Tournament";
+import { HAND_PUZZLES, loadHandPuzzles, noteHandPuzzle, type HandPuzzle } from "./learn/handPuzzles";
 import { TouchTips } from "./components/TouchTips";
 import { MoreItem, MoreMenu } from "./components/MoreMenu";
 import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament, type TournamentKind } from "./tournament";
@@ -116,6 +117,8 @@ function finishedHand(view: View, hand: HandView): View {
     lastTrick: hand.tricks.at(-1) ?? null,
     tricks: hand.tricks,
     tricksWon: hand.tricksWon,
+    // This hand is still being played, as far as the table shows: it isn't among those played yet.
+    handsPlayed: view.history.filter((h) => !h.passedOut && h.number < hand.number).length,
     legal: [],
     played: hand.tricks.flatMap((t) => t.plays.map((p) => p.card)),
     trumpsUnseen: null,
@@ -178,6 +181,13 @@ export function App() {
    * in a replay counts (no saving, grades, records or progress). */
   const replayRef = useRef<{ resume: string } | null>(null);
   const [replaying, setReplaying] = useState<string | null>(null);
+  /** A full-hand puzzle (Learn → Full hands) on the table, and what to go back to afterwards: the
+   * real game's save (if it was on the table), its grades and hints, and where you were. Nothing
+   * in a puzzle is saved or counted, but your decisions are graded (shown once it's over). */
+  const puzzleRef = useRef<{ puzzle: HandPuzzle; resume: string | null; grades: GradeView[]; hinted: Set<number>; inTour: boolean; screen: "menu" | "table" } | null>(null);
+  const [puzzle, setPuzzle] = useState<HandPuzzle | null>(null);
+  /** The Learn tab to open on. */
+  const [learnTab, setLearnTab] = useState<LearnTab>("lessons");
   /** The tournament (saved in this browser), whether the game on the table is its current round,
    * its dialog (`after`: the round just played) and the final reveal. */
   const [tour, setTour] = useState<Tournament | null>(loadTournament);
@@ -236,7 +246,7 @@ export function App() {
     setView(next);
     saveRef.current = snapshot.save;
     gameRef.current = snapshot.game ?? gameId(snapshot.save);
-    const replay = !!replayRef.current;
+    const replay = !!replayRef.current || !!puzzleRef.current;
     if (modeRef.current === "solo" && !replay) savedGame.store(snapshot.save);
     for (const e of snapshot.events) {
       if (e.kind === "played") audio.play("card");
@@ -254,6 +264,8 @@ export function App() {
           noteHand(gameRef.current, hand);
           checkAchievements();
         }
+        const solving = puzzleRef.current;
+        if (solving && !replayRef.current && hand?.contract?.declarer === 0 && hand.made) noteHandPuzzle(solving.puzzle.id, hintedRef.current.size > 0);
       } else if (e.kind === "gameWon") {
         audio.play(next.winner === 0 ? "win" : "lose");
         if (!replay) recordGrades(gameRef.current, gradesRef.current, true, next.winner === 0);
@@ -270,6 +282,11 @@ export function App() {
     if (spoken.length > 0) setAnnouncement(spoken.join(". "));
     const shown = snapshot.events.filter((e) => e.kind !== "discarded" && e.kind !== "dealt");
     if (shown.length > 0) setMessage(shown[shown.length - 1].text);
+    const playing = puzzleRef.current?.puzzle;
+    if (playing && !replayRef.current && next.phase === "gameOver") {
+      const last = next.history.filter((h) => !h.passedOut).at(-1);
+      setMessage(last?.made ? `${playing.contract} made.` : `${playing.contract} went down.`);
+    }
     if (snapshot.events.some((e) => e.kind === "trickWon")) {
       setHeld(next.lastTrick ?? next.history.at(-1)?.tricks.at(-1) ?? null);
     }
@@ -313,9 +330,11 @@ export function App() {
     setShowTricks(null);
     setShowDecisions(false);
     setMessage("");
-    // A new game (or a host's table) ends any replay: its game is gone, and so is the way back.
+    // A new game (or a host's table) ends any replay or puzzle: its game is gone, and so is the way back.
     replayRef.current = null;
     setReplaying(null);
+    puzzleRef.current = null;
+    setPuzzle(null);
     setFinishing(false);
   }, []);
 
@@ -433,6 +452,18 @@ export function App() {
   const openTournament = () => {
     if (!tourRef.current || tourRef.current.finished) setShowNewTour(true);
     else setTourDialog({});
+  };
+
+  /** From a round's results to the main menu. The finished game goes: the tournament carries on
+   * from the menu (Tournament), and Continue would only find a game with nothing left to play. */
+  const leaveTourRound = () => {
+    setTourDialog(null);
+    savedGame.clear();
+    savedGrades.clear();
+    setGrades([]);
+    clearTable();
+    setScreen("menu");
+    tabGame.set(null);
   };
 
   /** Starts a new tournament of `kind` (replacing any other) and shows it. */
@@ -588,7 +619,7 @@ export function App() {
   }, []);
   // Clean sheet: judged once the coach has graded every decision of a finished game.
   useEffect(() => {
-    if (mode !== "solo" || replayRef.current || view?.phase !== "gameOver" || grading > 0 || !gameRef.current) return;
+    if (mode !== "solo" || replayRef.current || puzzleRef.current || view?.phase !== "gameOver" || grading > 0 || !gameRef.current) return;
     noteGrades(gameRef.current, grades);
     checkAchievements();
   }, [mode, view, grading, grades]);
@@ -653,6 +684,16 @@ export function App() {
   const keepGrade = (save: string, found: GradeView | null, numbers: number[]) => {
     if (!found) return;
     const g: GradeView = { ...found, hinted: numbers.some((n) => hintedRef.current.has(n)) };
+    // A puzzle's grades wait for the end (Review hand), and don't count anywhere else. A grade
+    // from an earlier try (started again since) is dropped.
+    if (puzzleRef.current) {
+      const now = saveRef.current ? (JSON.parse(saveRef.current) as { log: number[] }).log : [];
+      const then = (JSON.parse(save) as { log: number[] }).log;
+      if (then.length <= now.length && then.every((a, i) => a === now[i])) {
+        setGrades((all) => [...all.filter((x) => x.actionNumber !== g.actionNumber), g].sort((a, b) => a.actionNumber - b.actionNumber));
+      }
+      return;
+    }
     // Your mistakes become puzzles (solo games only: a LAN host keeps the save to itself).
     if (modeRef.current === "solo") keepMistake(g, save);
     setGrades((all) => {
@@ -675,7 +716,7 @@ export function App() {
   };
 
   const gradeLater = (save: string, numbers: number[]) => {
-    if (!coach || !settings.grade || replayRef.current) return;
+    if (!coach || replayRef.current || (!settings.grade && !puzzleRef.current)) return;
     for (const number of numbers) grade(() => coach.grade(save, number), save, [number]);
   };
 
@@ -698,7 +739,7 @@ export function App() {
   useEffect(() => {
     const save = saveRef.current;
     if (mode !== "solo" || !view?.humanToAct || view.phase !== "playing" || finishing || !save || !coachRef.current) return;
-    if (!settings.grade && hintedRef.current.size === 0) return;
+    if (!settings.grade && !puzzleRef.current && hintedRef.current.size === 0) return;
     if (lookAhead.current?.save === save) return;
     const hint = coachRef.current.hint(save);
     hint.catch(() => {});
@@ -735,6 +776,63 @@ export function App() {
     setLastGrade(null);
     setFinishing(false);
     void loadWhenFree(saveAt(save, at));
+  };
+
+  /** Plays a full-hand puzzle at the table (from Learn), keeping the way back to what was there. */
+  const startPuzzle = (p: HandPuzzle) => {
+    const back = puzzleRef.current ?? {
+      resume: modeRef.current === "solo" && view ? (replayRef.current?.resume ?? saveRef.current) : null,
+      grades: gradesRef.current,
+      hinted: new Set(hintedRef.current),
+      inTour,
+      screen: screen === "table" ? ("table" as const) : ("menu" as const),
+    };
+    toSolo();
+    clearTable();
+    setGrades([]);
+    hintedRef.current = new Set();
+    setInTour(false);
+    setShowLearn(false);
+    setShowNewGame(false);
+    setScreen("table");
+    puzzleRef.current = { ...back, puzzle: p };
+    setPuzzle(p);
+    void loadWhenFree(p.save).then(() => setMessage(`Puzzle ${p.id}: make ${p.contract}. Take the kitty and put three cards back.`));
+  };
+
+  /** The next puzzle you haven't solved (after this one, round to the start), or the next one. */
+  const nextPuzzle = (p: HandPuzzle): HandPuzzle => {
+    const { solved } = loadHandPuzzles();
+    const at = HAND_PUZZLES.findIndex((x) => x.id === p.id);
+    const after = [...HAND_PUZZLES.slice(at + 1), ...HAND_PUZZLES.slice(0, at + 1)];
+    return after.find((x) => !solved.includes(x.id)) ?? after[0];
+  };
+
+  /** Back from the puzzles to where you were, with the list open. */
+  const leavePuzzle = async () => {
+    const back = puzzleRef.current;
+    if (!back) return;
+    puzzleRef.current = null;
+    setPuzzle(null);
+    setResult(null);
+    setReview(null);
+    setHint(null);
+    setLastGrade(null);
+    setFinishing(false);
+    setHeld(null);
+    setGrades(back.grades);
+    hintedRef.current = back.hinted;
+    setInTour(back.inTour);
+    if (back.resume) {
+      await loadWhenFree(back.resume);
+      setScreen(back.screen);
+    } else {
+      clearTable();
+      tabGame.set(null);
+      setScreen("menu");
+    }
+    setLearnTab("hands");
+    setShowLearn(true);
   };
 
   /** Back from a replay to the real game, where you left it. */
@@ -798,7 +896,7 @@ export function App() {
     saveSettings(next);
   };
 
-  const quizActive = !!view && atTable && settings.quiz && !paused && !finishing && quizzed !== view.actionCount && quizDue(view);
+  const quizActive = !!view && atTable && settings.quiz && !paused && !finishing && quizzed !== view.actionCount && quizDue(view, settings.quizRate);
   const currentHint = hint && view && hint.forAction === view.actionCount && view.humanToAct ? hint.hint : null;
   const hintedAction = currentHint ? view?.legal[currentHint.best] : undefined;
   /** Cards the coach rates about as good as its choice (a close call). */
@@ -816,9 +914,9 @@ export function App() {
   const alsoGood = new Set(currentHint && view ? currentHint.close.map((i) => view.legal[i]?.card).filter((c) => c != null) : []);
 
   const legalCards = useMemo(() => {
-    if (!view?.humanToAct || paused || finishing || (settings.quiz && view && quizzed !== view.actionCount && quizDue(view))) return new Set<number>();
+    if (!view?.humanToAct || paused || finishing || (settings.quiz && view && quizzed !== view.actionCount && quizDue(view, settings.quizRate))) return new Set<number>();
     return new Set(view.legal.filter((a) => a.card !== null).map((a) => a.card!));
-  }, [view, paused, finishing, settings.quiz, quizzed]);
+  }, [view, paused, finishing, settings.quiz, settings.quizRate, quizzed]);
 
   const kittyIds = useMemo(() => new Set(view?.phase === "discarding" ? view.kitty?.map((c) => c.id) : []), [view]);
   const discardsLeft = view ? 3 - (view.discards?.length ?? 0) : 0;
@@ -881,7 +979,8 @@ export function App() {
   const openTricks = (focus?: number) => setShowTricks({ focus });
   const deal = view ? view.history.length + 1 : 0;
   const dealGrades = grades.filter((g) => g.deal === deal).length;
-  const openDecisions = settings.grade ? () => setShowDecisions(true) : undefined;
+  // In a puzzle, your graded decisions wait until the hand is over.
+  const openDecisions = (puzzle ? view?.phase === "gameOver" : settings.grade) ? () => setShowDecisions(true) : undefined;
   const trumpsUnseen = view && settings.trumpCounter && !quizActive ? view.trumpsUnseen : null;
 
   // Coach panels: in the side rail on wide screens, above the middle of the table otherwise.
@@ -1074,6 +1173,17 @@ export function App() {
                   dock={wide ? undefined : (coachPanels ?? undefined)}
                   status={
                     <div className="status-row">
+                      {puzzle && !replaying && (
+                        <span className="replay-banner puzzle-banner">
+                          Puzzle {puzzle.id}: make <strong>{puzzle.contract}</strong>.{" "}
+                          <button type="button" onClick={() => startPuzzle(puzzle)}>
+                            Start again
+                          </button>{" "}
+                          <button type="button" onClick={() => void leavePuzzle()}>
+                            Leave
+                          </button>
+                        </span>
+                      )}
                       {replaying && (
                         <span className="replay-banner">
                           Replay from {replaying}: it doesn't count.{" "}
@@ -1090,7 +1200,7 @@ export function App() {
                           Let a bot play for them
                         </button>
                       )}
-                      {mode === "solo" && view.phase === "playing" && !result && (
+                      {mode === "solo" && !puzzle && view.phase === "playing" && !result && (
                         <button
                           type="button"
                           className="finish-button"
@@ -1167,14 +1277,35 @@ export function App() {
         </div>
       )}
       {result && !held && view && atTable && (
-        <Dialog title={`Hand ${view.history.filter((h) => !h.passedOut).length}`}>
-          <Celebration hand={result} gameWinner={view.winner} />
-          <HandResult hand={result} view={view} />
+        <Dialog title={puzzle && !replaying ? `Puzzle ${puzzle.id}` : `Hand ${view.history.filter((h) => !h.passedOut).length}`}>
+          <Celebration hand={result} gameWinner={puzzle ? null : view.winner} />
+          {puzzle && !replaying && (
+            <p className={`puzzle-verdict ${result.made ? "made" : "down"}`}>
+              {result.made
+                ? hintedRef.current.size > 0
+                  ? `Made ${puzzle.contract}, with a hint along the way: try it without one to mark it solved.`
+                  : `Solved: ${puzzle.contract} made.`
+                : `${puzzle.contract} went down. Review the hand to see where the coach would have played differently, then try again.`}
+            </p>
+          )}
+          <HandResult hand={result} view={view} puzzle={!!puzzle && !replaying} />
           <div className="actions">
             <button type="button" onClick={() => setReview(result)}>
               Review hand
             </button>
-            {replaying ? (
+            {puzzle && !replaying ? (
+              <>
+                <button type="button" onClick={() => void leavePuzzle()}>
+                  All puzzles
+                </button>
+                <button type="button" className={result.made ? "" : "primary"} onClick={() => startPuzzle(puzzle)} autoFocus={!result.made}>
+                  Try again
+                </button>
+                <button type="button" className={result.made ? "primary" : ""} onClick={() => startPuzzle(nextPuzzle(puzzle))} autoFocus={!!result.made}>
+                  Next puzzle
+                </button>
+              </>
+            ) : replaying ? (
               // A replay always leads back to the real game, even when it reaches the game's end.
               <button type="button" className="primary" onClick={endReplay} autoFocus>
                 Back to the game
@@ -1219,7 +1350,7 @@ export function App() {
             grades={grades.filter((g) => g.deal === review.number)}
             coach={coach}
             save={coachSave()}
-            onReplay={mode === "solo" ? startReplay : undefined}
+            onReplay={mode === "solo" && !puzzle ? startReplay : undefined}
             onCode={mode === "solo" ? showCode : undefined}
             end={view.history.find((h) => h.number === review.number + 1)?.firstAction ?? view.actionCount}
           />
@@ -1254,6 +1385,13 @@ export function App() {
               : undefined
           }
           helpers={helpers}
+          onLeave={leaveTourRound}
+          onQuit={() => {
+            tourRef.current = null;
+            setTour(null);
+            saveTournament(null);
+            leaveTourRound();
+          }}
         />
       )}
       {showNewTour && (
@@ -1305,7 +1443,18 @@ export function App() {
           <ScorePad history={view.history} players={view.players} onReview={(h) => { setShowScores(false); setReview(h); }} />
         </Dialog>
       )}
-      {showLearn && <Learn coach={coachRef.current} onClose={() => setShowLearn(false)} />}
+      {showLearn && (
+        <Learn
+          key={learnTab}
+          coach={coachRef.current}
+          initialTab={learnTab}
+          onPlayHand={lan ? undefined : startPuzzle}
+          onClose={() => {
+            setShowLearn(false);
+            setLearnTab("lessons");
+          }}
+        />
+      )}
       {showSettings && <SettingsDialog settings={settings} onChange={changeSettings} onClose={() => setShowSettings(false)} />}
       {lobbyOpen && host && netRef.current && (
         <Lobby
@@ -1343,7 +1492,7 @@ export function App() {
   );
 }
 
-function HandResult({ hand, view }: { hand: HandView; view: View }) {
+function HandResult({ hand, view, puzzle }: { hand: HandView; view: View; puzzle?: boolean }) {
   const c = hand.contract!;
   const team = c.declarer % 2;
   const ours = team === 0;
@@ -1369,14 +1518,14 @@ function HandResult({ hand, view }: { hand: HandView; view: View }) {
           </tr>
         </tbody>
       </table>
-      {short && won === null && (
+      {short && won === null && !puzzle && (
         <p className="note">
           {view.handsPlayed < view.handLimit!
             ? `${view.handLimit! - view.handsPlayed} of ${view.handLimit} hands to go.`
             : "Tied after the last hand: one more hand to settle it."}
         </p>
       )}
-      {won !== null && (
+      {won !== null && !puzzle && (
         <p className="game-over">
           {won === 0 ? "You and your partner win the game!" : `${view.players[1].name} and ${view.players[3].name} win the game.`}
           {short && ` (${view.handsPlayed} hands)`}

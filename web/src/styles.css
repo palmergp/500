@@ -2686,3 +2686,54 @@ button.danger {
 .more-items button.off .more-icon {
   opacity: 0.45;
 }
+
+/* ---- Full-hand puzzles (Learn → Full hands) ------------------------------------------------ */
+
+.puzzle-banner {
+  background: rgba(242, 193, 78, 0.95);
+  color: #3a2a00;
+}
+.hand-puzzle-list {
+  list-style: none;
+  padding: 0;
+  margin: 12px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 8px;
+}
+.hand-puzzle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  text-align: left;
+}
+.hand-puzzle .hp-number {
+  font-size: 0.78rem;
+  opacity: 0.7;
+}
+.hand-puzzle strong {
+  font-size: 1.05rem;
+}
+.hand-puzzle strong.red {
+  color: #d23b3b;
+}
+.hand-puzzle.solved {
+  outline: 2px solid #3f9b5a;
+}
+.hand-puzzle.helped {
+  outline: 2px dashed #c9a227;
+}
+.hand-puzzle .hp-state {
+  font-weight: 700;
+  color: #3f9b5a;
+}
+.hand-puzzle.helped .hp-state {
+  color: #a3821b;
+}
+.puzzle-verdict {
+  font-weight: 700;
+}

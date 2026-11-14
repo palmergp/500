@@ -3,6 +3,7 @@ import type { View } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { recordScore } from "../progress";
 import { checkAchievements } from "../achievements";
+import type { QuizRate } from "../settings";
 
 const SUITS = ["S", "C", "D", "H"] as const;
 
@@ -33,10 +34,68 @@ function numberOptions(answer: number): string[] {
   return [...set].sort((a, b) => a - b).map(String);
 }
 
+const SAME_COLOR: Record<string, string> = { S: "C", C: "S", D: "H", H: "D" };
+const RANKS = ["A", "K", "Q", "J", "10", "9", "8", "7", "6", "5", "4"];
+
+/** Every card of `suit` (its effective suit), strongest first: with trumps, the Joker and both
+ * bowers on top; a side suit without its jack when that jack is the left bower. Black suits start
+ * at 5, red at 4. Names are "Q♠", "Joker". */
+function suitOrder(suit: string, trump: string | null): string[] {
+  const low = suit === "D" || suit === "H" ? "4" : "5";
+  const plain = RANKS.slice(0, RANKS.indexOf(low) + 1);
+  const name = (rank: string, s = suit) => `${rank}${SUIT_SYMBOL[s as keyof typeof SUIT_SYMBOL]}`;
+  if (trump === suit) return ["Joker", name("J"), name("J", SAME_COLOR[suit]), ...plain.filter((r) => r !== "J").map((r) => name(r))];
+  return plain.filter((r) => !(r === "J" && trump && SAME_COLOR[suit] === trump)).map((r) => name(r));
+}
+
+function cardName(c: { rank: string; suit: string | null }): string {
+  return c.suit ? `${c.rank}${SUIT_SYMBOL[c.suit as keyof typeof SUIT_SYMBOL]}` : "Joker";
+}
+
+/** "Which is the highest ♠ not yet played?", asked of a suit where a higher card has gone, so it
+ * takes remembering what fell. Null when no suit makes a fair question. */
+function highestQuestion(view: View, trump: string | null, rand: () => number): Question | null {
+  const gone = new Set(view.played.map(cardName));
+  const declarer = view.contract?.declarer === 0;
+  // Your own discards are out of play; the kitty's other cards you can't know, so they count as not played.
+  const buried = new Set(declarer ? (view.discards ?? []).map(cardName) : []);
+  const mine = new Set(view.hand.map(cardName));
+  const fair = SUITS.map((suit) => {
+    const order = suitOrder(suit, trump);
+    const top = order.findIndex((c) => !gone.has(c) && !buried.has(c));
+    return { suit, order, top };
+  }).filter((x) => x.top > 0 && x.order.slice(0, x.top).some((c) => gone.has(c)));
+  if (fair.length === 0) return null;
+  const { suit, order, top } = fair[Math.floor(rand() * fair.length)];
+  const answer = order[top];
+  const start = Math.max(0, top - 2);
+  const options = order.slice(start, start + 4);
+  const label = trump === suit ? `trump (${SUIT_SYMBOL[suit]})` : SUIT_SYMBOL[suit];
+  const above = order.slice(0, top);
+  const fell = above.filter((c) => gone.has(c));
+  const out = above.filter((c) => buried.has(c));
+  const parts = [`${listed(fell)} ${fell.length > 1 ? "have" : "has"} been played`];
+  if (out.length) parts.push(`${listed(out)} ${out.length > 1 ? "are" : "is"} among your discards`);
+  return {
+    text: `Which is the highest ${label} not yet played?`,
+    options,
+    answer,
+    explain: `${answer}: ${parts.join(", and ")}.${mine.has(answer) ? " It's in your hand: a sure winner in that suit." : ""}`,
+  };
+}
+
+function listed(items: string[]): string {
+  return items.length < 2 ? items.join("") : `${items.slice(0, -1).join(", ")} and ${items.at(-1)}`;
+}
+
 export function makeQuestion(view: View): Question {
   const rand = seeded(view.actionCount * 2654435761);
   const trump = view.contract?.strain && view.contract.strain !== "NT" ? view.contract.strain : null;
-  const kind = Math.floor(rand() * 3);
+  const kind = Math.floor(rand() * 4);
+  if (kind === 3) {
+    const highest = highestQuestion(view, trump, rand);
+    if (highest) return highest;
+  }
   if (kind === 0 && trump) {
     const n = view.trumpsUnseen ?? 0;
     return {
@@ -121,8 +180,12 @@ export function CountingQuiz({ view, onDone }: { view: View; onDone: () => void 
   );
 }
 
-/** Whether to quiz on this turn: in play, from the third trick, on about one turn in three. */
-export function quizDue(view: View): boolean {
-  if (view.phase !== "playing" || !view.humanToAct || view.played.length < 8) return false;
-  return seeded(view.actionCount * 40503)() < 0.34;
+/** How often a turn is quizzed, by the setting. */
+export const QUIZ_RATE: Record<QuizRate, number> = { low: 0.15, medium: 0.34, high: 0.6 };
+
+/** Whether to quiz on this turn: in play, from the third trick to the ninth (the last card is
+ * forced, so nothing hangs on it), on a share of turns set by `rate`. */
+export function quizDue(view: View, rate: QuizRate = "medium"): boolean {
+  if (view.phase !== "playing" || !view.humanToAct || view.played.length < 8 || view.hand.length <= 1) return false;
+  return seeded(view.actionCount * 40503)() < QUIZ_RATE[rate];
 }

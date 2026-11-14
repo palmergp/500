@@ -341,6 +341,26 @@ pub fn replay_to_deal(save: &SaveData, number: usize) -> Result<(Game, usize), S
 mod tests {
     use super::*;
 
+    /// Learn's full-hand puzzles (`fh-lab handpuzzles`): each restores at South's first discard from
+    /// the kitty, South holding the bid the list names, in a one-hand game.
+    #[test]
+    fn hand_puzzles_start_at_your_discard_with_their_bid() {
+        let list: Vec<serde_json::Value> = serde_json::from_str(include_str!("../../../web/src/learn/handPuzzles.json")).unwrap();
+        assert!(list.len() >= 20);
+        for (i, p) in list.iter().enumerate() {
+            assert_eq!(p["id"].as_u64(), Some(i as u64 + 1));
+            let save: SaveData = serde_json::from_str(p["save"].as_str().unwrap()).unwrap();
+            assert_eq!(save.hands, Some(1));
+            let table = Table::restore(&save).unwrap();
+            assert!(table.human_to_act(), "puzzle {}", i + 1);
+            assert_eq!(table.game().phase(), Phase::Discarding);
+            let (seat, contract) = table.game().contract().unwrap();
+            assert_eq!(seat, Seat::SOUTH);
+            assert!(contract.level >= 8);
+            assert_eq!(contract.to_string(), p["contract"].as_str().unwrap());
+        }
+    }
+
     /// A tournament's names survive a save and show in the view; South stays "You".
     #[test]
     fn display_names_are_saved_and_shown() {

@@ -8,6 +8,7 @@
 //!   fh-lab honesty [--deals N]   (are the coach's percentages right?)
 //!   fh-lab audit [--deals N]     (are the coach's grades fair and its hints steady?)
 //!   fh-lab declarer [--deals N]  (the kitty and the first lead, solved)
+//!   fh-lab handpuzzles [--count N]  (full-hand puzzles for Learn)
 //!
 //! STYLE is a persona: steady, rookie, rock, gambler (or random).
 
@@ -18,6 +19,7 @@ mod coach;
 mod dataset;
 mod declarer;
 mod habits;
+mod handpuzzles;
 mod honesty;
 mod honors;
 mod leads;
@@ -154,6 +156,12 @@ fn main() {
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),
+        "handpuzzles" => handpuzzles::run(
+            flag(&flags, "count", 40) as usize,
+            flag(&flags, "seed", 7_000_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flags.get("out").map_or("web/src/learn/handPuzzles.json", |s| s.as_str()),
+        ),
         "mentions" => mentions::run(
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 2_000_000),

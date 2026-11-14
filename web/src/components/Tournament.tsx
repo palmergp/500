@@ -224,6 +224,10 @@ interface Props {
   onRestart?: () => void;
   /** The helpers on now (grading, the trump counter…), which would count as help. */
   helpers?: string[];
+  /** After a round: to the main menu, the tournament kept for later. */
+  onLeave?: () => void;
+  /** After a round: end the tournament for good. */
+  onQuit?: () => void;
 }
 
 /** Whether this tournament can still be won unaided, and what would spoil it. */
@@ -273,7 +277,7 @@ export function NewTournamentDialog({ onStart, onCancel }: { onStart: (kind: Tou
 }
 
 /** The tournament's state: after a round, its results; always, the standings and the awards. */
-export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [] }: Props) {
+export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [], onLeave, onQuit }: Props) {
   const waiting = after !== undefined && !roundComplete({ ...t, current: after });
   const { highGame, highHand } = awards(t);
   const done = t.current >= ROUNDS;
@@ -329,6 +333,21 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
             }}
           >
             New tournament
+          </button>
+        )}
+        {!closable && onQuit && (
+          <button
+            type="button"
+            onClick={() => {
+              if (confirm("Quit this tournament? It ends here, and its standings are lost.")) onQuit();
+            }}
+          >
+            Quit tournament
+          </button>
+        )}
+        {!closable && onLeave && (
+          <button type="button" onClick={onLeave} title="Leave the tournament for now: pick it up again from the main menu">
+            Main menu
           </button>
         )}
         {closable && (

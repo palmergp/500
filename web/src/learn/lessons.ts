@@ -318,7 +318,7 @@ export const LESSONS: Lesson[] = [
       "## Put it together",
       "From voids and counts you can slowly place the hidden cards. Example: hearts are trumps, three rounds have gone, West threw off on the second, and you haven't seen J♦ or K♥. Then they're with North or East (or discarded by the declarer), so leading a small trump won't catch them both with West.",
       "## Practice",
-      "Turn on the counting quiz in Settings: during play it asks how many trumps or suit cards are still out, and who is out of a suit, hiding the card tracker while you answer.",
+      "Turn on the counting quiz in Settings: during play it asks how many trumps or suit cards are still out, who is out of a suit, and which is the highest card of a suit not yet played, hiding the card tracker while you answer. You can set how often it asks.",
     ],
     quiz: [
       { q: "Spades are trumps. How many trumps are in the pack?", options: ["10", "12", "13"], answer: 1, explain: "10 spades (5–A) + J♣ (left bower) + Joker = 12." },

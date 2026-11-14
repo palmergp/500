@@ -6,6 +6,7 @@ import { leaks, loadLessonsDone, loadProgress, recordScore, resetProgress, saveL
 import { bestHandBid, loadRecords, ordinal, resetRecords, type Records } from "../records";
 import { achievements, checkAchievements, doneDate, GROUPS, resetAchievements, type Status } from "../achievements";
 import { PATTERNS } from "../learn/patterns";
+import { HAND_PUZZLES, loadHandPuzzles, type HandPuzzle } from "../learn/handPuzzles";
 import { loadMistakes, solveMistake, type Mistake } from "../mistakes";
 import { BiddingBox } from "./BiddingBox";
 import { Card } from "./Card";
@@ -13,21 +14,23 @@ import { VerdictChip } from "./Coach";
 import { Dialog } from "./Dialog";
 import { TableView } from "./TableView";
 
-type Tab = "lessons" | "bidding" | "puzzles" | "mistakes" | "progress" | "achievements";
+export type LearnTab = "lessons" | "bidding" | "puzzles" | "hands" | "mistakes" | "progress" | "achievements";
+type Tab = LearnTab;
 
 function randomSeed() {
   return crypto.getRandomValues(new Uint32Array(1))[0];
 }
 
 /** Lessons, drills and progress. */
-export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: () => void }) {
-  const [tab, setTab] = useState<Tab>("lessons");
+export function Learn({ coach, onClose, onPlayHand, initialTab = "lessons" }: { coach: CoachClient | null; onClose: () => void; onPlayHand?: (puzzle: HandPuzzle) => void; initialTab?: Tab }) {
+  const [tab, setTab] = useState<Tab>(initialTab);
   /** A lesson to open, from a pattern on the Progress tab. */
   const [lesson, setLesson] = useState<string | null>(null);
   const tabs: [Tab, string][] = [
     ["lessons", "Lessons"],
     ["bidding", "Bidding trainer"],
     ["puzzles", "Play puzzles"],
+    ["hands", "Full hands"],
     ["mistakes", "Your mistakes"],
     ["progress", "Progress"],
     ["achievements", "Achievements"],
@@ -44,6 +47,7 @@ export function Learn({ coach, onClose }: { coach: CoachClient | null; onClose: 
       {tab === "lessons" && <Lessons key={lesson ?? ""} initial={lesson} />}
       {tab === "bidding" && <BiddingTrainer coach={coach} />}
       {tab === "puzzles" && <Puzzles coach={coach} />}
+      {tab === "hands" && <FullHands onPlay={onPlayHand} />}
       {tab === "mistakes" && <MyMistakes coach={coach} />}
       {tab === "achievements" && <AchievementsView />}
       {tab === "progress" && (
@@ -333,6 +337,43 @@ function Puzzles({ coach }: { coach: CoachClient | null }) {
           ))}
         </div>
       </TableView>
+    </div>
+  );
+}
+
+// ---- Full hands -----------------------------------------------------------------------------
+
+/** Hard bids to play out from the kitty, at the table. */
+function FullHands({ onPlay }: { onPlay?: (puzzle: HandPuzzle) => void }) {
+  const { solved, helped } = loadHandPuzzles();
+  return (
+    <div className="full-hands">
+      <p>
+        You've won the auction with a hard bid: take the kitty, put three back, and play the hand out against three strong bots. Each one can be
+        made, and an expert who sees only their own cards makes it every time, so count, plan and read the play: there's a line that works
+        without guessing. Careless play goes down. Afterwards the coach grades each of your decisions.
+      </p>
+      <p className="note">
+        {solved.length} of {HAND_PUZZLES.length} solved{helped.length ? `, ${helped.length} more made with a hint` : ""}. A hint is there if you're
+        stuck, but a puzzle made with one isn't marked solved.
+      </p>
+      {!onPlay && <p className="note">Open Learn from the main menu or a solo table to play these.</p>}
+      <ol className="hand-puzzle-list">
+        {HAND_PUZZLES.map((p) => {
+          const state = solved.includes(p.id) ? "solved" : helped.includes(p.id) ? "helped" : "";
+          return (
+            <li key={p.id}>
+              <button type="button" className={`hand-puzzle ${state}`} disabled={!onPlay} onClick={() => onPlay?.(p)} title={state === "solved" ? "Solved" : state === "helped" ? "Made with a hint" : "Not solved yet"}>
+                <span className="hp-number">{p.id}</span>
+                <strong className={/[♥♦]/.test(p.contract) ? "red" : ""}>{p.contract}</strong>
+                <span className="hp-state" aria-hidden="true">
+                  {state === "solved" ? "✓" : state === "helped" ? "½" : ""}
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }

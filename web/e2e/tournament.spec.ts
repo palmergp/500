@@ -57,7 +57,14 @@ test("a tournament round: play your table, see the standings, a new partner next
   // Grading was on, and Finish hand played your cards: that's help.
   await expect(after.getByText(/You've had help in this tournament/)).toBeVisible();
   await page.screenshot({ path: "test-results/tournament-round.png", fullPage: true });
-  await next.click();
+  // Leaving for now: to the menu, and the tournament carries on from there.
+  await expect(after.getByRole("button", { name: "Quit tournament" })).toBeVisible();
+  await after.getByRole("button", { name: "Main menu" }).click();
+  const menu = page.getByRole("navigation", { name: "Main menu" });
+  await expect(menu.getByRole("button", { name: /^Tournament.*Round 2 of 8/ })).toBeVisible();
+  await expect(menu.getByRole("button", { name: /^Continue/ })).toHaveCount(0);
+  await menu.getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Play round 2" }).click();
 
   // Round 2: a different partner.
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);

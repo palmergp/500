@@ -2,6 +2,7 @@
 // blocked site data), so every access is guarded and the app works without it.
 
 export type Speed = "slow" | "normal" | "fast";
+export type QuizRate = "low" | "medium" | "high";
 
 export interface Settings {
   /** Persona ids for the other seats, or "any" for a random one. */
@@ -21,6 +22,8 @@ export interface Settings {
   voids: boolean;
   /** Ask counting questions during play. */
   quiz: boolean;
+  /** How often the counting quiz asks. */
+  quizRate: QuizRate;
   /** Sound effects. */
   sound: boolean;
   /** Background music. */
@@ -42,6 +45,7 @@ export const DEFAULT_SETTINGS: Settings = {
   tracker: false,
   voids: true,
   quiz: false,
+  quizRate: "medium",
   sound: true,
   music: false,
   fourColor: false,

@@ -1,4 +1,4 @@
-import type { Settings, Speed } from "../settings";
+import type { QuizRate, Settings, Speed } from "../settings";
 import { Dialog } from "./Dialog";
 
 interface Props {
@@ -48,6 +48,21 @@ export function SettingsDialog({ settings, onChange, onClose }: Props) {
       <form className="new-game settings" onSubmit={(e) => e.preventDefault()}>
         <h3>Coach</h3>
         {toggles(COACH)}
+        <fieldset disabled={!settings.quiz}>
+          <legend>How often the counting quiz asks</legend>
+          {(
+            [
+              ["low", "rarely"],
+              ["medium", "sometimes"],
+              ["high", "often"],
+            ] as [QuizRate, string][]
+          ).map(([rate, label]) => (
+            <label key={rate} className="inline">
+              <input type="radio" name="quizRate" checked={settings.quizRate === rate} onChange={() => onChange({ ...settings, quizRate: rate })} />
+              {label}
+            </label>
+          ))}
+        </fieldset>
         <p className="note">The Hint button is always there on your turn.</p>
         <h3>Sound</h3>
         {toggles(SOUND)}
