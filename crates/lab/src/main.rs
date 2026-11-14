@@ -31,6 +31,7 @@ mod thumbcheck;
 mod mentions;
 mod show;
 mod kxkitty;
+mod bareking;
 mod lastdiscard;
 mod kittyplan;
 mod jokerplace;
@@ -153,6 +154,11 @@ fn main() {
         "kxkitty" => kxkitty::run(
             flag(&flags, "deals", 40000),
             flag(&flags, "seed", 2_300_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "bareking" => bareking::run(
+            flag(&flags, "deals", 1_000_000),
+            flag(&flags, "seed", 7_100_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),

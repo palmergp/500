@@ -284,6 +284,12 @@ What each part is worth, solved with every card visible over 4,137 deals where t
 So don't spend a discard keeping a king guarded: use it to make the void. That holds even when the only suit you
 can empty is a king with one small card: put both back (+0.4 tricks, finding 38).
 
+**Can't make a void? Leave the king bare.** When a king with small cards (K-x-x-x, say) is the only suit you can cut
+down, put back its small cards and keep the king alone: **+0.16 to +0.26 tricks** over keeping it guarded, better on
+about a quarter of deals and worse on under a tenth. The small cards were losers; with them gone you'll trump the
+suit once the king has won or fallen (finding 51). Where three discards can empty the suit, emptying it is better
+still.
+
 **Empty a short suit before you shorten a long one.** With K♠ 5♠, K♣ J♣ and four low hearts, put back a doubleton
 (king and all) rather than three hearts: 7.8 tricks against 7.5 (finding 40). Choose the three cards together: put
 back 5♠, then J♣, and you'd hold two bare kings and no void.

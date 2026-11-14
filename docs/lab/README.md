@@ -995,6 +995,35 @@ suits).* Tricks for the bidder's side in a suit bid, against a hand with no side
 - The count's values for one void (⅕) and one singleton (⅛) match. The count now adds ⅛ once for a second short
   side suit (void or singleton, any mix; `thumb.rs`), which comes up on about 1 suit bid in 10.
 
+### 51. Can't make a void? Leave the king bare rather than guarded
+
+*Measured by `fh-lab bareking` over 4,000,000 deals.* South declares at the count's level, and after the kitty a
+side king with small cards (no ace, nothing else above the 10) is the only suit that can be cut down to one card:
+every other side suit is empty or five cards or more. Three plans, solved on the same deals with every card
+visible: keep the king guarded (put back the three lowest other side cards, never an ace), leave it bare (put back
+its small cards, then the lowest other side cards), or, for comparison where it can be done, empty the suit.
+
+| King's suit | Trumps | Deals | Tricks: keep / bare / void | Bid made: keep / bare / void | Bare better / keep better |
+|---|---|---|---|---|---|
+| K-x | 6 or fewer | 2,840 | 7.96 / **8.12** / 8.49 | 73% / 76% / 84% | 21% / 5% |
+| K-x-x | 5 or fewer | 2,022 | 7.67 / **7.93** / 8.24 | 68% / 73% / 79% | 31% / 9% |
+| K-x-x-x | 5 or fewer | 333 | 7.01 / **7.26** / — | 53% / 58% / — | 31% / 11% |
+
+**The bare king wins: +0.16 to +0.26 tricks**, and the bid is made 3 to 5 times more in 100. It comes out ahead on
+about a quarter of the deals and behind on under a tenth. The small cards beside the king were losers anyway;
+with them gone the king either takes its trick or falls to the ace, and after that you trump the suit while the
+defenders can't run it. The discards it saves come from long suits of five or more, where the lowest cards are
+worth least. (Every card visible flatters the guarded king if anything: the solver always knows where the ace is,
+which a real declarer has to guess.)
+
+**Emptying the suit is better still** where three discards can: another +0.3 tricks over the bare king, as finding
+38 found for K-x. So the order is void, then bare king, then guarded king. With another side suit of four cards
+(which three discards could cut to a singleton instead) the bare king still beats keeping it guarded, by less
+(+0.08 to +0.14).
+
+The coach's kitty plan already does this: it voids K-x and K-x-x, and leaves K-x-x-x bare on every one of these
+deals.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

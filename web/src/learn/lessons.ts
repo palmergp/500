@@ -191,6 +191,7 @@ export const LESSONS: Lesson[] = [
       "Keep every trump and your aces. Use the three discards to shorten your shortest side suits: two discards from a doubleton leave you void, ready to trump that suit.",
       "In the lab, a search that compared discards across likely deals did no better than this simple rule.",
       "What each part is worth, solved over 4,000 deals: putting back a trump costs about ¾ of a trick, and putting back an ace about ½; neither was ever right. Making a void gains about ½ a trick, more the more trumps you hold. Keeping a king guarded makes no difference, so spend the discards on the void.",
+      "No suit you can empty? If a king with small cards is the only suit you can cut down, put back the small cards and leave the king alone: about ¼ of a trick better than keeping it guarded. The small cards were losers; once the king has won or fallen to the ace, you trump the suit.",
       "## In no trumps",
       "It's the other way round: you can't trump a void, so making one gains nothing. Keep your stoppers instead: a guarded king (a king with a small card beside it) was worth about ⅕ of a trick. Keep your aces and the length under them, and put back low cards from suits with no honours.",
     ],
@@ -206,6 +207,12 @@ export const LESSONS: Lesson[] = [
         options: ["Keep the king guarded", "Make the void", "No difference"],
         answer: 1,
         explain: "The void gains about ½ a trick on average; keeping the king guarded makes no difference.",
+      },
+      {
+        q: "Spades are trumps. You hold K♣ 9♣ 7♣ 6♣, five low hearts and no diamonds. Put back three clubs, or three hearts?",
+        options: ["Three clubs, leaving K♣ alone", "Three low hearts, keeping K♣ guarded", "No difference"],
+        answer: 0,
+        explain: "Leaving the king bare is about ¼ of a trick better: the small clubs were losers, and once the king has won or fallen you trump clubs.",
       },
       {
         q: "Now you're playing no trumps. Keep K♣ guarded, or put back both clubs to empty the suit?",
