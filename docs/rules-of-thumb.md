@@ -55,6 +55,7 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
     almost half a trick.
     - In a suit bid, second hand, winning cheaply when you can is as good or better (finding 45).
 12. **Trump the opponents' winners, not your partner's.** Do protect partner's trick when someone can still beat it.
+    - Make your own winners easy to read: from A-K, play the **ace** first, then the king.
 13. **On defense, lead a side ace if you have one.** Never a low trump, and partner's mention isn't a reason to lead that suit.
 14. **Holding the Joker but no bid? Call 6** (unless partner has already called). It's worth up to 1⅓ tricks to your partner.
 15. **Kitty discards come from your shortest side suits,** to make a void.
@@ -419,6 +420,12 @@ When you can't follow suit:
 | An opponent is winning and a trump would take it | **Trumps 88%** of the time |
 | Partner is winning with a sure winner | **Discards 95%** of the time |
 | Partner is winning but could still be beaten | Trumps **55%**: protect the trick when a later player might take it |
+
+**Make your winners easy for partner to read.** With touching cards that win the same tricks, play the one
+partner can see is a winner: from A-K, the ace, then the king (by then it's the top card left). Led first, the
+king leaves a partner who is short in the suit guessing whether an opponent holds the ace, and partner may trump
+a trick you had already won. It costs nothing, since the cards take the same tricks. The bots and the coach play
+this way (`cardplay::show_winner`) whenever partner still has to play to the trick.
 
 ### 13. As a defender, lead a side ace if you have one, and never a low trump
 

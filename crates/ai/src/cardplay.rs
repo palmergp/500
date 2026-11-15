@@ -2,7 +2,7 @@
 
 use fh_core::rules::{is_trump, trump_power};
 use fh_core::trick::trick_strength;
-use fh_core::{effective_suit, Card, CardSet, Suit};
+use fh_core::{effective_suit, Action, Card, CardSet, Observation, Suit};
 
 /// The cards of `suit` (as an effective suit under `trump`), strongest first.
 pub fn suit_order(suit: Suit, trump: Option<Suit>) -> Vec<Card> {
@@ -39,6 +39,27 @@ pub fn cheapest(cards: &[Card], hand: CardSet, trump: Option<Suit>) -> Card {
         .expect("cheapest of no cards")
 }
 
+/// Of cards that win exactly the same tricks, the one partner can read. When partner still plays
+/// to this trick and `action`'s card is in a run of touching cards (with the cards already gone
+/// taken out) topped by the boss, play the boss: the ace from A-K, not the king, so a partner who
+/// is short in the suit sees the trick is already won and doesn't trump it.
+pub fn show_winner(obs: &Observation, action: Action) -> Action {
+    let Action::Play(play) = action else { return action };
+    let Some(trick) = obs.current_trick.as_ref() else { return action };
+    let partner = obs.seat.partner();
+    if trick.plays().any(|(seat, _)| seat == partner) {
+        return action;
+    }
+    let trump = obs.trump();
+    let Some(suit) = effective_suit(play.card, trump) else { return action };
+    let gone = obs.played().union(obs.discards.unwrap_or_default());
+    let run: Vec<Card> = suit_order(suit, trump).into_iter().filter(|&c| !gone.contains(c)).take_while(|&c| obs.hand.contains(c)).collect();
+    match run.first() {
+        Some(&boss) if run.contains(&play.card) => Action::Play(fh_core::Play { card: boss, named_suit: None }),
+        _ => action,
+    }
+}
+
 /// Trumps in `cards` under `trump`.
 pub fn trumps(cards: CardSet, trump: Option<Suit>) -> CardSet {
     cards.iter().filter(|&c| is_trump(c, trump)).collect()
@@ -47,6 +68,53 @@ pub fn trumps(cards: CardSet, trump: Option<Suit>) -> CardSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// Leading with A-K (or K-Q once the ace is gone) of a side suit, the bot shows the boss so
+    /// partner can read it; once partner has played to the trick, nothing changes.
+    #[test]
+    fn touching_winners_show_the_boss_while_partner_is_still_to_play() {
+        use fh_core::{Game, Phase, Play, Rules};
+        let (mut leads, mut after_partner) = (0, 0);
+        for seed in 0..300u64 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bots: [Box<dyn crate::Bot>; 4] = std::array::from_fn(|i| {
+                // Mostly the quick rule bot; a few deals of the search bot too.
+                crate::make_bot(if seed % 30 == 0 { "counter" } else { "steady" }, seed * 4 + i as u64).unwrap()
+            });
+            while game.phase() != Phase::GameOver && game.history().is_empty() {
+                let seat = game.to_act().unwrap();
+                let obs = game.observe(seat);
+                let legal = game.legal_actions();
+                if obs.phase == Phase::Playing {
+                    let trump = obs.trump();
+                    let trick = obs.current_trick.clone().unwrap();
+                    let gone = obs.played().union(obs.discards.unwrap_or_default());
+                    for suit in Suit::ALL.into_iter().filter(|&s| Some(s) != trump) {
+                        let live: Vec<Card> = suit_order(suit, trump).into_iter().filter(|&c| !gone.contains(c)).collect();
+                        let (Some(&top), Some(&next)) = (live.first(), live.get(1)) else { continue };
+                        let play = |c: Card| Action::Play(Play { card: c, named_suit: None });
+                        if !obs.hand.contains(top) || !obs.hand.contains(next) || !legal.contains(&play(next)) {
+                            continue;
+                        }
+                        let shown = show_winner(&obs, play(next));
+                        if trick.plays().any(|(s, _)| s == seat.partner()) {
+                            assert_eq!(shown, play(next), "partner has played: seed {seed}");
+                            after_partner += 1;
+                        } else {
+                            assert_eq!(shown, play(top), "{next} and {top} touch: show {top} (seed {seed})");
+                            leads += u32::from(trick.is_empty());
+                        }
+                    }
+                }
+                let action = bots[seat.index()].choose(&obs, &legal);
+                if obs.phase == Phase::Playing {
+                    assert_eq!(show_winner(&obs, action), action, "the bot played the lower of touching winners (seed {seed})");
+                }
+                game.apply(action).unwrap();
+            }
+        }
+        assert!(leads > 20 && after_partner > 20, "{leads} leads, {after_partner} after partner");
+    }
 
     #[test]
     fn boss_accounts_for_bowers() {

@@ -334,6 +334,11 @@ impl SearchBot {
             near.min_by_key(|&i| cost(&scored[i].0)).unwrap()
         };
         scored[..=pick].rotate_right(1);
+        // Of touching cards (they win the same tricks), the one partner can read: the ace from A-K.
+        let shown = crate::cardplay::show_winner(obs, scored[0].0);
+        if let Some(i) = scored.iter().position(|(a, _)| *a == shown) {
+            scored[..=i].rotate_right(1);
+        }
         scored
     }
 

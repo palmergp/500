@@ -290,6 +290,7 @@ export const LESSONS: Lesson[] = [
       "• Second hand low: when following second, the expert plays low most of the time (94% in no trumps).",
       "• Trump the opponents' winners: when an opponent is winning and a trump would take the trick, the expert trumps 88% of the time.",
       "• Don't trump your partner's sure winner: the expert discards 95% of the time. But if partner's card could still be beaten by a later player, trumping to protect the trick is often right.",
+      "• Make your winners easy to read: from A-K, play the ace first, then the king. Partner can see the ace is a winner and won't trump it; a king first leaves partner guessing where the ace is.",
     ],
     quiz: [
       {

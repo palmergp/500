@@ -191,7 +191,7 @@ impl RuleBot {
             // When leading the Joker in no trumps, name our longest suit.
             p.named_suit.map_or(0, |s| obs.hand.of_printed_suit(s).len())
         });
-        Action::Play(*play.expect("chosen card is legal"))
+        crate::cardplay::show_winner(obs, Action::Play(*play.expect("chosen card is legal")))
     }
 
     fn lead(&self, obs: &Observation, cards: &[Card], seen: CardSet) -> Card {

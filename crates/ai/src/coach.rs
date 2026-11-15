@@ -354,7 +354,7 @@ impl Coach {
             .take(3)
             .collect();
         let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
-        let close_note = (!close.is_empty()).then(|| close_call_reason(&result, best, &close));
+        let close_note = (!close.is_empty()).then(|| close_call_reason(obs, &result, best, &close));
         Analysis { options, best, reasons, worlds: result.worlds, close, close_note, units: Units::Points, play: Some(result) }
     }
 
@@ -548,7 +548,7 @@ fn equivalent(play: &PlayStats, a: Action, b: Action) -> bool {
 }
 
 /// "Close call: …" for the hint and the grade.
-fn close_call_reason(play: &PlayStats, best: Action, close: &[Action]) -> String {
+fn close_call_reason(obs: &Observation, play: &PlayStats, best: Action, close: &[Action]) -> String {
     let (same, near): (Vec<Action>, Vec<Action>) = close.iter().partition(|&&a| equivalent(play, best, a));
     let list = |actions: &[Action]| {
         let names: Vec<String> = actions.iter().map(|a| a.to_string()).collect();
@@ -558,7 +558,13 @@ fn close_call_reason(play: &PlayStats, best: Action, close: &[Action]) -> String
             n => format!("{} or {}", names[..n - 1].join(", "), names[n - 1]),
         }
     };
-    let same_text = format!("{} is the same as {best} here: it wins the same tricks.", list(&same));
+    // The ace from A-K: the same tricks, but partner can see it's a winner (`show_winner`).
+    let shown = same.iter().any(|&a| crate::cardplay::show_winner(obs, a) == best);
+    let same_text = if shown {
+        format!("{} wins the same tricks, but play {best}: your partner can see the trick is already won and won't trump it.", list(&same))
+    } else {
+        format!("{} is the same as {best} here: it wins the same tricks.", list(&same))
+    };
     match (same.is_empty(), near.is_empty()) {
         (false, true) => same_text,
         (true, false) => format!("Close call: {} does about as well (the {} likely deals can't separate them).", list(&near), play.worlds),

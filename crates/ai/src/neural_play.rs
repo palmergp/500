@@ -63,6 +63,8 @@ impl NeuralBot {
             _ => f32::MIN,
         };
         let best = legal.iter().copied().max_by(|a, b| score(a).total_cmp(&score(b))).expect("legal plays");
+        // Of touching cards, the one partner can read (the ace from A-K).
+        let best = crate::cardplay::show_winner(obs, best);
         // Leading the Joker in no trumps: name the suit you hold most of (then the higher card).
         let Action::Play(p) = best else { return best };
         if p.named_suit.is_none() {
