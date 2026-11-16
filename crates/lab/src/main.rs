@@ -32,6 +32,8 @@ mod mentions;
 mod show;
 mod kxkitty;
 mod bareking;
+mod leadcheck;
+mod bidbar;
 mod lastdiscard;
 mod kittyplan;
 mod jokerplace;
@@ -159,6 +161,16 @@ fn main() {
         "bareking" => bareking::run(
             flag(&flags, "deals", 1_000_000),
             flag(&flags, "seed", 7_100_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "bidbar" => bidbar::run(
+            flag(&flags, "deals", 20000),
+            flag(&flags, "seed", 7_300_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "leadcheck" => leadcheck::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 7_200_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),

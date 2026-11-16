@@ -1,6 +1,7 @@
 import type { ReactNode } from "react";
 import type { CallView, SeatIndex, TrickView, View } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
+import { BidText } from "./BidText";
 import { Card, CardBack } from "./Card";
 
 const POSITION: Record<SeatIndex, string> = { 0: "south", 1: "west", 2: "north", 3: "east" };
@@ -87,7 +88,11 @@ function SeatPlate({ view, seat, showVoids, piles, onTricks }: PlateProps) {
         {player.name}
         {seat === 2 && <span className="tag">partner</span>}
         {view.dealer === seat && <span className="chip">dealer</span>}
-        {declarer && <span className="chip declarer">{view.contract!.label}</span>}
+        {declarer && (
+          <span className="chip declarer">
+            <BidText label={view.contract!.label} />
+          </span>
+        )}
       </div>
       <div className="seat-sub">
         {SEAT_NAMES[seat]}
@@ -110,7 +115,7 @@ function SeatPlate({ view, seat, showVoids, piles, onTricks }: PlateProps) {
       <Piles indices={piles} onOpen={onTricks} />
       {call && (
         <div key={latest ? `new-${view.calls.length}` : "old"} className={`bubble ${call.kind}${latest ? " latest" : ""}`} aria-label={`${player.name}: ${call.label}`}>
-          {call.label}
+          <BidText label={call.label} />
         </div>
       )}
     </div>
@@ -165,7 +170,9 @@ export function InfoPanel({
             {view.calls.map((call, i) => (
               <li key={i} className={`auction-row${i === view.calls.length - 1 ? " latest" : ""}`}>
                 <span>{view.players[call.seat].name}</span>
-                <strong className={call.kind}>{call.label}</strong>
+                <strong className={call.kind}>
+                  <BidText label={call.label} />
+                </strong>
               </li>
             ))}
             {view.toAct !== null && (
@@ -179,8 +186,22 @@ export function InfoPanel({
       )}
       {c && (
         <div className="contract">
-          <div>
-            Bid <strong>{c.label}</strong> by {view.players[c.declarer].name}
+          <div className="bid-tile" aria-label={`Bid ${c.label} by ${view.players[c.declarer].name}`}>
+            <strong className="bid-tile-bid">
+              <BidText label={c.label} />
+            </strong>
+            <span className="bid-tile-text">
+              <span>{c.declarer === 0 ? "Your bid" : `${view.players[c.declarer].name}'s bid`}</span>
+              <span>
+                {c.strain === "NT" ? (
+                  "No trumps"
+                ) : (
+                  <>
+                    Trumps <BidText label={SUIT_SYMBOL[c.strain]} />
+                  </>
+                )}
+              </span>
+            </span>
           </div>
           {view.phase !== "discarding" && (
             <div className="contract-tricks">

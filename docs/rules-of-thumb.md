@@ -49,7 +49,9 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 9. **As declarer with 5+ trumps, open with your top trump; with fewer, cash a side ace.** Rarely lead a small trump, unless partner called 6.
    Count your top trumps (Joker, both bowers, ace): missing two, it's a toss-up with a side ace; missing three or
    four, lead a side ace or a singleton first.
-    - **In no trumps,** cash side winners and keep the Joker.
+   A side ace cashed early is as good as the top trump, and safest early: it gets trumped more as the hand goes on.
+   Don't lead a side king early; it runs into the ace more often than not (finding 53).
+    - **In no trumps,** cash side winners and keep the Joker early; from about trick 7, lead it.
 10. **Don't rush the Joker.** The expert usually plays it in tricks 3–5.
 11. **Second hand low,** almost always in no trumps. **Third hand high, and cover an honour with an honour:** each worth
     almost half a trick.
@@ -257,6 +259,9 @@ The Oracle bids from a neural network trained on 112,000 solved bidding decision
 
 - **Bid when the count says it pays,** even if that means going down a little more often.
 - **Making a high share of your bids isn't the goal;** bidding the right ones is.
+- **Over an opponent's bid, a bid at 50–60% still pays:** letting theirs play costs more than going down in
+  yours (+36 to +53 points over passing, finding 52). **First to bid, it's a coin flip below about 60%,** and
+  pays from about 65%.
 - *Source: lab, 400 duplicate deals* (finding 9).
 
 ### 7. Partner's bid is worth trusting
@@ -366,7 +371,9 @@ Leading small toward partner's Joker draws the opponents' trumps without spendin
 ### 9b. In no trumps, cash side winners, and never open with the Joker
 
 - **Side winners:** an ace or other sure winner was the best opening lead **87%** of the time (cost 5).
-- **The Joker:** leading it was the worst choice (cost 49). It's your stopper in whichever suit the opponents attack, so keep it.
+- **The Joker:** leading it was the worst choice (cost 49). Keep it early: in tricks 1–3 a Joker lead costs about
+  0.2 tricks. **From about trick 7, lead it** (+0.2 tricks): it's a sure trick and the lead, and naming a suit makes
+  the others give up cards in it. It isn't a stopper: you may play it only when you can't follow suit (finding 53).
 
 ### 10. Don't rush the Joker as declarer
 

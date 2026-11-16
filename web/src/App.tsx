@@ -18,6 +18,7 @@ import { HandReview } from "./components/HandReview";
 import { NewGameDialog } from "./components/NewGameDialog";
 import { ScorePad } from "./components/ScorePad";
 import { InfoPanel, TableView } from "./components/TableView";
+import { BidText } from "./components/BidText";
 import { TricksDialog } from "./components/TricksDialog";
 import { DecisionsDialog } from "./components/DecisionsDialog";
 import { keepMistake } from "./mistakes";
@@ -195,6 +196,8 @@ export function App() {
   const [inTour, setInTour] = useState(false);
   const [tourDialog, setTourDialog] = useState<{ after?: number } | null>(null);
   const [showFinal, setShowFinal] = useState(false);
+  /** The deal (by the number of deals before it) whose finished auction you've continued from. */
+  const [seenAuction, setSeenAuction] = useState<number | null>(null);
   /** Choosing a new tournament's kind. */
   const [showNewTour, setShowNewTour] = useState(false);
   const simRef = useRef<Simulator | null>(null);
@@ -667,8 +670,11 @@ export function App() {
   const lobbyOpen = atTable && lan && (showLobby || !lobby?.playing || lobby.you === null || !view);
   // At a LAN table, nobody moves until everyone has seen the last hand's result.
   const waitingOnOthers = lan && !!lobby && lobby.waiting.length > 0;
+  // "Pause after the bidding": the finished auction waits in the middle until you continue.
+  const auctionPause =
+    atTable && mode === "solo" && settings.pauseAfterBidding && !replaying && !puzzle && !!view && view.phase === "discarding" && seenAuction !== view.history.length;
   const paused =
-    !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers || !!tourDialog || showFinal;
+    auctionPause || !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers || !!tourDialog || showFinal;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -1012,6 +1018,32 @@ export function App() {
   if (view && view.humanToAct && !paused && view.phase === "bidding") {
     const chances = currentHint?.bids ? new Map(currentHint.bids.map((b) => [b.index, b.makes ?? 0])) : undefined;
     middle = <BiddingBox legal={view.legal} mustBid={view.mustBid} onAct={act} hinted={hintedAction?.index} chances={chances} />;
+  } else if (view && auctionPause && view.contract) {
+    const c = view.contract;
+    middle = (
+      <div className="auction-summary" role="group" aria-label="The bidding">
+        <div className="auction-title">The bidding</div>
+        <ol>
+          {view.calls.map((call, i) => (
+            <li key={i} className="auction-row">
+              <span>{view.players[call.seat].name}</span>
+              <strong className={call.kind}>
+                <BidText label={call.label} />
+              </strong>
+            </li>
+          ))}
+        </ol>
+        <p>
+          {c.declarer === 0 ? "You play" : `${view.players[c.declarer].name} plays`}{" "}
+          <strong className="bid-big">
+            <BidText label={c.label} />
+          </strong>
+        </p>
+        <button type="button" className="primary" autoFocus onClick={() => setSeenAuction(view.history.length)}>
+          Continue
+        </button>
+      </div>
+    );
   } else if (view && jokerLeads) {
     middle = (
       <div className="joker-choice">
@@ -1502,7 +1534,10 @@ function HandResult({ hand, view, puzzle }: { hand: HandView; view: View; puzzle
   return (
     <div className="hand-result">
       <p className={hand.made ? "made" : "down"}>
-        {who} {hand.made ? "made" : "went down in"} <strong>{c.label}</strong> with {hand.tricksWon[team]} tricks.
+        {who} {hand.made ? "made" : "went down in"}{" "}
+        <strong>
+          <BidText label={c.label} />
+        </strong> with {hand.tricksWon[team]} tricks.
       </p>
       <table>
         <tbody>

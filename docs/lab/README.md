@@ -1024,6 +1024,74 @@ which a real declarer has to guess.)
 The coach's kitty plan already does this: it voids K-x and K-x-x, and leaves K-x-x-x bare on every one of these
 deals.
 
+### 52. The coach's bids under 70%: worth it when passing isn't free
+
+*Measured by `fh-lab bidbar` over 20,000 deals (34,972 bids).* The user asked why the coach sometimes recommends a
+bid it gives only 53%. The Oracle bid in every seat (the coach's bidding recommendation is the Oracle's); at each
+bid it made (not forced), the deal was played out both ways, the bid or a pass, with the Oracle finishing the
+auction and the hand solved and scored for real play (as in `fh-lab switch`). Points for the bidder's side, bidding
+minus passing, by the chance the coach shows for the bid:
+
+| Coach shows | No bid yet | Over an opponent's bid | Over partner's bid |
+|---|---|---|---|
+| under 55% | (27 cases) | **+36 ± 7** (4,087) | +44 ± 20 (548) |
+| 55–60% | −4 ± 9 (1,941) | **+53 ± 14** (1,104) | +57 ± 28 (258) |
+| 60–65% | +6 ± 5 (6,051) | **+70 ± 11** (1,739) | +48 ± 19 (583) |
+| 65–70% | +23 ± 7 (2,565) | +81 ± 18 (653) | +54 ± 24 (312) |
+| 70–80% | +37 ± 5 (5,128) | +87 ± 12 (1,177) | +44 ± 11 (1,282) |
+| 80% or more | +60 ± 5 (4,233) | +106 ± 12 (1,153) | +56 ± 6 (2,131) |
+
+- **Over an opponent's bid, bidding pays at every chance shown, even under 55%.** Passing isn't free: their bid
+  usually makes, which costs your side its value less the few defensive tricks. Going down in your own bid costs
+  less than that on average. Most of the coach's low-chance bids are these.
+- **Over partner's bid,** the coach's bids (a better strain or a level up) gain 44–57 points across the range.
+- **First to bid, under about 62% is a coin flip:** 55–60% came out −4 ± 9, 60–65% +6 ± 5. From 65% it pays. A
+  7-level bid made with exactly 7 tricks scores +140 less 30 for the defenders' tricks; one short it's −140 and
+  they score 40, so it needs about 60% to break even. The bar wasn't changed (the stake is about half a point a
+  deal), but the coach now calls these bids **a close call**, and explains why low-chance bids over an opponent's
+  bid still pay.
+
+### 53. The bots' leads: side aces before trumps, and the Joker in no trumps
+
+*Measured by `fh-lab leadcheck` over 6,000 deals of Oracle play.* At each lead, the solver (every card visible)
+compared the bot's card with the alternatives. Two questions from the user.
+
+**Why cash a side ace before the top trump?** Leads by the declaring side while it holds the top trump left and the
+opponents still hold trumps (declarer's leads; partner's are similar):
+
+| Trick | Top trump | Side ace | Side king | Other side card | Side ace: won / trumped | Side ace vs the top trump | Side king vs the top trump |
+|---|---|---|---|---|---|---|---|
+| 1 | 30% | 36% | 2% | 25% | 94% / 6% | **+0.03** | −0.17 (beaten by the ace 58%) |
+| 2–3 | 47% | 20% | 4% | 22% | 93% / 7% | **+0.02** | −0.13 |
+| 4–6 | 56% | 10% | 6% | 23% | 83% / 17% | −0.06 | +0.05 |
+| 7–10 | 72% | 2% | 3% | 18% | 61% / 39% | +0.04 | −0.11 |
+
+- **The early side ace is as good as the top trump** (+0.02 to +0.03 tricks, as good or better 92–93% of the time),
+  and it's safest early: trumped 6–7% of the time in tricks 1–3, 17% in tricks 4–6, 39% later, as the opponents run
+  out of side suits. Cash it while it's still good; drawing trumps first doesn't make it safer in time, because the
+  opponents' voids come from the play itself.
+- **The side king is the weak lead:** led early it ran into the ace 58% of the time and cost 0.13–0.17 tricks. The
+  bots lead it rarely (2–6% of these leads); the cost is about 0.005 tricks a hand, so it was left alone.
+
+**The Joker in no trumps:** every lead by a player holding the Joker with other cards left.
+
+| Leader | Trick | n | Bot led the Joker | Best Joker lead vs best other | Joker better / worse |
+|---|---|---|---|---|---|
+| Declaring side | 1 | 1,061 | 2% | **−0.21** | 1% / 18% |
+| Declaring side | 2–3 | 1,383 | 7% | **−0.16** | 3% / 16% |
+| Declaring side | 4–6 | 1,511 | 19% | −0.03 | 9% / 11% |
+| Declaring side | 7–10 | 555 | 42% | **+0.19** | 20% / 2% |
+| Defender | 4–10 | 77 | 30% | about even | |
+
+- **Early, hold it** (the user's intuition): a Joker lead in tricks 1–3 is worse by about 0.2 tricks, and the bots
+  rarely do it (2–7%). **Late, lead it:** from trick 7 the Joker lead is better (+0.19), and that's where most of the
+  bots' Joker leads are (42% of those leads). In the middle it's a toss-up.
+- **It isn't a stopper.** In no trumps the Joker may be played only when you can't follow the suit led (H18a), so
+  holding it doesn't take back control of a suit you still hold cards in. Its value is a certain trick and the lead
+  that comes with it; late in the hand, leading it and naming a suit forces the others to give up cards in that suit.
+- When the bots did lead it early, it cost a little more than their other choices (0.40 against 0.28 at trick 1,
+  0.26 against 0.18 at tricks 2–3, n of about 20 and 100); too rare to be worth a rule.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

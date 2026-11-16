@@ -630,7 +630,7 @@ thread_local! {
     static PLAY_CACHE: std::cell::RefCell<Vec<(Observation, Units, PlayStats)>> = const { std::cell::RefCell::new(Vec::new()) };
 }
 
-const BID_CURVE: &[(f64, f64)] = &[
+pub const BID_CURVE: &[(f64, f64)] = &[
     // Refit after finding 47: 1,993 bid predictions, as for PLAY_CURVE.
     (0.00, 0.06),
     (0.27, 0.34),
@@ -906,7 +906,8 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
                     if let (Some(p), Some((seat, theirs))) = (pass, high) {
                         let gain = o.ev - p.ev;
                         let sacrifice = seat.team() != obs.seat.team() && plays_for_the_game(obs);
-                        if gain >= 1.0 && (seat == partner || (m < 0.5 && !sacrifice)) {
+                        // Over an opponent's bid, bids under 70% still beat passing (finding 52).
+                        if gain >= 1.0 && (seat == partner || (m < 0.7 && !sacrifice)) {
                             let compare = Units::of(obs).compare(&c.to_string(), "passing", gain);
                             let reason = if seat == partner {
                                 let support = theirs.strain.trump().map(|t| hand.iter().filter(|&card| is_trump(card, Some(t))).count());
@@ -922,6 +923,14 @@ fn call_reasons(obs: &Observation, best: Action, chosen: Option<Action>, options
                             reasons.insert(0, reason);
                             weighed = true;
                         }
+                    }
+                    // Nobody has bid: an opening bid this close to even is a close call (finding 52).
+                    if high.is_none() && m < 0.65 && !plays_for_the_game(obs) {
+                        reasons.insert(
+                            0,
+                            "A close call. Nobody has bid yet, so passing costs nothing now; in the lab, opening bids the coach gives under 65% came out about even with passing, and from 65% they pay. Over an opponent's bid it's different: letting their bid play costs more than going down.".into(),
+                        );
+                        weighed = true;
                     }
                     // A long shot over an opponent's bid near the end is a sacrifice: say so.
                     if let Some((seat, theirs)) = high.filter(|(s, _)| s.team() != obs.seat.team()) {

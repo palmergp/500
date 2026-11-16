@@ -7,7 +7,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Toggle = "grade" | "trumpCounter" | "tracker" | "voids" | "quiz" | "sound" | "music" | "fourColor" | "bigCards";
+type Toggle = "grade" | "trumpCounter" | "tracker" | "voids" | "quiz" | "sound" | "music" | "fourColor" | "bigCards" | "pauseAfterBidding";
 
 const COACH: { key: Toggle; label: string; detail: string }[] = [
   { key: "grade", label: "Grade my decisions", detail: "After each bid and card, see how it compares with the expert's choice, and undo mistakes." },
@@ -29,6 +29,11 @@ const DISPLAY: { key: Toggle; label: string; detail: string }[] = [
     detail: "Diamonds blue and clubs green, so every suit has its own color. Bowers still pair hearts with diamonds and spades with clubs.",
   },
   { key: "bigCards", label: "Larger cards", detail: "Bigger cards and text on the table." },
+  {
+    key: "pauseAfterBidding",
+    label: "Pause after the bidding",
+    detail: "When the bidding ends, show everyone's calls and wait for Continue before the kitty and play.",
+  },
 ];
 
 /** Everything you can change about the game, in one place. Changes apply straight away. */

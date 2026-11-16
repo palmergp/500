@@ -102,6 +102,10 @@
   it; changing the tag needs the app re-added to the Home Screen); the layout pads by the safe-area insets
   (`e2e/iphone.spec.ts`), and
   short screens (a phone on its side, `max-height: 500px`) put the other three players in a row across the top.
+- Calls and bids render through `components/BidText.tsx` (♥ and ♦ red, the four-color deck's colors too; lighter on
+  the felt). The bid being played is the card-like `.bid-tile` in `InfoPanel` (bid, whose, trumps).
+  `Settings.pauseAfterBidding` (solo only, not puzzles or replays): the finished auction waits in the middle
+  (`auctionPause` in App.tsx) until Continue, and the bots wait with it.
 - Touch screens have no hover: `components/TouchTips.tsx` shows any `title` on press-and-hold (and on a tap for plain
   labels), so put extra information in `title`, never in hover-only handlers.
 - The web app runs two engine workers: one plays, one coaches (rebuilding positions from the save), so grading never delays play.

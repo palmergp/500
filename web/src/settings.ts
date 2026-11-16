@@ -32,6 +32,8 @@ export interface Settings {
   fourColor: boolean;
   /** Larger cards. */
   bigCards: boolean;
+  /** When the bidding ends, show every call and wait for Continue. */
+  pauseAfterBidding: boolean;
 }
 
 export const DEFAULT_SETTINGS: Settings = {
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   music: false,
   fourColor: false,
   bigCards: false,
+  pauseAfterBidding: false,
 };
 
 /** The helpers on in `settings` (for an unaided tournament they must all be off), named for people. */
