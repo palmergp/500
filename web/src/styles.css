@@ -1811,12 +1811,6 @@ button.danger {
   margin: 0;
   justify-self: start;
 }
-.contract-tricks {
-  color: var(--ink-dim);
-}
-.contract-tricks b {
-  color: var(--ink);
-}
 .past-tricks-button {
   justify-self: start;
   font-size: 0.8rem;
@@ -2065,9 +2059,7 @@ button.danger {
     padding: 4px 8px;
   }
   .table-info .info-panel .contract {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 10px;
+    flex: 1 1 100%;
   }
   .table-info .info-game {
     font-size: 0.68rem;
@@ -2324,9 +2316,7 @@ button.danger {
     padding: 4px 8px;
   }
   .table-info .info-panel .contract {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 2px 8px;
+    flex: 1 1 100%;
   }
   .table-info .auction ol {
     display: none;
@@ -2777,43 +2767,147 @@ button.danger {
   color: var(--suit-green);
 }
 
-/* The bid being played: a card-like tile, so the bid and trumps are hard to miss. */
-.bid-tile {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  justify-self: start;
+/* The bid being played: a card the width of the panel, so the bid and trumps are hard to miss.
+   Its top is a button that opens everyone's calls; the tricks so far sit along its foot. */
+.info-panel .bid-tile {
+  display: grid;
+  justify-self: stretch;
+  gap: 0;
   background: var(--card);
   color: var(--black);
   border: 2px solid var(--gold);
   border-radius: 10px;
-  padding: 6px 12px 6px 10px;
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  overflow: hidden;
 }
-.contract .bid-tile-bid {
+/* A narrow panel (the table's corner on a small screen) keeps the bid's text its room: the
+   "Bids" label shrinks to a small arrow in the corner. */
+.info-panel .bid-tile {
+  container-type: inline-size;
+}
+.bid-tile-head {
+  position: relative;
+}
+@container (max-width: 240px) {
+  .bid-tile-more-word {
+    display: none;
+  }
+  .bid-tile-more {
+    position: absolute;
+    top: 1px;
+    right: 3px;
+    padding: 0;
+    border: 0;
+  }
+}
+.info-panel .bid-tile strong {
+  color: var(--black);
+}
+.bid-tile-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  margin: 0;
+  padding: 6px 10px 6px 12px;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  text-align: left;
+}
+.bid-tile-head:hover {
+  background: rgba(0, 0, 0, 0.04);
+}
+.bid-tile-head:focus-visible {
+  outline-offset: -3px;
+}
+.bid-tile-bid {
   font-size: 1.8rem;
   line-height: 1;
   font-weight: 800;
   color: var(--black);
   white-space: nowrap;
+  min-width: 2.2ch;
 }
 .bid-tile-text {
+  flex: 1;
+  min-width: 0;
   display: grid;
   font-size: 0.8rem;
   line-height: 1.3;
   font-weight: 600;
 }
-.table-info .bid-tile {
-  gap: 6px;
-  padding: 2px 8px 2px 6px;
-  border-radius: 8px;
+.bid-tile-who {
+  overflow-wrap: anywhere;
 }
-.table-info .contract .bid-tile-bid {
-  font-size: 1.2rem;
+.bid-tile-more {
+  align-self: center;
+  color: #7a6a45;
+  font-size: 0.72rem;
+  font-weight: 600;
+  white-space: nowrap;
+  padding: 1px 6px;
+  border: 1px solid rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
 }
-.table-info .bid-tile-text {
+.bid-tile-calls {
+  list-style: none;
+  margin: 0;
+  padding: 2px 12px 4px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  font-size: 0.8rem;
+}
+.bid-tile-calls li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 2px 0;
+}
+.bid-tile-calls li + li {
+  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+}
+.bid-tile-calls li.pass {
+  color: #6b6b6b;
+}
+.bid-tile-calls li.pass strong {
+  font-weight: 500;
+}
+.bid-tile-tricks {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 3px 12px;
+  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  background: rgba(0, 0, 0, 0.04);
+  font-size: 0.78rem;
+  color: #555;
+}
+.bid-tile-tricks b {
+  color: var(--black);
+}
+.info-buttons {
+  align-items: center;
+}
+.info-buttons .trump-count {
+  margin: 0;
+}
+.table-info .bid-tile-head {
+  gap: 8px;
+  padding: 3px 8px;
+}
+.table-info .bid-tile-bid {
+  font-size: 1.25rem;
+}
+.table-info .bid-tile-text,
+.table-info .bid-tile-calls,
+.table-info .bid-tile-tricks {
   font-size: 0.7rem;
   line-height: 1.2;
+}
+.table-info .bid-tile-calls,
+.table-info .bid-tile-tricks {
+  padding: 1px 8px;
 }
 
 /* "Pause after the bidding": every call, then Continue. */

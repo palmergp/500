@@ -103,7 +103,8 @@
   (`e2e/iphone.spec.ts`), and
   short screens (a phone on its side, `max-height: 500px`) put the other three players in a row across the top.
 - Calls and bids render through `components/BidText.tsx` (♥ and ♦ red, the four-color deck's colors too; lighter on
-  the felt). The bid being played is the card-like `.bid-tile` in `InfoPanel` (bid, whose, trumps).
+  the felt). The bid being played is the card-like `.bid-tile` in `InfoPanel` (bid, whose, trumps, tricks along its foot);
+  pressing it opens everyone's calls for that hand (narrow panels shrink its "Bids" label to an arrow, a container query).
   `Settings.pauseAfterBidding` (solo only, not puzzles or replays): the finished auction waits in the middle
   (`auctionPause` in App.tsx) until Continue, and the bots wait with it.
 - Touch screens have no hover: `components/TouchTips.tsx` shows any `title` on press-and-hold (and on a tap for plain

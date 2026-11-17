@@ -23,9 +23,17 @@ test("pause after the bidding: every call waits for Continue, and the bid shows 
   await expect(summary).toHaveCount(0);
   await expect(page.locator(".discard-bar, .trick-area .card").first()).toBeVisible({ timeout: 15_000 });
   // The bid in its tile, with trumps named.
-  const tile = page.locator(".bid-tile").first();
+  const tile = page.locator(".bid-tile:visible").first();
   await expect(tile).toBeVisible();
   await expect(tile).toContainText(/Trumps|No trumps/);
+  // Pressing it opens everyone's calls (with a mention among them, if anyone made one), and closes them again.
+  const head = page.locator(".bid-tile-head:visible").first();
+  await head.click();
+  await expect(head).toHaveAttribute("aria-expanded", "true");
+  await expect(page.locator(".bid-tile-calls:visible li")).toHaveCount(4);
+  await page.screenshot({ path: `test-results/${info.project.name}-bid-tile-open.png` });
+  await head.click();
+  await expect(page.locator(".bid-tile-calls:visible")).toHaveCount(0);
 });
 
 test("hearts and diamonds read red in calls and bids", async ({ page }) => {

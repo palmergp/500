@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import type { CallView, SeatIndex, TrickView, View } from "../engine";
 import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { BidText } from "./BidText";
@@ -158,6 +158,10 @@ export function InfoPanel({
   onDecisions?: () => void;
 }) {
   const c = view.contract;
+  // The calls stay open for the hand they were opened in.
+  const hand = view.history.length;
+  const [callsOpenFor, setCallsOpenFor] = useState<number | null>(null);
+  const callsOpen = callsOpenFor === hand;
   return (
     <section className="info-panel" aria-label="Bidding">
       <div className="info-game">{gameProgress(view)}</div>
@@ -185,13 +189,20 @@ export function InfoPanel({
         </div>
       )}
       {c && (
-        <div className="contract">
-          <div className="bid-tile" aria-label={`Bid ${c.label} by ${view.players[c.declarer].name}`}>
+        <div className={`contract bid-tile${callsOpen ? " open" : ""}`}>
+          <button
+            type="button"
+            className="bid-tile-head"
+            aria-expanded={callsOpen}
+            aria-label={`Bid ${c.label} by ${view.players[c.declarer].name}: ${callsOpen ? "hide" : "show"} everyone's bids`}
+            title={callsOpen ? "Hide the bidding" : "Show what everyone bid"}
+            onClick={() => setCallsOpenFor(callsOpen ? null : hand)}
+          >
             <strong className="bid-tile-bid">
               <BidText label={c.label} />
             </strong>
             <span className="bid-tile-text">
-              <span>{c.declarer === 0 ? "Your bid" : `${view.players[c.declarer].name}'s bid`}</span>
+              <span className="bid-tile-who">{c.declarer === 0 ? "Your bid" : `${view.players[c.declarer].name}'s bid`}</span>
               <span>
                 {c.strain === "NT" ? (
                   "No trumps"
@@ -202,20 +213,41 @@ export function InfoPanel({
                 )}
               </span>
             </span>
-          </div>
-          {view.phase !== "discarding" && (
-            <div className="contract-tricks">
-              Tricks: <b>{view.tricksWon[c.declarer % 2]}</b> of {c.level} needed · defenders <b>{view.tricksWon[1 - (c.declarer % 2)]}</b>
-            </div>
+            <span className="bid-tile-more" aria-hidden="true">
+              <span className="bid-tile-more-word">Bids </span>
+              {callsOpen ? "▴" : "▾"}
+            </span>
+          </button>
+          {callsOpen && (
+            <ol className="bid-tile-calls" aria-label="Everyone's bids">
+              {view.calls.map((call, i) => (
+                <li key={i} className={call.kind}>
+                  <span>{view.players[call.seat].name}</span>
+                  <strong>
+                    <BidText label={call.label} />
+                  </strong>
+                </li>
+              ))}
+            </ol>
           )}
-          {trumpsUnseen != null && view.phase === "playing" && (
-            <div className="trump-count" title="Trumps not in your hand, not yet played, and not among your discards">
-              Trumps out: {trumpsUnseen}
+          {view.phase !== "discarding" && (
+            <div className="bid-tile-tricks">
+              <span>
+                Tricks <b>{view.tricksWon[c.declarer % 2]}</b> of {c.level}
+              </span>
+              <span>
+                Defenders <b>{view.tricksWon[1 - (c.declarer % 2)]}</b>
+              </span>
             </div>
           )}
         </div>
       )}
       <div className="info-buttons">
+        {trumpsUnseen != null && view.phase === "playing" && (
+          <span className="trump-count" title="Trumps not in your hand, not yet played, and not among your discards">
+            Trumps out: {trumpsUnseen}
+          </span>
+        )}
         {onTricks && view.tricks.length > 0 && view.phase === "playing" && (
           <button type="button" className="past-tricks-button" onClick={onTricks} title="See every trick played so far this hand">
             Past tricks ({view.tricks.length})
