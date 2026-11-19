@@ -2730,7 +2730,7 @@ button.danger {
 
 /* ---- Suit colors in calls and bids (BidText) ------------------------------------------------
    On the felt and dark panels the card colors are too dark to read, so they're lightened; on
-   light surfaces (bubbles, chips, the bid tile, light dialogs) they're the cards' own colors. */
+   light surfaces (bubbles, chips, light dialogs) they're the cards' own colors. */
 :root {
   --suit-red: #ff7d7d;
   --suit-blue: #8cc4ff;
@@ -2738,7 +2738,6 @@ button.danger {
 }
 .bubble,
 .chip,
-.bid-tile,
 .dialog {
   --suit-red: var(--red);
   --suit-blue: #1565c0;
@@ -2767,17 +2766,18 @@ button.danger {
   color: var(--suit-green);
 }
 
-/* The bid being played: a card the width of the panel, so the bid and trumps are hard to miss.
+/* The bid being played: a gold-edged plate the width of the panel, so the bid and trumps stand out
+   without a bright card pulling the eye from the table.
    Its top is a button that opens everyone's calls; the tricks so far sit along its foot. */
 .info-panel .bid-tile {
   display: grid;
   justify-self: stretch;
   gap: 0;
-  background: var(--card);
-  color: var(--black);
-  border: 2px solid var(--gold);
+  background: linear-gradient(180deg, rgba(242, 193, 78, 0.16), rgba(242, 193, 78, 0.05));
+  color: var(--ink);
+  border: 1px solid rgba(242, 193, 78, 0.6);
   border-radius: 10px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
   overflow: hidden;
 }
 /* A narrow panel (the table's corner on a small screen) keeps the bid's text its room: the
@@ -2801,7 +2801,7 @@ button.danger {
   }
 }
 .info-panel .bid-tile strong {
-  color: var(--black);
+  color: var(--ink);
 }
 .bid-tile-head {
   display: flex;
@@ -2817,7 +2817,7 @@ button.danger {
   text-align: left;
 }
 .bid-tile-head:hover {
-  background: rgba(0, 0, 0, 0.04);
+  background: rgba(242, 193, 78, 0.08);
 }
 .bid-tile-head:focus-visible {
   outline-offset: -3px;
@@ -2826,7 +2826,6 @@ button.danger {
   font-size: 1.8rem;
   line-height: 1;
   font-weight: 800;
-  color: var(--black);
   white-space: nowrap;
   min-width: 2.2ch;
 }
@@ -2843,19 +2842,19 @@ button.danger {
 }
 .bid-tile-more {
   align-self: center;
-  color: #7a6a45;
+  color: var(--gold);
   font-size: 0.72rem;
   font-weight: 600;
   white-space: nowrap;
   padding: 1px 6px;
-  border: 1px solid rgba(0, 0, 0, 0.15);
+  border: 1px solid rgba(242, 193, 78, 0.45);
   border-radius: 999px;
 }
 .bid-tile-calls {
   list-style: none;
   margin: 0;
   padding: 2px 12px 4px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid var(--felt-line);
   font-size: 0.8rem;
 }
 .bid-tile-calls li {
@@ -2865,10 +2864,11 @@ button.danger {
   padding: 2px 0;
 }
 .bid-tile-calls li + li {
-  border-top: 1px dashed rgba(0, 0, 0, 0.1);
+  border-top: 1px dashed var(--felt-line);
 }
-.bid-tile-calls li.pass {
-  color: #6b6b6b;
+.bid-tile-calls li.pass,
+.bid-tile-calls li.pass strong {
+  color: var(--ink-dim);
 }
 .bid-tile-calls li.pass strong {
   font-weight: 500;
@@ -2878,13 +2878,13 @@ button.danger {
   justify-content: space-between;
   gap: 12px;
   padding: 3px 12px;
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
-  background: rgba(0, 0, 0, 0.04);
+  border-top: 1px solid var(--felt-line);
+  background: rgba(0, 0, 0, 0.12);
   font-size: 0.78rem;
-  color: #555;
+  color: var(--ink-dim);
 }
 .bid-tile-tricks b {
-  color: var(--black);
+  color: var(--ink);
 }
 .info-buttons {
   align-items: center;
