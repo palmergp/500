@@ -796,7 +796,13 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     }
     let partner_winning = trick.winner(trump) == Some(me.partner());
     if chosen_play.is_some_and(|c| c.card.is_joker()) && !best_play.card.is_joker() && (trump.is_none() || partner_winning) {
-        reasons.push("Keep the Joker: it can win a trick whenever you need one.".into());
+        reasons.push(if crate::cardplay::opening_joker_lead(obs) {
+            "Don't open with the Joker in no trumps: kept, it takes the lead back once you're out of a suit. Declarers who led it first made their bid 48% of the time, against 58% with another lead.".into()
+        } else if trump.is_none() {
+            "Keep the Joker: once you're out of the suit led, it wins the trick and gets you back in.".into()
+        } else {
+            "Keep the Joker: it can win a trick whenever you need one.".into()
+        });
     }
     reasons.truncate(3);
     reasons
@@ -1435,6 +1441,57 @@ mod tests {
             assert_eq!(format!("{:?}", hint_a.options), format!("{:?}", hint_b.options));
             assert_eq!(hint_a.reasons, hint_b.reasons);
         }
+    }
+
+    /// South's opening lead at 8 no trumps, holding the Joker. The bots never lead it here
+    /// (finding 54), and the coach grades it as costing the bid's chance.
+    fn opening_lead_with_the_joker() -> (Observation, Vec<Action>) {
+        let rules = Rules::default();
+        let mut auction = fh_core::Auction::new(Seat::SOUTH, false);
+        assert!(auction.apply(Call::Bid(Contract::new(8, Strain::NoTrumps)), &rules));
+        for _ in 0..3 {
+            assert!(auction.apply(Call::Pass, &rules));
+        }
+        let trick = Trick::new(Seat::SOUTH);
+        let obs = Observation {
+            seat: Seat::SOUTH,
+            phase: Phase::Playing,
+            to_act: Some(Seat::SOUTH),
+            rules,
+            scores: [0, 0],
+            dealer: Seat::EAST,
+            deal_number: 1,
+            hand: CardSet::parse("Joker AS KS QS 9S AH KH 7H AD 6C").unwrap(),
+            auction,
+            contract: Some((Seat::SOUTH, Contract::new(8, Strain::NoTrumps))),
+            kitty: None,
+            discards: Some(CardSet::parse("4D 5C 4H").unwrap()),
+            tricks: vec![],
+            current_trick: Some(trick.clone()),
+            tricks_won: [0, 0],
+            hands_played: 0,
+        };
+        let legal = fh_core::legal_plays(obs.hand, &trick, None).into_iter().map(Action::Play).collect();
+        (obs, legal)
+    }
+
+    #[test]
+    fn never_opens_no_trumps_with_the_joker() {
+        let (obs, legal) = opening_lead_with_the_joker();
+        let is_joker = |a: Action| matches!(a, Action::Play(p) if p.card.is_joker());
+        for seed in 0..3 {
+            let mut bot = SearchBot::new("Oracle", SearchConfig::ORACLE, seed);
+            assert!(!is_joker(bot.choose(&obs, &legal)));
+        }
+        if let Some(natural) = crate::neural_play::NeuralBot::new("Natural", 1) {
+            assert!(!is_joker(natural.play(&obs, &legal)));
+        }
+        let joker = *legal.iter().find(|&&a| is_joker(a)).unwrap();
+        let grade = Coach::new(3).grade(&obs, &legal, joker);
+        assert!(!is_joker(grade.best));
+        // 10 in a hundred of the swing between making 8 no trumps and going down one (+220, −220).
+        assert!(grade.loss >= 40.0, "loss {}", grade.loss);
+        assert!(grade.analysis.reasons.iter().any(|r| r.contains("Don't open with the Joker")), "{:?}", grade.analysis.reasons);
     }
 
     #[test]

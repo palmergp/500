@@ -1090,7 +1090,38 @@ opponents still hold trumps (declarer's leads; partner's are similar):
   holding it doesn't take back control of a suit you still hold cards in. Its value is a certain trick and the lead
   that comes with it; late in the hand, leading it and naming a suit forces the others to give up cards in that suit.
 - When the bots did lead it early, it cost a little more than their other choices (0.40 against 0.28 at trick 1,
-  0.26 against 0.18 at tricks 2–3, n of about 20 and 100); too rare to be worth a rule.
+  0.26 against 0.18 at tricks 2–3, n of about 20 and 100); too rare to be worth a rule. (Finding 54 measured
+  them directly, and the opening lead got a rule after all.)
+
+### 54. The Oracle's early Joker leads in no trumps, played out both ways
+
+The user saw the bots open with the Joker in no trumps, lose the next trick and never get back in. `fh-lab
+jokerlead` finds every lead in tricks 1–6 of a no-trump hand where The Oracle (without the rule below) holds the
+Joker and other cards and is about to lead it. From that moment it plays the hand out twice with the same bots and
+seeds: once with the Joker, once with the search's best other lead. The solver (every card visible) also values both
+leads.
+
+| Leader | Trick | n | Tricks (Joker − other) | Points | Bid made: Joker / other | Solver: Joker − other | Solver: Joker worse / better |
+|---|---|---|---|---|---|---|---|
+| Declaring side | 1 | 395 | **−0.31 ± 0.15** | **−49 ± 27** | **48% / 58%** | −0.30 | 35% / 10% |
+| Declaring side | 2–3 | 568 | −0.05 ± 0.12 | +1 ± 22 | 66% / 66% | −0.04 | 28% / 25% |
+| Declaring side | 4–6 | 1,637 | −0.03 ± 0.06 | −4 ± 12 | 71% / 72% | +0.15 | 19% / 31% |
+| Defender | 2–6 | 78 | −0.21 ± 0.27 | −28 ± 55 | | −0.05 | 28% / 29% |
+
+(Three runs pooled: 12,000 and 24,000 deals for tricks 1–6, 60,000 for trick 1 alone; intervals are 95%, scaled
+from the run that kept them. The two runs for tricks 2–3 disagreed, +0.20 and −0.17 tricks: it's noise around zero.)
+
+- **The opening lead is the real leak.** The search rated the Joker about 40 points better on average; played out, it
+  was 49 points worse, and the solver agreed (worse 35% of the time, better 10%). Sampled deals are each solved with
+  every card seen, so cashing the Joker at once costs nothing in them: the perfect play afterwards needs no way back
+  in. At the table the declarer has to find the suits, and the Joker is the one sure re-entry once a suit runs out.
+- **The rule:** search bots and The Natural never open a no-trump hand with the Joker while holding other cards
+  (`cardplay::opening_joker_lead`, `SearchConfig::hold_opening_joker`). The coach counts that lead as 10 in a hundred
+  of the swing between making the bid and going down one (about 44 points at 8 no trumps) behind the best other lead,
+  and says why. Lab variant `oracle-openjoker` turns it off. It comes up on about 1.6% of no-trump hands.
+- **After the first trick it's a fair choice.** From trick 2 the Joker lead and the best other lead come out even,
+  so the search decides as before. Holding it to retake the lead only works once you're out of the suit led (H18a),
+  so a Joker kept back doesn't take control of a suit you still hold.
 
 ## Open questions for the lab
 

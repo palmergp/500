@@ -374,6 +374,8 @@ Leading small toward partner's Joker draws the opponents' trumps without spendin
 - **The Joker:** leading it was the worst choice (cost 49). Keep it early: in tricks 1–3 a Joker lead costs about
   0.2 tricks. **From about trick 7, lead it** (+0.2 tricks): it's a sure trick and the lead, and naming a suit makes
   the others give up cards in it. It isn't a stopper: you may play it only when you can't follow suit (finding 53).
+  Played out both ways from the opening lead, the Joker lost 0.31 tricks and the bid was made 48% of the time
+  against 58% with the best other lead (finding 54); the bots no longer open with it.
 
 ### 10. Don't rush the Joker as declarer
 

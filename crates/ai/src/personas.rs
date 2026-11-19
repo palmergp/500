@@ -130,6 +130,10 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { lead_winners: true, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (declarer leads winners on near-ties)", config, seed)));
         }
+        "oracle-openjoker" => {
+            let config = SearchConfig { hold_opening_joker: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (may lead the Joker to the first no-trump trick)", config, seed)));
+        }
         "oracle-latesignals" => {
             let config = SearchConfig { signal_after_partner: true, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (mentions and 6-calls after partner's call too)", config, seed)));

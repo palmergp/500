@@ -33,6 +33,7 @@ mod show;
 mod kxkitty;
 mod bareking;
 mod leadcheck;
+mod jokerlead;
 mod bidbar;
 mod lastdiscard;
 mod kittyplan;
@@ -167,6 +168,12 @@ fn main() {
             flag(&flags, "deals", 20000),
             flag(&flags, "seed", 7_300_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "jokerlead" => jokerlead::run(
+            flag(&flags, "deals", 20000),
+            flag(&flags, "seed", 7_400_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            flag(&flags, "before", 6) as usize,
         ),
         "leadcheck" => leadcheck::run(
             flag(&flags, "deals", 3000),

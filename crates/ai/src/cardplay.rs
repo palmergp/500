@@ -30,6 +30,24 @@ pub fn card_cost(card: Card, trump: Option<Suit>) -> u16 {
     }
 }
 
+/// Whether this is the declarer's opening lead in no trumps, holding the Joker and other cards.
+/// Search likes cashing the Joker here (in each sampled deal it then plays perfectly, needing no
+/// stopper), but at the table it cost declarers 0.31 tricks a time and the bid was made 48% of
+/// the time against 58% with the search's best other lead (docs/lab/README.md, finding 54).
+pub fn opening_joker_lead(obs: &Observation) -> bool {
+    obs.trump().is_none()
+        && obs.contract.is_some()
+        && obs.tricks.is_empty()
+        && obs.current_trick.as_ref().is_some_and(|t| t.cards().is_empty())
+        && obs.hand.contains(Card::JOKER)
+        && obs.hand.len() > 1
+}
+
+/// How much worse than the best other lead an opening Joker lead in no trumps counts: the bid's
+/// chance falls by 10 points in a hundred (finding 54), so 0.10 of the swing between making the
+/// bid and going down one, in `utility`'s units.
+pub const OPENING_JOKER_CHANCE: f64 = 0.10;
+
 /// The cheapest card of `cards` to give up; ties go to the card from the shorter suit in `hand`.
 pub fn cheapest(cards: &[Card], hand: CardSet, trump: Option<Suit>) -> Card {
     let suit_len = |c: Card| hand.iter().filter(|&h| effective_suit(h, trump) == effective_suit(c, trump)).count();

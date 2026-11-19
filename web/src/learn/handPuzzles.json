@@ -155,9 +155,9 @@
     "save": "{\"version\":1,\"seed\":7000909,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,23],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
-    "contract": "9♣",
+    "contract": "9NT",
     "id": 32,
-    "save": "{\"version\":1,\"seed\":7000983,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,22,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+    "save": "{\"version\":1,\"seed\":7000919,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,25,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10NT",

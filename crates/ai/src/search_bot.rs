@@ -130,6 +130,10 @@ pub struct SearchConfig {
     /// Leading for the declaring side, break near-ties toward the dearest card (top trumps and
     /// winners) instead of the cheapest (a lab variant).
     pub lead_winners: bool,
+    /// Never lead the Joker to the first trick of a no-trump hand while holding other cards, and
+    /// count that lead as costing the bid 10 points in a hundred (finding 54; a lab variant
+    /// turns it off).
+    pub hold_opening_joker: bool,
     /// Bid with the network from `FH_ALT_BID_MODEL` instead of the embedded one (a lab variant).
     pub alt_bid_model: bool,
 }
@@ -171,6 +175,7 @@ impl SearchConfig {
         six: crate::rule_bot::SixPolicy::Always,
         signal_after_partner: false,
         lead_winners: false,
+        hold_opening_joker: true,
         alt_bid_model: false,
     };
     pub const SHARK: SearchConfig =
@@ -323,6 +328,9 @@ impl SearchBot {
             return vec![(*legal.iter().min_by_key(|a| cost(a)).expect("legal actions"), 0.0)];
         }
         let mut scored: Vec<(Action, f64)> = result.stats.iter().map(|s| (s.action, s.ev)).collect();
+        if self.config.hold_opening_joker && crate::cardplay::opening_joker_lead(obs) {
+            self.hold_joker(obs, &mut scored);
+        }
         scored.sort_by(|a, b| b.1.total_cmp(&a.1));
         let top = scored[0].1;
         let near = (0..scored.len()).filter(|&i| top - scored[i].1 < 0.5);
@@ -340,6 +348,21 @@ impl SearchBot {
             scored[..=i].rotate_right(1);
         }
         scored
+    }
+
+    /// The opening Joker lead in no trumps counts as below the best other lead, by
+    /// `OPENING_JOKER_CHANCE` of the swing between making the bid and going down one.
+    fn hold_joker(&self, obs: &Observation, scored: &mut [(Action, f64)]) {
+        let is_joker = |a: &Action| matches!(a, Action::Play(p) if p.card.is_joker());
+        let Some(other) = scored.iter().filter(|(a, _)| !is_joker(a)).map(|&(_, ev)| ev).max_by(f64::total_cmp) else { return };
+        let Some((declarer, contract)) = obs.contract else { return };
+        let won = obs.tricks_won[declarer.team().index()];
+        let made = self.utility(obs, contract, declarer, contract.level.max(won));
+        let down = self.utility(obs, contract, declarer, contract.level.saturating_sub(1).max(won));
+        let cost = (crate::cardplay::OPENING_JOKER_CHANCE * (made - down).abs()).max(1.0);
+        for entry in scored.iter_mut().filter(|e| is_joker(&e.0)) {
+            entry.1 = entry.1.min(other) - cost;
+        }
     }
 
     /// At a first show-out, the discard signal if it costs at most `signal_allowance` points.
