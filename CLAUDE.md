@@ -92,6 +92,8 @@
 - Bots follow the house discard signal (first throw-off from the strongest side suit; `crates/ai/src/signals.rs`).
 - Of touching cards, bots (and the coach) play the boss while partner is still to play to the trick: the ace from
   A-K, so a short partner can read it (`cardplay::show_winner`, applied in every bot's card choice).
+- Search bots and The Natural never open a no-trump hand with the Joker while holding other cards
+  (`cardplay::opening_joker_lead`, finding 54); the coach grades that lead as costing the bid's chance.
 - Offline: `web/public/sw.js` precaches the build (from `dist/precache.json`, written by `vite.config.ts`; Vite's
   manifest misses the worker's WebAssembly file). The build appends its own hash to the `CACHE` name, so each release
   installs fresh; bump the `v2` part only when changing caching behaviour. It only registers in production builds
