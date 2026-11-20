@@ -175,7 +175,11 @@ test("the final results: third, second, then the winner, then the awards", async
   const { standings: order } = await import("../src/tournament");
   await expect(grid.locator("tbody tr").first().locator(".game-total")).toHaveText(String(order(t)[0].total));
   await expect(grid.locator(".best-mark")).not.toHaveCount(0);
-  await expect(grid.locator(".game-cell").first()).toHaveAttribute("title", /^Round 1: with .+ against .+ and .+, -?\d+ to -?\d+, (won|lost|tied)$/);
+  // A score's tooltip names the table, then each hand's bid, who declared it and what it scored.
+  await expect(grid.locator(".game-cell").first()).toHaveAttribute(
+    "title",
+    /^Round 1: with .+ against .+ and .+, -?\d+ to -?\d+, (won|lost|tied)\nHand 1: 8♥ by .+, made \((\+\d+|0)\)\nHand 2: 7♠ by .+, made \((\+\d+|0)\)$/,
+  );
   await expect(final.getByRole("heading", { name: "Your games" })).toBeVisible();
   await expect(final.locator(".player-games li")).toHaveCount(ROUNDS);
   const other = grid.locator("tbody th button", { hasNotText: "You" }).first();

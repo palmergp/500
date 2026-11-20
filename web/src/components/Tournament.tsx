@@ -89,7 +89,7 @@ function StandingsTable({ t, personas }: { t: Tournament; personas: Persona[] })
 
 /** Every player's score in every round: a row each, best total first. Each score is tinted (blue
  * for points, deeper for more; red below zero) and the round's best is starred; a score's tooltip
- * names that table, and choosing a player lists their games underneath. */
+ * names that table and lists each hand's bid, and choosing a player lists their games underneath. */
 export function GameGrid({ t, personas }: { t: Tournament; personas: Persona[] }) {
   const list = standings(t);
   const games = gamesByPlayer(t);
@@ -108,7 +108,12 @@ export function GameGrid({ t, personas }: { t: Tournament; personas: Persona[] }
         ? `color-mix(in srgb, var(--score-down) ${Math.round(8 + (40 * -score) / low)}%, transparent)`
         : undefined;
   const describe = (r: number, g: GameLine) =>
-    `Round ${r + 1}: with ${name(g.partner)} against ${name(g.opponents[0])} and ${name(g.opponents[1])}, ${g.score} to ${g.against}${g.score > g.against ? ", won" : g.score < g.against ? ", lost" : ", tied"}`;
+    [
+      `Round ${r + 1}: with ${name(g.partner)} against ${name(g.opponents[0])} and ${name(g.opponents[1])}, ${g.score} to ${g.against}${g.score > g.against ? ", won" : g.score < g.against ? ", lost" : ", tied"}`,
+      ...g.hands.map(
+        (h, i) => `Hand ${i + 1}: ${h.label} by ${name(h.by)}, ${h.made ? "made" : "set"} (${h.points > 0 ? "+" : h.points < 0 ? "−" : ""}${Math.abs(h.points)})`,
+      ),
+    ].join("\n");
   const theirs = games.get(chosen)!;
   if (rounds.length === 0) return <p className="note">No games finished yet.</p>;
   return (

@@ -2385,6 +2385,7 @@ button.danger {
 /* Touch screens: press and hold for a tooltip (components/TouchTips.tsx). */
 .touch-tip {
   position: fixed;
+  white-space: pre-line;
   inset: auto;
   margin: 0;
   border: none;

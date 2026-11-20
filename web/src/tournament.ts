@@ -241,6 +241,18 @@ export interface GameLine {
   /** Their side's final score, and the other side's. */
   score: number;
   against: number;
+  /** Each hand's bid and what it scored their side (empty in tournaments saved before bids were kept). */
+  hands: HandLine[];
+}
+
+/** One hand of a game, from one player's side: the bid, who declared it, and their side's points. */
+export interface HandLine {
+  label: string;
+  by: number;
+  /** Declared by their side. */
+  ours: boolean;
+  made: boolean;
+  points: number;
 }
 
 /** Each player's game in every round, by participant id (null where their table hasn't finished). */
@@ -256,6 +268,13 @@ export function gamesByPlayer(t: Tournament): Map<number, (GameLine | null)[]> {
           opponents: [table.seats[(seat + 1) % 4], table.seats[(seat + 3) % 4]],
           score: table.result!.scores[side],
           against: table.result!.scores[1 - side],
+          hands: (table.result!.bids ?? []).map((bid, i) => ({
+            label: bid.label,
+            by: table.seats[bid.seat],
+            ours: bid.seat % 2 === side,
+            made: bid.made,
+            points: table.result!.hands[i]?.[side] ?? 0,
+          })),
         };
       });
     }

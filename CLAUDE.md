@@ -70,7 +70,7 @@
   partners never repeat (circle-method schedule). You play one table (names via `SaveData.names`); the other two are
   played out by `simulateGame` in a third worker (`Simulator`). Saved in local storage; standings after each round,
   then (straight after your last game, waiting for the other tables if need be) a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand, and every player's score in every round
-  (`GameGrid`: tinted cells, the round's best starred, a player's games listed when chosen).
+  (`GameGrid`: tinted cells, the round's best starred, each game's hands and bids in its tooltip, a player's games listed when chosen).
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
   the next round.
