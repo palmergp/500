@@ -2,7 +2,7 @@
 // while a search bot works. A second instance runs the coach, so analysis never delays play.
 // Each request gets one reply carrying the same id.
 
-import init, { coachExpert, coachGrade, coachGradeDiscards, coachHint, coachPosition, coachTrace, drillBidding, drillPlay, WasmTable, personas, simulateGame } from "./pkg/fh_wasm.js";
+import init, { coachDecisions, coachExpert, coachGrade, coachGradeDiscards, coachHint, coachPosition, coachTrace, drillBidding, drillPlay, WasmTable, personas, simulateGame } from "./pkg/fh_wasm.js";
 import type { Request, Response, Snapshot } from "./protocol";
 
 const ready = init();
@@ -44,6 +44,8 @@ function handle(request: Request): unknown {
       return coachGrade(request.save, request.number);
     case "gradeDiscards":
       return coachGradeDiscards(request.save, request.number);
+    case "decisions":
+      return coachDecisions(request.save);
     case "trace":
       return coachTrace(request.save, request.number);
     case "expert":

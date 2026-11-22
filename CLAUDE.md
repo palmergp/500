@@ -71,9 +71,14 @@
   played out by `simulateGame` in a third worker (`Simulator`). Saved in local storage; standings after each round,
   then (straight after your last game, waiting for the other tables if need be) a staged reveal of 3rd, 2nd, 1st with the High Game and High Hand, and every player's score in every round
   (`GameGrid`: tinted cells, the round's best starred, each game's hands and bids in its tooltip, a player's games listed when chosen).
+  After the reveal, Your recap (`components/TournamentRecap.tsx`, `recap()`; also from New tournament later): from
+  `Tournament.mine`, your game each round (save, hands, grades). The coach grades whatever it didn't during play in
+  the background (`gradeGame`, coach op `decisions`), a grade at a time, pausing while you play a game it grades live.
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
   the next round.
+- A finished solo game stays saved (a reload shows its result) but is marked over (`savedGame.over`), so the main
+  menu doesn't offer Continue; the game-over result has Main menu and New game.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,
   worker op `autoAct`); those plays aren't graded. The top bar's speed button cycles slow/normal/fast.
 - Persona "any" picks a random persona when the seat is filled (`resolve_persona` in `table.rs`); the save

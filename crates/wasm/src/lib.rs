@@ -115,6 +115,12 @@ pub fn coach_grade_discards(save: &str, number: u32) -> Result<JsValue, JsError>
     to_js(&coach::grade_discards(save, number as usize).map_err(js_err)?)
 }
 
+/// Your decisions in a game (`{ number, discards }`), to grade them after it's over.
+#[wasm_bindgen(js_name = coachDecisions)]
+pub fn coach_decisions(save: &str) -> Result<JsValue, JsError> {
+    to_js(&coach::decisions(save).map_err(js_err)?)
+}
+
 /// The double-dummy (all cards visible) trace of deal `number`, or null if it was passed out.
 #[wasm_bindgen(js_name = coachTrace)]
 pub fn coach_trace(save: &str, number: u32) -> Result<JsValue, JsError> {

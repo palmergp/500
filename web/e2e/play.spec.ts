@@ -80,6 +80,11 @@ test("a finished game, reloaded, shows its last result and the way to a new game
   await newGame.click();
   await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Cancel" }).click();
   await expect(newGame).toBeVisible();
+  // To the main menu: the game is over, so there's nothing to continue.
+  await last.getByRole("button", { name: "Main menu" }).click();
+  const menu = page.getByRole("navigation", { name: "Main menu" });
+  await expect(menu.getByRole("button", { name: /^Play solo/ })).toBeVisible();
+  await expect(menu.getByRole("button", { name: /^Continue/ })).toHaveCount(0);
 });
 
 test("finish the hand: a bot plays your cards quickly to the end", async ({ page }, info) => {

@@ -3,6 +3,8 @@
 // has a different partner every round. You play one table; the other two are played out by the
 // engine (`simulateGame`). Kept in this browser's storage, so a tournament survives a reload.
 
+import type { GradeView } from "./engine/types";
+
 export const ROUNDS = 8;
 export const HANDS = 4;
 const PLAYERS = 12;
@@ -66,7 +68,138 @@ export interface Tournament {
   current: number;
   /** The final results have been revealed. */
   finished: boolean;
+  /** Your own game in each round, kept for your recap (absent in tournaments from before). */
+  mine?: (YourGame | null)[];
 }
+
+/** Your game in one round, as your recap needs it. */
+export interface YourGame {
+  /** The game's save, so the coach can go over your decisions after it's over. */
+  save: string;
+  hands: YourHand[];
+  /** The coach's grades of your decisions: those made during play (grading on), then the rest,
+   * added in the background once the game is over. */
+  grades: RecapGrade[];
+  /** Every decision has been graded. */
+  graded: boolean;
+}
+
+/** One hand of your game, from your side. */
+export interface YourHand {
+  /** Who declared it: 0 you, 1 West, 2 your partner, 3 East. */
+  declarer: number;
+  label: string;
+  made: boolean;
+  /** You bid in its auction (not just a pass, mention or 6-call). */
+  youBid: boolean;
+  /** Your side's score change. */
+  points: number;
+}
+
+/** One of your decisions, graded by the coach. */
+export interface RecapGrade {
+  /** Its place in the game's action log. */
+  action: number;
+  phase: "bidding" | "discarding" | "playing";
+  verdict: "best" | "good" | "inaccuracy" | "mistake" | "blunder";
+  /** Points given up against the coach's choice. */
+  loss: number;
+  deal: number;
+  trick: number | null;
+  chosen: string;
+  best: string;
+  /** The coach's first reason, kept for the costliest. */
+  reason: string | null;
+  /** You asked for a hint on it, so it isn't counted. */
+  hinted?: boolean;
+}
+
+/** What your recap shows: how you bid, where your points came from, and how you played. */
+export interface Recap {
+  games: number;
+  hands: number;
+  /** Hands you bid in, won the bid on, and made. */
+  bid: number;
+  declared: number;
+  made: number;
+  partnerDeclared: number;
+  partnerMade: number;
+  /** The opponents' bids, and how many of them your side beat. */
+  defended: number;
+  beaten: number;
+  /** Your side's points from your bids, your partners' bids, and tricks on the opponents' bids. */
+  points: { yours: number; partner: number; defence: number };
+  /** Every graded decision, with its round; and the games not yet fully graded. */
+  grades: (RecapGrade & { round: number })[];
+  ungraded: number;
+}
+
+/** A coach grade as the recap keeps it. */
+export function recapGrade(g: GradeView): RecapGrade {
+  return {
+    action: g.actionNumber,
+    phase: g.phase === "bidding" || g.phase === "discarding" ? g.phase : "playing",
+    verdict: g.verdict,
+    loss: g.loss,
+    deal: g.deal,
+    trick: g.trick,
+    chosen: g.chosenLabel,
+    best: g.bestLabel,
+    reason: g.reasons[0] ?? null,
+    ...(g.hinted ? { hinted: true } : {}),
+  };
+}
+
+/** What grading a finished game needs of the coach. */
+export interface GameCoach {
+  decisions(save: string): Promise<{ number: number; discards: boolean }[]>;
+  grade(save: string, number: number): Promise<GradeView | null>;
+  gradeDiscards(save: string, number: number): Promise<GradeView | null>;
+}
+
+/** Grades the decisions of `game` it doesn't have yet, one at a time, handing each to `keep`
+ * (with how far along it is) as it comes. */
+export async function gradeGame(coach: GameCoach, game: YourGame, keep: (g: RecapGrade | null, done: number, total: number) => void): Promise<void> {
+  const list = await coach.decisions(game.save);
+  const have = new Set(game.grades.map((g) => g.action));
+  const todo = list.filter((d) => !have.has(d.number));
+  for (const [i, d] of todo.entries()) {
+    const g = await (d.discards ? coach.gradeDiscards(game.save, d.number) : coach.grade(game.save, d.number)).catch(() => null);
+    keep(g && recapGrade(g), i + 1, todo.length);
+  }
+}
+
+export function recap(t: Tournament): Recap {
+  const r: Recap = {
+    games: 0, hands: 0, bid: 0, declared: 0, made: 0, partnerDeclared: 0, partnerMade: 0, defended: 0, beaten: 0,
+    points: { yours: 0, partner: 0, defence: 0 }, grades: [], ungraded: 0,
+  };
+  (t.mine ?? []).forEach((game, round) => {
+    if (!game) return;
+    r.games++;
+    if (!game.graded) r.ungraded++;
+    for (const h of game.hands) {
+      r.hands++;
+      if (h.youBid) r.bid++;
+      if (h.declarer === 0) {
+        r.declared++;
+        if (h.made) r.made++;
+        r.points.yours += h.points;
+      } else if (h.declarer === 2) {
+        r.partnerDeclared++;
+        if (h.made) r.partnerMade++;
+        r.points.partner += h.points;
+      } else {
+        r.defended++;
+        if (!h.made) r.beaten++;
+        r.points.defence += h.points;
+      }
+    }
+    for (const g of game.grades) r.grades.push({ ...g, round });
+  });
+  return r;
+}
+
 
 const NAMES = ["Ada", "Ben", "Cleo", "Dev", "Elena", "Finn", "Gus", "Hana", "Ivan", "June", "Kai", "Lena", "Milo", "Nora", "Otto", "Pia", "Quinn", "Rosa", "Sol", "Tess"];
 const STYLES = ["steady", "rookie", "rock", "gambler", "counter", "shark", "oracle", "natural"];

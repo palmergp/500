@@ -2941,3 +2941,66 @@ button.danger {
 .auction-summary button {
   justify-self: center;
 }
+
+/* Tournament: your recap (TournamentRecap.tsx). Headline tiles, then plain tables. */
+.recap-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 8px;
+  margin: 4px 0 12px;
+}
+.recap-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--panel-line);
+  background: color-mix(in srgb, var(--panel-ink) 4%, transparent);
+}
+.recap-tile span,
+.recap-tile small {
+  font-size: 0.8rem;
+  opacity: 0.75;
+}
+.recap-tile strong {
+  font-size: 1.5rem;
+  line-height: 1.1;
+}
+.recap-lines {
+  padding-left: 1.2em;
+  margin: 4px 0 10px;
+}
+.recap-lines li {
+  margin: 3px 0;
+}
+.recap-table td,
+.recap-rounds td,
+.recap-rounds th {
+  font-variant-numeric: tabular-nums;
+}
+.recap-table th[scope="row"] {
+  font-weight: 500;
+}
+.recap-total th,
+.recap-total td {
+  font-weight: 700;
+}
+.recap-rounds th,
+.recap-rounds td {
+  text-align: center;
+}
+.recap-costly {
+  padding-left: 1.4em;
+  margin: 4px 0;
+}
+.recap-costly li {
+  margin: 6px 0;
+}
+.recap-costly small {
+  display: block;
+  opacity: 0.75;
+}
+.recap-where {
+  font-weight: 600;
+}

@@ -143,6 +143,38 @@ pub fn hint_for(save: &SaveData, seat: Seat) -> Result<HintView, String> {
     })
 }
 
+/// One of South's decisions in a game, to grade afterwards: an action with a real choice, or a
+/// whole kitty discard (graded as one, from its first card).
+#[derive(Serialize, Debug, PartialEq)]
+#[serde(rename_all = "camelCase")]
+pub struct DecisionRef {
+    pub number: usize,
+    pub discards: bool,
+}
+
+/// Every decision South made in the save, in order (for grading a finished game afterwards).
+pub fn decisions(save: &str) -> Result<Vec<DecisionRef>, String> {
+    let save = parse(save)?;
+    let mut game = replay(&save, 0)?;
+    let mut out = Vec::new();
+    for (number, &index) in save.log.iter().enumerate() {
+        let legal = game.legal_actions();
+        if game.to_act() == Some(HUMAN) && legal.len() > 1 {
+            if game.phase() == Phase::Discarding {
+                let first = game.observe(HUMAN).discards.is_none_or(|d| d.is_empty());
+                if first {
+                    out.push(DecisionRef { number, discards: true });
+                }
+            } else {
+                out.push(DecisionRef { number, discards: false });
+            }
+        }
+        let action = *legal.get(index as usize).ok_or("the save doesn't replay")?;
+        game.apply(action).map_err(|e| e.to_string())?;
+    }
+    Ok(out)
+}
+
 /// Grades action `number` of the save (it must be one of South's, with a real choice).
 pub fn grade(save: &str, number: usize) -> Result<Option<GradeView>, String> {
     grade_for(&parse(save)?, number, HUMAN)
@@ -339,6 +371,28 @@ mod tests {
         save.log.push(h.best as u16);
         let g = grade(&serde_json::to_string(&save).unwrap(), number).unwrap().unwrap();
         assert_eq!(g.verdict, "best");
+    }
+
+    /// A finished game's decisions are South's real choices, each one gradable, with the kitty's
+    /// three discards as one.
+    #[test]
+    fn lists_your_decisions_for_grading_afterwards() {
+        let mut table = Table::with_players(21, ["human".into(), "steady".into(), "steady".into(), "steady".into()], Some(1)).unwrap();
+        while table.game().phase() != Phase::GameOver {
+            if table.human_to_act() {
+                table.auto_act().unwrap();
+            } else {
+                table.step_bot();
+            }
+        }
+        let save = serde_json::to_string(&table.save()).unwrap();
+        let list = decisions(&save).unwrap();
+        assert!(list.len() >= 5, "{list:?}");
+        assert!(list.windows(2).all(|w| w[0].number < w[1].number));
+        for d in list.iter().take(3) {
+            let g = if d.discards { grade_discards(&save, d.number) } else { grade(&save, d.number) };
+            assert!(g.unwrap().is_some(), "{d:?}");
+        }
     }
 
     /// A saved position rebuilds as a puzzle, but only at one of South's decisions.

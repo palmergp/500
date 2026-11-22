@@ -25,11 +25,11 @@ import { keepMistake } from "./mistakes";
 import { recordGame, recordHand, recordTournament } from "./records";
 import { achievements, checkAchievements, noteGame, noteGrades, noteHand, noteTournament } from "./achievements";
 import { handCode, saveAt } from "./handcode";
-import { FinalReveal, NewTournamentDialog, TournamentDialog } from "./components/Tournament";
+import { FinalReveal, NewTournamentDialog, RecapDialog, TournamentDialog } from "./components/Tournament";
 import { HAND_PUZZLES, loadHandPuzzles, noteHandPuzzle, type HandPuzzle } from "./learn/handPuzzles";
 import { TouchTips } from "./components/TouchTips";
 import { MoreItem, MoreMenu } from "./components/MoreMenu";
-import { HANDS, loadTournament, newTournament, ROUNDS, saveTournament, yourTable, type Tournament, type TournamentKind } from "./tournament";
+import { gradeGame, HANDS, loadTournament, newTournament, recapGrade, ROUNDS, saveTournament, yourTable, type Tournament, type TournamentKind } from "./tournament";
 import { assistHelpers, loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -250,7 +250,7 @@ export function App() {
     saveRef.current = snapshot.save;
     gameRef.current = snapshot.game ?? gameId(snapshot.save);
     const replay = !!replayRef.current || !!puzzleRef.current;
-    if (modeRef.current === "solo" && !replay) savedGame.store(snapshot.save);
+    if (modeRef.current === "solo" && !replay) savedGame.store(snapshot.save, next.phase === "gameOver");
     for (const e of snapshot.events) {
       if (e.kind === "played") audio.play("card");
       else if (e.kind === "dealt") audio.play("deal");
@@ -439,6 +439,23 @@ export function App() {
           .filter((h) => !h.passedOut && h.contract)
           .map((h) => ({ seat: h.contract!.declarer, label: h.contract!.label, made: !!h.made })),
       };
+      // Your game, for your recap: the coach goes over whatever it didn't grade during play.
+      const mine = next.mine ?? next.rounds.map(() => null);
+      mine[r] = {
+        save: saveRef.current ?? "",
+        hands: view.history
+          .filter((h) => !h.passedOut && h.contract)
+          .map((h) => ({
+            declarer: h.contract!.declarer,
+            label: h.contract!.label,
+            made: !!h.made,
+            youBid: h.calls.some((c) => c.seat === 0 && c.kind === "bid"),
+            points: h.scoreChange[0],
+          })),
+        grades: grades.map(recapGrade),
+        graded: false,
+      };
+      next.mine = mine;
       next.current = r + 1;
     });
     setResult(null);
@@ -493,6 +510,45 @@ export function App() {
     // Again when a replay ends: helpers turned on during one are still on in the real game.
     if (inTour && helped) markAssisted();
   }, [inTour, helped, replaying, markAssisted]);
+
+  // Your recap: the coach goes over each of your finished tournament games in the background, a
+  // game at a time, keeping each grade as it comes (so a reload carries on where it was). It waits
+  // while you play a game it's grading live, so your grades there aren't held up.
+  const [showRecap, setShowRecap] = useState(false);
+  const [recapProgress, setRecapProgress] = useState<{ round: number; done: number; total: number } | null>(null);
+  const recapBusy = useRef(false);
+  const liveGrading = screen === "table" && mode === "solo" && settings.grade && !!view && view.phase !== "gameOver";
+  useEffect(() => {
+    const t = tour;
+    const coach = coachRef.current;
+    if (!t || !coach || recapBusy.current || liveGrading) return;
+    const r = (t.mine ?? []).findIndex((g) => g && !g.graded);
+    if (r < 0) return;
+    recapBusy.current = true;
+    const own = (next: Tournament) => (next.id === t.id ? next.mine?.[r] ?? null : null);
+    gradeGame(coach, t.mine![r]!, (g, done, total) => {
+      if (g) {
+        updateTour((next) => {
+          const game = own(next);
+          if (game && !game.grades.some((x) => x.action === g.action)) game.grades.push(g);
+        });
+      }
+      setRecapProgress({ round: r, done, total });
+    })
+      .catch(() => {})
+      .finally(() => {
+        // Done (or the coach couldn't read the game): either way, don't go round again.
+        updateTour((next) => {
+          const game = own(next);
+          if (!game) return;
+          game.grades.sort((a, b) => a.action - b.action);
+          game.graded = true;
+        });
+        recapBusy.current = false;
+        setRecapProgress(null);
+      });
+    // `personas` arrives once the coach's worker is up.
+  }, [tour, liveGrading, updateTour, personas]);
 
   /** Play the tournament's current round: pick up its game if it's the one saved, else deal it. */
   const playTourRound = () => {
@@ -1080,7 +1136,7 @@ export function App() {
 
       {screen === "menu" && (
         <MainMenu
-          canContinue={(mode === "solo" && !!view) || !!savedGame.load()}
+          canContinue={mode === "solo" && !!view ? view.phase !== "gameOver" : !!savedGame.load() && !savedGame.over()}
           hostAvailable={!!host}
           atTable={lan}
           onContinue={() => void continueSolo()}
@@ -1347,17 +1403,25 @@ export function App() {
                 {tour && tour.current === ROUNDS - 1 ? "Final results" : "Round results"}
               </button>
             ) : view.phase === "gameOver" ? (
-              <button
-                type="button"
-                className="primary"
-                onClick={() => {
+              <>
+                <button type="button" onClick={() => {
                   setResult(null);
-                  if (lan) netRef.current?.endGame();
-                  else setShowNewGame(true);
-                }}
-              >
-                New game
-              </button>
+                  setScreen("menu");
+                }}>
+                  Main menu
+                </button>
+                <button
+                  type="button"
+                  className="primary"
+                  onClick={() => {
+                    setResult(null);
+                    if (lan) netRef.current?.endGame();
+                    else setShowNewGame(true);
+                  }}
+                >
+                  New game
+                </button>
+              </>
             ) : (
               <button
                 type="button"
@@ -1426,9 +1490,18 @@ export function App() {
           }}
         />
       )}
+      {showRecap && tour && <RecapDialog t={tour} progress={recapProgress} onClose={() => setShowRecap(false)} />}
       {showNewTour && (
         <NewTournamentDialog
           onStart={beginTournament}
+          onRecap={
+            tour?.finished && tour.mine?.some(Boolean)
+              ? () => {
+                  setShowNewTour(false);
+                  setShowRecap(true);
+                }
+              : undefined
+          }
           onCancel={() => {
             setShowNewTour(false);
             // Backing out of replacing a tournament leads back to it.
@@ -1440,6 +1513,7 @@ export function App() {
         <FinalReveal
           t={tour}
           personas={personas}
+          progress={recapProgress}
           onDone={() => {
             updateTour((t) => {
               t.finished = true;

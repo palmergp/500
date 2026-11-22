@@ -68,6 +68,7 @@ export function assistHelpers(settings: Settings): string[] {
 
 const SETTINGS_KEY = "fh500.settings";
 const SAVE_KEY = "fh500.save";
+const SAVE_OVER_KEY = "fh500.save.over";
 const GRADES_KEY = "fh500.grades";
 
 export const SPEED_FACTOR: Record<Speed, number> = { slow: 1.6, normal: 1, fast: 0.45 };
@@ -102,10 +103,19 @@ export function saveSettings(settings: Settings) {
   write(SETTINGS_KEY, JSON.stringify(settings));
 }
 
+/** The solo game saved on this device. `over` marks one with nothing left to play (kept so a
+ * reload still shows its result), which the main menu doesn't offer to continue. */
 export const savedGame = {
   load: () => read(SAVE_KEY),
-  store: (save: string) => write(SAVE_KEY, save),
-  clear: () => write(SAVE_KEY, null),
+  over: () => read(SAVE_OVER_KEY) === "1",
+  store: (save: string, over = false) => {
+    write(SAVE_KEY, save);
+    write(SAVE_OVER_KEY, over ? "1" : null);
+  },
+  clear: () => {
+    write(SAVE_KEY, null);
+    write(SAVE_OVER_KEY, null);
+  },
 };
 
 /** The coach's grades for the saved game, kept alongside it. */

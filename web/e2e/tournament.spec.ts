@@ -222,6 +222,62 @@ test("the final results: third, second, then the winner, then the awards", async
   expect(records).toBe(1);
 });
 
+test("your recap: how you bid, where your points came from, and how you played", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  const { newTournament, ROUNDS, yourTable } = await import("../src/tournament");
+  const t = newTournament(9);
+  t.mine = [];
+  t.rounds.forEach((round, r) => {
+    round.tables.forEach((table, i) => {
+      table.result = { scores: i === yourTable(t, r) ? [210, 90] : [100 + 10 * i, 120], hands: [[260, 0], [-140, 0], [30, 0], [60, 0]] };
+    });
+    // Each game: your 8♥ made, partner's 7♠ down, West's 7NT made, East's 8♦ beaten.
+    t.mine!.push({
+      save: "",
+      hands: [
+        { declarer: 0, label: "8♥", made: true, youBid: true, points: 260 },
+        { declarer: 2, label: "7♠", made: false, youBid: false, points: -140 },
+        { declarer: 1, label: "7NT", made: true, youBid: false, points: 30 },
+        { declarer: 3, label: "8♦", made: false, youBid: false, points: 60 },
+      ],
+      grades: [
+        { action: 1, phase: "bidding", verdict: "best", loss: 0, deal: 1, trick: null, chosen: "8♥", best: "8♥", reason: null },
+        { action: 12, phase: "discarding", verdict: "good", loss: 1, deal: 1, trick: null, chosen: "4♣ 5♣ 6♠", best: "4♣ 5♣ 7♠", reason: null },
+        { action: 40, phase: "playing", verdict: "mistake", loss: 20 + r, deal: 2, trick: 3, chosen: "9♠", best: "A♠", reason: "Cash the A♠ while it's still good." },
+      ],
+      graded: true,
+    });
+  });
+  t.current = ROUNDS;
+  await freshStart(page);
+  await page.evaluate((saved) => localStorage.setItem("fh500.tournament", saved), JSON.stringify(t));
+  await page.reload();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Final results" }).click();
+  const final = page.getByRole("dialog", { name: "Tournament results" });
+  for (const step of ["Reveal third place", "Reveal second place", "Reveal the winner"]) await final.getByRole("button", { name: step }).click();
+  await final.getByRole("button", { name: "Your recap" }).click();
+  const recap = page.getByRole("dialog", { name: "Your tournament" });
+  await expect(recap.locator(".recap-tile", { hasText: "Games won" })).toContainText("8of 8");
+  await expect(recap.locator(".recap-tile", { hasText: "Your bids made" })).toContainText("100%");
+  await expect(recap.getByText(/You bid in 8 of 32 hands \(25%\)/)).toBeVisible();
+  await expect(recap.getByText(/your side beat 8 of those bids \(50%\)/)).toBeVisible();
+  const row = (name: string) => recap.locator(".recap-table tr", { hasText: name });
+  await expect(row("Your bids")).toContainText("+2080124%");
+  await expect(row("Your partners' bids")).toContainText("−1120−67%");
+  await expect(row("Tricks on the opponents' bids")).toContainText("+72043%");
+  await expect(recap.getByText(/graded 24 of your decisions: 67% best or good/)).toBeVisible();
+  await expect(recap.getByText(/8\.2 points a decision/)).toBeVisible();
+  await expect(row("Card play")).toContainText("Card play80%23.58");
+  await expect(recap.locator(".recap-costly li").first()).toContainText("Round 8, hand 2, trick 3: you chose 9♠; the coach preferred A♠ (27 points)");
+  await page.screenshot({ path: "test-results/tournament-recap.png", fullPage: true });
+  await recap.getByRole("button", { name: "Done" }).click();
+  // Later, from the menu: the finished tournament's recap is still there.
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "New tournament" }).getByRole("button", { name: "Your last tournament's recap" }).click();
+  await expect(page.getByRole("dialog", { name: "Your tournament" }).locator(".recap-tile").first()).toBeVisible();
+});
+
 test("the best hand record says which bid it was", async ({ page }, info) => {
   test.skip(info.project.name !== "desktop", "one pass is enough");
   await freshStart(page);

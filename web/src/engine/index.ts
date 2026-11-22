@@ -259,6 +259,11 @@ export class CoachClient extends WorkerClient implements Coach {
     return this.call("gradeDiscards", { save, number }) as Promise<GradeView | null>;
   }
 
+  /** Your decisions in a finished game (whole kitty discards as one), to grade afterwards. */
+  decisions(save: string): Promise<{ number: number; discards: boolean }[]> {
+    return this.call("decisions", { save }) as Promise<{ number: number; discards: boolean }[]>;
+  }
+
   /** The all-cards-visible trace of deal `number`, or null if it was passed out. */
   trace(save: string, number: number): Promise<TraceView | null> {
     return this.call("trace", { save, number }) as Promise<TraceView | null>;

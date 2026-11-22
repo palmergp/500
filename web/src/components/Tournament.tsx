@@ -17,6 +17,7 @@ import {
   type TournamentKind,
 } from "../tournament";
 import { Dialog } from "./Dialog";
+import { TournamentRecap, type RecapProgress } from "./TournamentRecap";
 
 function styleName(personas: Persona[], id: string): string {
   return id === "human" ? "" : (personas.find((p) => p.id === id)?.name ?? id);
@@ -256,7 +257,7 @@ function capitalize(text: string): string {
 }
 
 /** A new tournament: who the other 11 players are. */
-export function NewTournamentDialog({ onStart, onCancel }: { onStart: (kind: TournamentKind) => void; onCancel: () => void }) {
+export function NewTournamentDialog({ onStart, onCancel, onRecap }: { onStart: (kind: TournamentKind) => void; onCancel: () => void; onRecap?: () => void }) {
   return (
     <Dialog title="New tournament" onClose={onCancel}>
       <p>
@@ -273,8 +274,27 @@ export function NewTournamentDialog({ onStart, onCancel }: { onStart: (kind: Tou
         ))}
       </div>
       <div className="actions">
+        {onRecap && (
+          <button type="button" onClick={onRecap}>
+            Your last tournament's recap
+          </button>
+        )}
         <button type="button" onClick={onCancel}>
           Cancel
+        </button>
+      </div>
+    </Dialog>
+  );
+}
+
+/** Your recap of a finished tournament, from the menu. */
+export function RecapDialog({ t, progress, onClose }: { t: Tournament; progress: RecapProgress | null; onClose: () => void }) {
+  return (
+    <Dialog title="Your tournament" wide onClose={onClose}>
+      <TournamentRecap t={t} progress={progress} />
+      <div className="actions">
+        <button type="button" className="primary" onClick={onClose} autoFocus>
+          Close
         </button>
       </div>
     </Dialog>
@@ -372,8 +392,9 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
   );
 }
 
-/** After the last round: third place, then second, then the winner, then the awards. */
-export function FinalReveal({ t, personas, onDone }: { t: Tournament; personas: Persona[]; onDone: () => void }) {
+/** After the last round: third place, then second, then the winner, then the awards; then your
+ * own recap. */
+export function FinalReveal({ t, personas, onDone, progress }: { t: Tournament; personas: Persona[]; onDone: () => void; progress: RecapProgress | null }) {
   const [step, setStep] = useState(0);
   // Straight from your last game: the other two tables may still be playing out.
   if (!t.rounds.every((round) => round.tables.every((table) => table.result))) {
@@ -394,6 +415,21 @@ export function FinalReveal({ t, personas, onDone }: { t: Tournament; personas: 
   const you = list.find((s) => s.participant.id === 0)!;
   const places = [3, 2, 1];
   const label = ["Third place", "Second place", "The winner"];
+  if (step > 3) {
+    return (
+      <Dialog title="Your tournament" wide>
+        <TournamentRecap t={t} progress={progress} />
+        <div className="actions">
+          <button type="button" onClick={() => setStep(3)}>
+            Back to the results
+          </button>
+          <button type="button" className="primary" onClick={onDone} autoFocus>
+            Done
+          </button>
+        </div>
+      </Dialog>
+    );
+  }
   return (
     <Dialog title="Tournament results" wide>
       <div className="podium">
@@ -429,9 +465,14 @@ export function FinalReveal({ t, personas, onDone }: { t: Tournament; personas: 
             {["Reveal third place", "Reveal second place", "Reveal the winner"][step]}
           </button>
         ) : (
-          <button type="button" className="primary" onClick={onDone} autoFocus>
-            Done
-          </button>
+          <>
+            <button type="button" onClick={onDone}>
+              Done
+            </button>
+            <button type="button" className="primary" onClick={() => setStep(4)} autoFocus>
+              Your recap
+            </button>
+          </>
         )}
       </div>
     </Dialog>
