@@ -1123,6 +1123,33 @@ from the run that kept them. The two runs for tricks 2–3 disagreed, +0.20 and 
   so the search decides as before. Holding it to retake the lead only works once you're out of the suit led (H18a),
   so a Joker kept back doesn't take control of a suit you still hold.
 
+### 55. The top trump or a side ace early, played out both ways
+
+The user saw the coach suggest cashing a side ace early while holding the top trump with many trumps still out,
+and expected the top trump to be better: draw theirs so the ace can't be trumped. `fh-lab acelead` (9,000 deals,
+6,845 in a suit) finds every lead in tricks 1–3 of a suit bid where the declaring side holds the top trump left,
+the opponents hold trumps, and The Oracle is about to cash a side ace. From there it plays the hand out twice with
+the same bots and seeds, once with the top trump and once with the ace, and the solver values both leads.
+
+| Opponents' trumps | n | Tricks (top trump − ace) | Points | Bid made: trump / ace | Ace trumped | Solver: trump − ace |
+|---|---|---|---|---|---|---|
+| 1 | 94 | **+0.22 ± 0.14** | +5 ± 4 | 99% / 99% | 6% | +0.06 |
+| 2 | 189 | +0.05 ± 0.09 | −5 ± 11 | 96% / 97% | 7% | −0.02 |
+| 3 | 373 | +0.05 ± 0.07 | +17 ± 13 | 96% / 93% | 4% | −0.01 |
+| 4+ | 1,091 | −0.00 ± 0.05 | +2 ± 9 | 83% / 83% | 6% | −0.08 |
+| All | 1,747 | +0.03 ± 0.04 | +5 ± 6 | 88% / 88% | 6% | −0.05 |
+
+(By trick the rows are noisy; trick 3 with four or more trumps out leaned to the ace, −0.26 ± 0.16 tricks, n = 89.)
+
+- **Even.** Played out, the top trump and the ace came out the same, as the solver alone found in finding 53. With
+  many trumps out, one round doesn't pull them all, and this early the opponents still follow suit to an ace (it
+  was trumped 6% of the time). Only with a single trump left against them did drawing it gain a little, about a
+  fifth of a trick but just 5 points, since those bids were made anyway.
+- **The coach overrated the ace.** Its search rated the ace about 19 points better on average, so a player who led
+  the top trump was marked down for a play that does as well. Now, in this position (`cardplay::early_top_trump`),
+  the coach grades the top trump or a side ace as good at no cost, whichever it prefers, and its hint offers the
+  other as just as good, with the numbers (`cardplay::ace_or_top_trump`). The bots play as before.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

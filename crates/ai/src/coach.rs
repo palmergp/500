@@ -268,6 +268,12 @@ impl Coach {
                 analysis.reasons.insert(0, note);
             }
         }
+        if crate::cardplay::ace_or_top_trump(obs, analysis.best, chosen) {
+            // The top trump or a side ace early: even when played out (finding 55), whichever the
+            // search happened to prefer.
+            analysis.reasons = vec![ace_or_top_trump_note(chosen, analysis.best)];
+            return Grade { chosen, best: analysis.best, loss: 0.0, verdict: Verdict::Good, analysis };
+        }
         if analysis.close.contains(&chosen) {
             // One of the plays the coach couldn't separate from its choice: not a mistake.
             verdict = verdict.min(Verdict::Good);
@@ -346,15 +352,27 @@ impl Coach {
             .collect();
         options.dedup_by_key(|o| o.action);
         // Still too close to call after the closer look: say so, rather than pick one as if sure.
-        let close: Vec<Action> = ranked
+        // A side ace early, holding the top trump: the search usually prefers the ace, but played
+        // out the two came out even (finding 55), so the top trump is offered as just as good.
+        let top = crate::cardplay::early_top_trump(obs).map(|c| Action::Play(Play::card(c))).filter(|&top| crate::cardplay::ace_or_top_trump(obs, best, top));
+        let mut close: Vec<Action> = ranked
             .iter()
             .skip(1)
-            .filter(|&&(a, ev)| ranked[0].1 - ev < CLOSE_POINTS && (equivalent(&result, best, a) || !significant(Some(&result), best, a)))
+            .filter(|&&(a, ev)| Some(a) != top && ranked[0].1 - ev < CLOSE_POINTS && (equivalent(&result, best, a) || !significant(Some(&result), best, a)))
             .map(|&(a, _)| a)
             .take(3)
             .collect();
         let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
-        let close_note = (!close.is_empty()).then(|| close_call_reason(obs, &result, best, &close));
+        let mut close_note = (!close.is_empty()).then(|| close_call_reason(obs, &result, best, &close));
+        if let Some(top) = top {
+            let note = ace_or_top_trump_note(top, best);
+            close_note = Some(match close_note.filter(|n| !n.is_empty()) {
+                Some(rest) => format!("{note} {rest}"),
+                None => note,
+            });
+            close.insert(0, top);
+            close.truncate(3);
+        }
         Analysis { options, best, reasons, worlds: result.worlds, close, close_note, units: Units::Points, play: Some(result) }
     }
 
@@ -545,6 +563,16 @@ fn equivalent(play: &PlayStats, a: Action, b: Action) -> bool {
     let index = |x: Action| play.stats.iter().position(|s| s.action == x);
     let (Some(i), Some(j)) = (index(a), index(b)) else { return false };
     play.per_world.iter().all(|(_, u)| (u[i] - u[j]).abs() < 1e-9)
+}
+
+/// Why the top trump and a side ace are as good as each other early in a suit bid (finding 55):
+/// `yours` is the play being described, `other` the one it's as good as.
+fn ace_or_top_trump_note(yours: Action, other: Action) -> String {
+    let is_ace = |a: Action| matches!(a, Action::Play(p) if !p.card.is_joker() && p.card.rank() == fh_core::cards::ACE);
+    let (ace, top) = if is_ace(yours) { (yours, other) } else { (other, yours) };
+    format!(
+        "{yours} does as well as {other} here. Early in the hand, leading your top trump ({top}) to draw theirs and cashing a side ace ({ace}) came out even when both were played out from 1,747 hands like this: a side ace is seldom trumped this early (6% of the time)."
+    )
 }
 
 /// "Close call: …" for the hint and the grade.
@@ -1492,6 +1520,67 @@ mod tests {
         // 10 in a hundred of the swing between making 8 no trumps and going down one (+220, −220).
         assert!(grade.loss >= 40.0, "loss {}", grade.loss);
         assert!(grade.analysis.reasons.iter().any(|r| r.contains("Don't open with the Joker")), "{:?}", grade.analysis.reasons);
+    }
+
+    #[test]
+    fn the_top_trump_and_a_side_ace_are_even_early() {
+        // South opens 7♠ holding the top trump (the Joker) with trumps out, and side aces.
+        let rules = Rules::default();
+        let mut auction = fh_core::Auction::new(Seat::SOUTH, false);
+        assert!(auction.apply(Call::Bid(Contract::new(7, Strain::Spades)), &rules));
+        for _ in 0..3 {
+            assert!(auction.apply(Call::Pass, &rules));
+        }
+        let trick = Trick::new(Seat::SOUTH);
+        let mut obs = Observation {
+            seat: Seat::SOUTH,
+            phase: Phase::Playing,
+            to_act: Some(Seat::SOUTH),
+            rules,
+            scores: [0, 0],
+            dealer: Seat::EAST,
+            deal_number: 1,
+            hand: CardSet::parse("Joker JC 10S 9S AH 8H AD 7D AC 6C").unwrap(),
+            auction,
+            contract: Some((Seat::SOUTH, Contract::new(7, Strain::Spades))),
+            kitty: None,
+            discards: Some(CardSet::parse("4D 5C 4H").unwrap()),
+            tricks: vec![],
+            current_trick: Some(trick.clone()),
+            tricks_won: [0, 0],
+            hands_played: 0,
+        };
+        let legal: Vec<Action> = fh_core::legal_plays(obs.hand, &trick, obs.trump()).into_iter().map(Action::Play).collect();
+        let play = |c: &str| Action::Play(Play::card(Card::parse(c).unwrap()));
+        assert_eq!(crate::cardplay::early_top_trump(&obs), Some(Card::JOKER));
+        assert!(crate::cardplay::ace_or_top_trump(&obs, play("AH"), Action::Play(Play::card(Card::JOKER))));
+        assert!(!crate::cardplay::ace_or_top_trump(&obs, play("JC"), play("AH")), "only the top trump");
+        assert!(!crate::cardplay::ace_or_top_trump(&obs, play("8H"), Action::Play(Play::card(Card::JOKER))), "only an ace");
+
+        // Whichever of the two the coach prefers, the other grades as good, at no cost, saying why.
+        let joker = Action::Play(Play::card(Card::JOKER));
+        let mut coach = Coach::new(5);
+        let hint = coach.analyze(&obs, &legal, None);
+        let (other, best) = if crate::cardplay::ace_or_top_trump(&obs, hint.best, joker) {
+            (joker, hint.best)
+        } else {
+            assert_eq!(hint.best, joker, "the coach opens with the top trump or a side ace");
+            (play("AH"), joker)
+        };
+        if best != joker {
+            assert!(hint.close.contains(&joker), "the hint offers the top trump too");
+            assert!(hint.reasons.iter().any(|r| r.contains("came out even")), "{:?}", hint.reasons);
+        }
+        let grade = coach.grade(&obs, &legal, other);
+        assert_eq!((grade.verdict, grade.loss), (Verdict::Good, 0.0));
+        assert!(grade.analysis.reasons[0].contains("came out even"), "{:?}", grade.analysis.reasons);
+
+        // A defender, a no-trump bid, or after the third trick: not this position.
+        obs.seat = Seat::WEST;
+        assert_eq!(crate::cardplay::early_top_trump(&obs), None);
+        obs.seat = Seat::SOUTH;
+        obs.contract = Some((Seat::SOUTH, Contract::new(7, Strain::NoTrumps)));
+        assert_eq!(crate::cardplay::early_top_trump(&obs), None);
     }
 
     #[test]

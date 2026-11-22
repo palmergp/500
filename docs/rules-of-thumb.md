@@ -49,7 +49,8 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
 9. **As declarer with 5+ trumps, open with your top trump; with fewer, cash a side ace.** Rarely lead a small trump, unless partner called 6.
    Count your top trumps (Joker, both bowers, ace): missing two, it's a toss-up with a side ace; missing three or
    four, lead a side ace or a singleton first.
-   A side ace cashed early is as good as the top trump, and safest early: it gets trumped more as the hand goes on.
+   A side ace cashed early is as good as the top trump (played out both ways, even to within 0.03 tricks; finding 55),
+   and safest early: it gets trumped more as the hand goes on.
    Don't lead a side king early; it runs into the ace more often than not (finding 53).
     - **In no trumps,** cash side winners and keep the Joker early; from about trick 7, lead it.
 10. **Don't rush the Joker.** The expert usually plays it in tricks 3–5.
@@ -359,6 +360,13 @@ you, leading trump gives them the lead to attack your side suits. Take your side
 **After the first lead: draw trumps, then cash winners.** With every card visible (finding 45), a trump lead beat
 the best side lead while the opponents still held trumps, most when they held one or two (+0.09 and +0.05 tricks;
 +0.01 with three or more). Once they're out of trumps, cash a side winner (+0.05, best or tied 99% of the time).
+
+**The top trump or a side ace, early?** Either. When the expert was about to cash a side ace in tricks 1–3 while
+holding the top trump left, the hand was played out both ways from there (1,747 hands, finding 55): the top trump
+came out +0.03 ± 0.04 tricks and +5 ± 6 points, and the bid was made 88% of the time either way. Many trumps out
+doesn't change it (+0.00 with four or more against you): one round of trumps doesn't pull them all, and the ace
+was trumped only 6% of the time this early. Only with a single trump left against you was drawing it a little
+better (+0.22 tricks, but just 5 points). The coach grades either lead as good.
 
 ### 9a. If partner called 6, a small trump becomes a good lead
 

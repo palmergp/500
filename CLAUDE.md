@@ -99,6 +99,8 @@
   A-K, so a short partner can read it (`cardplay::show_winner`, applied in every bot's card choice).
 - Search bots and The Natural never open a no-trump hand with the Joker while holding other cards
   (`cardplay::opening_joker_lead`, finding 54); the coach grades that lead as costing the bid's chance.
+- Early in a suit bid (tricks 1–3), the top trump and a side ace lead come out even when played out (finding 55,
+  `fh-lab acelead`): the coach grades either as good and offers the other in its hint (`cardplay::ace_or_top_trump`).
 - Offline: `web/public/sw.js` precaches the build (from `dist/precache.json`, written by `vite.config.ts`; Vite's
   manifest misses the worker's WebAssembly file). The build appends its own hash to the `CACHE` name, so each release
   installs fresh; bump the `v2` part only when changing caching behaviour. It only registers in production builds

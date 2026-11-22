@@ -48,6 +48,39 @@ pub fn opening_joker_lead(obs: &Observation) -> bool {
 /// bid and going down one, in `utility`'s units.
 pub const OPENING_JOKER_CHANCE: f64 = 0.10;
 
+/// Early in a suit bid (tricks 1–3), the declaring side on lead, holding the top trump left while
+/// trumps may still be out: that top trump. From here, leading it or cashing a side ace came out
+/// even when both were played out (finding 55), though the search usually rates the ace higher.
+pub fn early_top_trump(obs: &Observation) -> Option<Card> {
+    let (declarer, contract) = obs.contract?;
+    let suit = contract.trump()?;
+    let leading = obs.current_trick.as_ref().is_none_or(|t| t.cards().is_empty());
+    if obs.seat.team() != declarer.team() || obs.tricks.len() >= 3 || !leading {
+        return None;
+    }
+    let played = obs.played();
+    let order = suit_order(suit, Some(suit));
+    let top = order.iter().copied().find(|&c| !played.contains(c))?;
+    let seen = played.union(obs.hand).union(obs.discards.unwrap_or_default());
+    (obs.hand.contains(top) && order.iter().any(|&c| !seen.contains(c))).then_some(top)
+}
+
+/// Whether `a` and `b` are the top trump and a side ace in [`early_top_trump`]'s position, which
+/// do about equally well: the coach grades either as good when it prefers the other.
+pub fn ace_or_top_trump(obs: &Observation, a: Action, b: Action) -> bool {
+    let Some(top) = early_top_trump(obs) else { return false };
+    let trump = obs.trump();
+    let card = |x: Action| match x {
+        Action::Play(p) => Some(p.card),
+        _ => None,
+    };
+    let side_ace = |c: Card| !c.is_joker() && !is_trump(c, trump) && c.rank() == fh_core::cards::ACE;
+    match (card(a), card(b)) {
+        (Some(x), Some(y)) => (x == top && side_ace(y)) || (y == top && side_ace(x)),
+        _ => false,
+    }
+}
+
 /// The cheapest card of `cards` to give up; ties go to the card from the shorter suit in `hand`.
 pub fn cheapest(cards: &[Card], hand: CardSet, trump: Option<Suit>) -> Card {
     let suit_len = |c: Card| hand.iter().filter(|&h| effective_suit(h, trump) == effective_suit(c, trump)).count();

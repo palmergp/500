@@ -240,7 +240,7 @@ export const LESSONS: Lesson[] = [
       "• Partner mentioned your trump suit (a bower): lead your top trump as usual.",
       "## After the first lead",
       "Keep drawing trumps gradually while the opponents still have some, mixing in your side winners. Count trumps as they fall (lesson 9): when none are left out, your side aces can't be trumped.",
-      "Cash a side ace early rather than late: as the hand goes on the opponents run out of side suits, and an ace led after trick 6 was trumped 39% of the time (7% in the first three tricks). Leading a side king early is the weak play: it ran into the ace more often than not.",
+      "Cash a side ace early rather than late: as the hand goes on the opponents run out of side suits, and an ace led after trick 6 was trumped 39% of the time (7% in the first three tricks). In the first three tricks, leading your top trump or cashing a side ace came out even when hands were played out both ways, even with many trumps out. Leading a side king early is the weak play: it ran into the ace more often than not.",
       "## No trumps",
       "Cash your side winners first: an ace or sure winner was the best lead 87% of the time. Don't lead the Joker early: in the first three tricks it cost about 0.2 tricks. Remember it isn't a stopper: you may play it only when you can't follow suit. Late in the hand (from about trick 7) leading it is better: a sure trick, the lead back, and the suit you name makes the others give up cards in it.",
     ],
