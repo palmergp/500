@@ -54,7 +54,7 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
             <small>You and a bot partner against two bots</small>
           </button>
           <button type="button" className="career-button" onClick={onCareer}>
-            Career
+            Story
             <small>{career}</small>
           </button>
           {!atTable && (
@@ -69,7 +69,7 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
             Tournament
             <small>
               {tournament
-                ? `Round ${tournament.round} of 8${tournament.chapter !== undefined ? ` (career, chapter ${tournament.chapter + 1})` : ""}: pick up where you left off`
+                ? `Round ${tournament.round} of 8${tournament.chapter !== undefined ? ` (story, chapter ${tournament.chapter + 1})` : ""}: pick up where you left off`
                 : "12 players, 8 rounds of 4 hands, a new partner every round"}
             </small>
           </button>

@@ -1,16 +1,16 @@
-// Career mode: name yourself, watch Chapter One's opening scene (a title card, typed lines, a
+// Story mode: name yourself, watch Chapter One's opening scene (a title card, typed lines, a
 // choice), play its game against the story's characters, and see how the story goes on.
 
 import { expect, test } from "@playwright/test";
 import { freshStart, takeTurn } from "./helpers";
 
-test("career: a chapter's scene, its game against the story's players, and the story going on", async ({ page }, info) => {
+test("story mode: a chapter's scene, its game against the story's players, and the story going on", async ({ page }, info) => {
   test.setTimeout(300_000);
   const desktop = info.project.name === "desktop";
   await freshStart(page);
   const menu = page.getByRole("navigation", { name: "Main menu" });
-  await menu.getByRole("button", { name: /^Career/ }).click();
-  const hub = page.getByRole("dialog", { name: "Career" });
+  await menu.getByRole("button", { name: /^Story/ }).click();
+  const hub = page.getByRole("dialog", { name: "Story" });
   await hub.getByLabel("What do they call you at the table?").fill("Sam");
   await hub.getByRole("button", { name: "Begin" }).click();
   await expect(hub.getByText("Playing as")).toContainText("Sam");
@@ -81,5 +81,5 @@ test("career: a chapter's scene, its game against the story's players, and the s
   }
   // The main menu says where the story's up to.
   await hub.locator(".actions").getByRole("button", { name: "Close" }).click();
-  await expect(menu.getByRole("button", { name: /^Career/ })).toContainText(won ? "Chapter 2: Forty Thousand" : "Chapter 1: Tuesday Night");
+  await expect(menu.getByRole("button", { name: /^Story/ })).toContainText(won ? "Chapter 2: Forty Thousand" : "Chapter 1: Tuesday Night");
 });

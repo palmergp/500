@@ -77,7 +77,7 @@
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
   the next round.
-- Career mode (`web/src/career/`): the story "The Kitty" lives in `story.ts` (characters with the persona that plays
+- Story mode (`web/src/career/`, called career in the code): the story "The Kitty" lives in `story.ts` (characters with the persona that plays
   them, ten chapters: opening scene, level, win and lose scenes, lines after each hand); progress in `career.ts`
   (local storage). A level is a game against story characters (solo save, `careerGame` in App.tsx, "Continue the
   story" at its end) or a tournament with a story cast (`Tournament.career`, judged by place after the final reveal).

@@ -17,14 +17,14 @@ interface Props {
 
 const NUMBERS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
 
-/** Career mode: the story's chapters, where you are in it, and the way into each level. */
+/** Story mode: the story's chapters, where you are in it, and the way into each level. */
 export function CareerDialog({ career, resumable, onName, onPlay, onResume, onReset, onClose }: Props) {
   const [naming, setNaming] = useState(!career.name);
   const [draft, setDraft] = useState(career.name);
   const next = nextChapter(career);
   const playing = career.playing;
   return (
-    <Dialog title="Career" wide onClose={onClose}>
+    <Dialog title="Story" wide onClose={onClose}>
       <div className="career">
         <header className="career-head">
           <h3 className="career-title">{STORY_TITLE}</h3>
@@ -124,7 +124,6 @@ export function CareerDialog({ career, resumable, onName, onPlay, onResume, onRe
             Close
           </button>
         </div>
-        <p className="note">The story is told between the games; the games are plain 500. Each character at the table plays as one of the bots.</p>
       </div>
     </Dialog>
   );
