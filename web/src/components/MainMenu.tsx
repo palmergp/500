@@ -10,15 +10,18 @@ interface Props {
   onFriends: () => void;
   onLearn: () => void;
   onSettings: () => void;
-  /** A tournament in progress (its round), or null. */
-  tournament: { round: number } | null;
+  /** A tournament in progress (its round, and the career chapter it belongs to), or null. */
+  tournament: { round: number; chapter?: number } | null;
   onTournament: () => void;
+  /** Where you are in the career's story. */
+  career: string;
+  onCareer: () => void;
 }
 
 const SUITS = ["♠", "♥", "♣", "♦"];
 
 /** The first screen: pick how to play, learn, or change settings. */
-export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSolo, onFriends, onLearn, onSettings, tournament, onTournament }: Props) {
+export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSolo, onFriends, onLearn, onSettings, tournament, onTournament, career, onCareer }: Props) {
   return (
     <main className="main-menu">
       <div className="menu-card">
@@ -50,6 +53,10 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
             Play solo
             <small>You and a bot partner against two bots</small>
           </button>
+          <button type="button" className="career-button" onClick={onCareer}>
+            Career
+            <small>{career}</small>
+          </button>
           {!atTable && (
             <button type="button" onClick={onFriends} disabled={!hostAvailable}>
               Play with friends
@@ -60,7 +67,11 @@ export function MainMenu({ canContinue, hostAvailable, atTable, onContinue, onSo
           )}
           <button type="button" onClick={onTournament}>
             Tournament
-            <small>{tournament ? `Round ${tournament.round} of 8: pick up where you left off` : "12 players, 8 rounds of 4 hands, a new partner every round"}</small>
+            <small>
+              {tournament
+                ? `Round ${tournament.round} of 8${tournament.chapter !== undefined ? ` (career, chapter ${tournament.chapter + 1})` : ""}: pick up where you left off`
+                : "12 players, 8 rounds of 4 hands, a new partner every round"}
+            </small>
           </button>
           <button type="button" onClick={onLearn}>
             Learn

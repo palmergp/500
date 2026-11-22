@@ -29,7 +29,11 @@ import { FinalReveal, NewTournamentDialog, RecapDialog, TournamentDialog } from 
 import { HAND_PUZZLES, loadHandPuzzles, noteHandPuzzle, type HandPuzzle } from "./learn/handPuzzles";
 import { TouchTips } from "./components/TouchTips";
 import { MoreItem, MoreMenu } from "./components/MoreMenu";
-import { gradeGame, HANDS, loadTournament, newTournament, recapGrade, ROUNDS, saveTournament, yourTable, type Tournament, type TournamentKind } from "./tournament";
+import { gradeGame, HANDS, loadTournament, newTournament, recapGrade, ROUNDS, saveTournament, standings, yourTable, type Tournament, type TournamentKind } from "./tournament";
+import { banterFor, fill, loadCareer, nextChapter, saveCareer, type CareerState } from "./career/career";
+import { CHAPTERS, CHARACTERS, goal, type Step } from "./career/story";
+import { CareerDialog } from "./components/Career";
+import { Cutscene, Portrait } from "./components/Cutscene";
 import { assistHelpers, loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -75,6 +79,15 @@ const tabGame = {
 
 function names(list: string[]): string {
   return list.length <= 1 ? list.join("") : `${list.slice(0, -1).join(", ")} and ${list.at(-1)}`;
+}
+
+/** The seed a save was dealt from. */
+function seedOf(save: string | null): number | null {
+  try {
+    return save ? (JSON.parse(save) as { seed: number }).seed : null;
+  } catch {
+    return null;
+  }
 }
 
 function randomSeed(): number {
@@ -217,6 +230,13 @@ export function App() {
   /** Action numbers you asked a hint for: their grades don't count toward your patterns. */
   const hintedRef = useRef(new Set<number>());
   const [announcement, setAnnouncement] = useState("");
+  /** Career mode: your progress, whether the game on the table is a chapter's level, the chapter
+   * list, and a story scene playing (with what follows it). */
+  const [career, setCareer] = useState<CareerState>(loadCareer);
+  const careerRef = useRef(career);
+  const [careerGame, setCareerGame] = useState(false);
+  const [showCareer, setShowCareer] = useState(false);
+  const [scene, setScene] = useState<{ id: number; steps: Step[]; label: string; then: () => void } | null>(null);
   /** The main menu, or the table. */
   const [screen, setScreen] = useState<"starting" | "menu" | "table">("starting");
   // Playing at a table on a LAN host (crates/host) rather than against bots on this device.
@@ -359,6 +379,7 @@ export function App() {
       setSettings(chosen);
       toSolo();
       setInTour(false);
+      setCareerGame(false);
       savedGrades.clear();
       setGrades([]);
       hintedRef.current.clear();
@@ -419,6 +440,7 @@ export function App() {
     setTourDialog(null);
     setScreen("table");
     setInTour(true);
+    setCareerGame(false);
     void request((engine) =>
       engine.create(table.seed, { west: west.persona, north: north.persona, east: east.persona, hands: HANDS, names: [west.name, north.name, east.name] }),
     ).then(() => setMessage(`Tournament round ${t.current + 1} of ${ROUNDS}: you partner ${north.name}.`));
@@ -581,6 +603,7 @@ export function App() {
       try {
         handle(await engineRef.current.load(save));
         setMessage("Welcome back: your game was restored.");
+        setCareerGame(careerRef.current.playing?.seed === seedOf(save));
         const t = tourRef.current;
         if (t && t.current < ROUNDS && t.rounds[t.current].tables[yourTable(t, t.current)].seed === (JSON.parse(save) as { seed: number }).seed) {
           setInTour(true);
@@ -594,6 +617,109 @@ export function App() {
     setShowNewGame(true);
   }, [handle, toSolo, view]);
 
+  /** Changes your career and keeps it saved. */
+  const updateCareer = useCallback((change: (c: CareerState) => void) => {
+    const next = structuredClone(careerRef.current);
+    change(next);
+    careerRef.current = next;
+    setCareer(next);
+    saveCareer(next);
+  }, []);
+
+  /** Plays a story scene, then whatever comes next. */
+  const playScene = (steps: Step[], label: string, then: () => void) => setScene({ id: Date.now(), steps, label, then });
+
+  /** A chapter's level: its game against the story's players, or its tournament. */
+  const startLevel = (chapter: number) => {
+    const level = CHAPTERS[chapter].level;
+    const seed = randomSeed();
+    if (level.kind === "tournament") {
+      const cast = level.cast.map((c) => (typeof c === "string" ? { name: CHARACTERS[c].name, persona: CHARACTERS[c].persona } : { name: c[0], persona: c[1] }));
+      const t = newTournament(seed, "random", cast, { chapter, title: level.title, goal: goal(level), place: level.place });
+      tourRef.current = t;
+      setTour(t);
+      saveTournament(t);
+      updateCareer((c) => {
+        if (c.playing) Object.assign(c.playing, { tour: t.id, seed: null });
+      });
+      setScreen("menu");
+      setTourDialog({});
+      return;
+    }
+    updateCareer((c) => {
+      if (c.playing) Object.assign(c.playing, { seed, tour: null });
+    });
+    const [west, north, east] = [level.west, level.partner, level.east].map((id) => CHARACTERS[id]);
+    toSolo();
+    setInTour(false);
+    setCareerGame(true);
+    savedGrades.clear();
+    setGrades([]);
+    hintedRef.current.clear();
+    clearTable();
+    setShowNewGame(false);
+    setScreen("table");
+    void request((engine) =>
+      engine.create(seed, { west: west.persona, north: north.persona, east: east.persona, hands: level.hands ?? 0, names: [west.name, north.name, east.name] }),
+    ).then(() => setMessage(`Chapter ${chapter + 1}: ${goal(level)} You partner ${north.name}.`));
+  };
+
+  /** From the chapter list: the chapter's opening scene and then its level (or, trying again, the level). */
+  const startChapter = (chapter: number, skipIntro: boolean) => {
+    const ch = CHAPTERS[chapter];
+    const t = tourRef.current;
+    if (ch.level.kind === "tournament" && t && !t.finished && !t.career && !confirm(`This chapter is a tournament: it replaces your tournament in progress (round ${t.current + 1} of ${ROUNDS}). Go on?`)) return;
+    const save = savedGame.load();
+    const ownSave = seedOf(save) === careerRef.current.playing?.seed;
+    if (ch.level.kind === "game" && save && !savedGame.over() && !ownSave && !confirm("This chapter deals a new game: it replaces your game in progress. Go on?")) return;
+    updateCareer((c) => {
+      c.playing = { chapter, seed: null, tour: null, attempts: c.playing?.chapter === chapter ? c.playing.attempts : 0 };
+    });
+    setShowCareer(false);
+    if (skipIntro) startLevel(chapter);
+    else playScene(ch.intro, `Chapter ${chapter + 1}: ${ch.title}`, () => startLevel(chapter));
+  };
+
+  /** A level is over: the scene for how it went, then the chapter list (the next chapter, or another try). */
+  const endLevel = (chapter: number, won: boolean) => {
+    const ch = CHAPTERS[chapter];
+    setCareerGame(false);
+    updateCareer((c) => {
+      if (won) {
+        if (!c.done.includes(chapter)) c.done.push(chapter);
+        if (c.playing?.chapter === chapter) c.playing = null;
+      } else {
+        const attempts = c.playing?.chapter === chapter ? c.playing.attempts + 1 : 1;
+        c.playing = { chapter, seed: null, tour: null, attempts };
+      }
+    });
+    playScene(won ? ch.win : ch.lose, `Chapter ${chapter + 1}: ${ch.title}`, () => setShowCareer(true));
+  };
+
+  /** "Continue the story" after a chapter's game. */
+  const finishCareerGame = () => {
+    const p = careerRef.current.playing;
+    if (!view || !p) return;
+    const won = view.winner === 0;
+    setResult(null);
+    savedGame.clear();
+    savedGrades.clear();
+    setGrades([]);
+    clearTable();
+    setScreen("menu");
+    tabGame.set(null);
+    endLevel(p.chapter, won);
+  };
+
+  /** Back to the chapter under way: its game, or its tournament. */
+  const resumeCareer = () => {
+    const p = careerRef.current.playing;
+    setShowCareer(false);
+    if (!p) return;
+    if (p.tour) setTourDialog({});
+    else void continueSolo();
+  };
+
   /** At the LAN host's table. */
   const joinHost = useCallback(() => {
     setScreen("table");
@@ -602,6 +728,7 @@ export function App() {
     modeRef.current = "lan";
     setMode("lan");
     setInTour(false);
+    setCareerGame(false);
     clearTable();
     setGrades([]);
     setShowNewGame(false);
@@ -730,7 +857,7 @@ export function App() {
   const auctionPause =
     atTable && mode === "solo" && settings.pauseAfterBidding && !replaying && !puzzle && !!view && view.phase === "discarding" && seenAuction !== view.history.length;
   const paused =
-    auctionPause || !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers || !!tourDialog || showFinal;
+    auctionPause || !atTable || !!held || !!result || !!review || showScores || showNewGame || showSettings || showLearn || !!showTricks || showDecisions || lobbyOpen || waitingOnOthers || !!tourDialog || showFinal || !!scene || showCareer;
 
   // Let the bots take their turns one at a time. Thinking time counts toward the pause between
   // moves, so a slow search doesn't add to it.
@@ -1127,6 +1254,22 @@ export function App() {
     );
   }
 
+  // Career: the level on the table (for its lines after each hand), and where the story's up to.
+  const careerLevel = careerGame && mode === "solo" && !puzzle && !replaying && career.playing ? CHAPTERS[career.playing.chapter].level : null;
+  const careerLine = careerLevel?.kind === "game" && result ? banterFor(careerLevel.banter, result) : null;
+  const careerAt = career.playing?.chapter ?? nextChapter(career);
+  const careerLabel = !career.name
+    ? `${CHAPTERS.length} chapters of cards, crime and betrayal`
+    : careerAt >= CHAPTERS.length
+      ? "The end… for now. Play any chapter again"
+      : `Chapter ${careerAt + 1}: ${CHAPTERS[careerAt].title}`;
+  const careerResumable = (() => {
+    const p = career.playing;
+    if (!p) return false;
+    if (p.tour) return !!tour && tour.id === p.tour && !tour.finished;
+    return p.seed !== null && seedOf(savedGame.load()) === p.seed;
+  })();
+
   return (
     <div className={`app${settings.fourColor ? " four-color" : ""}${settings.bigCards ? " big-cards" : ""}${atTable ? " at-table" : ""}`}>
       <div className="visually-hidden" aria-live="polite" aria-atomic="true">
@@ -1140,8 +1283,10 @@ export function App() {
           hostAvailable={!!host}
           atTable={lan}
           onContinue={() => void continueSolo()}
-          tournament={tour && !tour.finished ? { round: Math.min(tour.current + 1, ROUNDS) } : null}
+          tournament={tour && !tour.finished ? { round: Math.min(tour.current + 1, ROUNDS), chapter: tour.career?.chapter } : null}
           onTournament={openTournament}
+          career={careerLabel}
+          onCareer={() => setShowCareer(true)}
           onSolo={() => setShowNewGame(true)}
           onFriends={joinHost}
           onLearn={() => setShowLearn(true)}
@@ -1367,6 +1512,14 @@ export function App() {
       {result && !held && view && atTable && (
         <Dialog title={puzzle && !replaying ? `Puzzle ${puzzle.id}` : `Hand ${view.history.filter((h) => !h.passedOut).length}`}>
           <Celebration hand={result} gameWinner={puzzle ? null : view.winner} />
+          {careerLine && (
+            <div className="career-banter">
+              <Portrait look={CHARACTERS[careerLine.who].look} />
+              <p>
+                <strong>{CHARACTERS[careerLine.who].name}</strong> “{fill(careerLine.text, career.name)}”
+              </p>
+            </div>
+          )}
           {puzzle && !replaying && (
             <p className={`puzzle-verdict ${result.made ? "made" : "down"}`}>
               {result.made
@@ -1397,6 +1550,10 @@ export function App() {
               // A replay always leads back to the real game, even when it reaches the game's end.
               <button type="button" className="primary" onClick={endReplay} autoFocus>
                 Back to the game
+              </button>
+            ) : careerLevel && view.phase === "gameOver" ? (
+              <button type="button" className="primary" onClick={finishCareerGame} autoFocus>
+                Continue the story
               </button>
             ) : inTour && view.phase === "gameOver" ? (
               <button type="button" className="primary" onClick={finishTourRound} autoFocus>
@@ -1526,6 +1683,45 @@ export function App() {
             }
             setShowFinal(false);
             setScreen("menu");
+            // A career chapter's tournament: did you place high enough?
+            const done = tourRef.current;
+            if (done?.career) {
+              const you = standings(done).find((s) => s.participant.id === 0);
+              endLevel(done.career.chapter, !!you && you.place <= done.career.place);
+            }
+          }}
+        />
+      )}
+      {showCareer && (
+        <CareerDialog
+          career={career}
+          resumable={careerResumable}
+          onName={(name) =>
+            updateCareer((c) => {
+              c.name = name;
+            })
+          }
+          onPlay={startChapter}
+          onResume={resumeCareer}
+          onReset={() => {
+            updateCareer((c) => {
+              c.done = [];
+              c.playing = null;
+            });
+            setCareerGame(false);
+          }}
+          onClose={() => setShowCareer(false)}
+        />
+      )}
+      {scene && (
+        <Cutscene
+          key={scene.id}
+          steps={scene.steps}
+          name={career.name}
+          label={scene.label}
+          onDone={() => {
+            setScene(null);
+            scene.then();
           }}
         />
       )}

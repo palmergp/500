@@ -311,9 +311,15 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
   const closable = after === undefined;
   return (
     <Dialog title={after !== undefined ? `Tournament: round ${after + 1} of ${ROUNDS}` : "Tournament"} wide onClose={closable ? onClose : undefined}>
-      <p className="tournament-kind">
-        {kind.icon} <strong>{kind.title} tournament.</strong> {kind.text}
-      </p>
+      {t.career ? (
+        <p className="tournament-kind">
+          🃏 <strong>{t.career.title}.</strong> {t.career.goal}
+        </p>
+      ) : (
+        <p className="tournament-kind">
+          {kind.icon} <strong>{kind.title} tournament.</strong> {kind.text}
+        </p>
+      )}
       {after !== undefined && (
         <>
           <h3>This round's tables</h3>

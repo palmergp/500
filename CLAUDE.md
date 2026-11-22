@@ -77,6 +77,12 @@
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
   the next round.
+- Career mode (`web/src/career/`): the story "The Kitty" lives in `story.ts` (characters with the persona that plays
+  them, ten chapters: opening scene, level, win and lose scenes, lines after each hand); progress in `career.ts`
+  (local storage). A level is a game against story characters (solo save, `careerGame` in App.tsx, "Continue the
+  story" at its end) or a tournament with a story cast (`Tournament.career`, judged by place after the final reveal).
+  Scenes play in `components/Cutscene.tsx` (a full-screen `<dialog>`; `{name}` is the player, who is never given
+  pronouns); the chapter list is `components/Career.tsx`. Test: `e2e/career.spec.ts`.
 - A finished solo game stays saved (a reload shows its result) but is marked over (`savedGame.over`), so the main
   menu doesn't offer Continue; the game-over result has Main menu and New game.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,

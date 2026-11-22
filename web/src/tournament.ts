@@ -70,6 +70,8 @@ export interface Tournament {
   finished: boolean;
   /** Your own game in each round, kept for your recap (absent in tournaments from before). */
   mine?: (YourGame | null)[];
+  /** A career chapter's tournament: which chapter, what it's called, and the place to reach. */
+  career?: { chapter: number; title: string; goal: string; place: number };
 }
 
 /** Your game in one round, as your recap needs it. */
@@ -245,13 +247,17 @@ export function tournamentKind(t: Tournament): TournamentKind {
   return t.kind ?? "random";
 }
 
-/** A new tournament: you and 11 bots with random names, styles for the kind, and the whole schedule. */
-export function newTournament(seed: number, kind: TournamentKind = "random"): Tournament {
+/** A new tournament: you and 11 bots with random names, styles for the kind, and the whole schedule.
+ * A career chapter's tournament names its 11 instead (`cast`). */
+export function newTournament(seed: number, kind: TournamentKind = "random", cast?: { name: string; persona: string }[], career?: Tournament["career"]): Tournament {
   const random = rng(seed);
   const names = shuffle(NAMES, random);
   const styles = kind === "expert" ? EXPERT_STYLES : kind === "chaos" ? ["gambler"] : STYLES;
   const participants: Participant[] = [{ id: 0, name: "You", persona: "human" }];
-  for (let i = 1; i < PLAYERS; i++) participants.push({ id: i, name: names[i - 1], persona: styles[Math.floor(random() * styles.length)] });
+  for (let i = 1; i < PLAYERS; i++) {
+    const persona = styles[Math.floor(random() * styles.length)];
+    participants.push({ id: i, ...(cast?.[i - 1] ?? { name: names[i - 1], persona }) });
+  }
   const rounds: Round[] = schedulePairs(random).map((pairs) => {
     const grouped = shuffle(pairs, random);
     const tables: Seating[] = [];
@@ -264,7 +270,7 @@ export function newTournament(seed: number, kind: TournamentKind = "random"): To
     }
     return { tables };
   });
-  return { id: `t${seed}`, kind, assisted: false, participants, rounds, current: 0, finished: false };
+  return { id: `t${seed}`, kind, assisted: false, participants, rounds, current: 0, finished: false, ...(career ? { career } : {}) };
 }
 
 /** The table you're at in round `r`. */

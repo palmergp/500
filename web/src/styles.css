@@ -3004,3 +3004,613 @@ button.danger {
 .recap-where {
   font-weight: 600;
 }
+
+/* ---- Career: story scenes (components/Cutscene.tsx) ---- */
+dialog.cutscene {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100dvh;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: #000;
+  color: #f4efe2;
+  overflow: hidden;
+  font-family: Georgia, "Times New Roman", serif;
+}
+dialog.cutscene::backdrop {
+  background: #000;
+}
+.cut-bg {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+}
+.bg-black {
+  background: #000;
+}
+.bg-diner {
+  background: radial-gradient(ellipse at 30% 35%, rgba(255, 170, 90, 0.32), transparent 55%), linear-gradient(180deg, #2b1b12 0%, #160d08 70%, #0c0705 100%);
+}
+.bg-diner-dawn {
+  background: radial-gradient(ellipse at 30% 30%, rgba(255, 200, 140, 0.45), transparent 60%), linear-gradient(180deg, #5a3b2a, #2a1a12 70%, #1a100b);
+}
+.cut-window {
+  position: absolute;
+  left: 8%;
+  top: 10%;
+  width: 38%;
+  height: 42%;
+  border: 6px solid #3a2618;
+  background: linear-gradient(180deg, #0f1a2a, #1b2a3c);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+  overflow: hidden;
+}
+.bg-diner-dawn .cut-window {
+  background: linear-gradient(180deg, #f2b27a, #f7d8a8 60%, #b9c8d8);
+}
+.cut-neon {
+  position: absolute;
+  right: 8%;
+  top: 12%;
+  font: 700 clamp(28px, 7vw, 72px) / 1 Georgia, serif;
+  letter-spacing: 0.12em;
+  color: #ff6fae;
+  text-shadow: 0 0 6px #ff5fa2, 0 0 18px #ff2f86, 0 0 36px #ff2f86;
+  animation: neon-flicker 6s infinite;
+}
+.cut-neon .dead {
+  color: #4a2236;
+  text-shadow: none;
+}
+.cut-counter {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 22%;
+  background: linear-gradient(180deg, #7a2b2b 0 8px, #3a1d14 8px);
+}
+@keyframes neon-flicker {
+  0%,
+  92%,
+  100% {
+    opacity: 1;
+  }
+  93% {
+    opacity: 0.4;
+  }
+  94% {
+    opacity: 1;
+  }
+  96% {
+    opacity: 0.6;
+  }
+}
+.cut-rain {
+  position: absolute;
+  inset: -20% 0 0 0;
+  background: repeating-linear-gradient(100deg, transparent 0 9px, rgba(190, 210, 255, 0.16) 9px 10px);
+  background-size: 120px 120px;
+  animation: cut-rain 0.5s linear infinite;
+}
+@keyframes cut-rain {
+  to {
+    background-position: -30px 120px;
+  }
+}
+.bg-street {
+  background: radial-gradient(ellipse at 75% 20%, rgba(255, 214, 140, 0.3), transparent 40%), linear-gradient(180deg, #0c121c, #070a10 70%, #05070b);
+}
+.cut-lamp {
+  position: absolute;
+  right: 22%;
+  top: 8%;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: #ffe2a0;
+  box-shadow: 0 0 30px 12px rgba(255, 214, 140, 0.5);
+}
+.cut-lamp::after {
+  content: "";
+  position: absolute;
+  left: 5px;
+  top: 14px;
+  width: 4px;
+  height: 70vh;
+  background: #1a1d24;
+}
+.bg-poolhall {
+  background: linear-gradient(180deg, #0d0d0b, #050504);
+}
+.cut-cone {
+  position: absolute;
+  left: 50%;
+  top: 0;
+  width: 70%;
+  height: 78%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at 50% 0%, rgba(255, 235, 170, 0.4), transparent 75%);
+  clip-path: polygon(46% 0, 54% 0, 100% 100%, 0 100%);
+}
+.cut-felt {
+  position: absolute;
+  left: 15%;
+  right: 15%;
+  bottom: 14%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, #1f6b45, #0e3a25 70%);
+  box-shadow: 0 0 0 10px #3a2414;
+}
+.bg-velvet {
+  background: repeating-linear-gradient(90deg, #4a0b14 0 26px, #3a0810 26px 40px);
+}
+.bg-velvet::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 30%, transparent 30%, rgba(0, 0, 0, 0.75) 85%);
+}
+.cut-frame {
+  position: absolute;
+  left: 50%;
+  top: 8%;
+  transform: translateX(-50%);
+  font-size: clamp(40px, 9vw, 100px);
+  line-height: 1.1;
+  padding: 0.15em 0.3em;
+  border: 8px solid #b88a2e;
+  outline: 3px solid #5a3e10;
+  background: #1a0a0c;
+  filter: saturate(0.7) brightness(0.85);
+}
+.bg-warehouse {
+  background: linear-gradient(180deg, #11161a, #080b0d);
+}
+.cut-lamps,
+.cut-chandeliers {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  justify-content: space-around;
+}
+.cut-lamps i {
+  position: relative;
+  width: 30%;
+  height: 70%;
+  background: radial-gradient(ellipse at 50% 0, rgba(200, 230, 255, 0.28), transparent 70%);
+}
+.bg-car {
+  background: linear-gradient(180deg, #0a0f18, #05070c);
+}
+.cut-windshield {
+  position: absolute;
+  left: 6%;
+  right: 6%;
+  top: 6%;
+  height: 58%;
+  border-radius: 40% 40% 8% 8% / 30% 30% 8% 8%;
+  background: radial-gradient(ellipse at 70% 60%, rgba(255, 90, 90, 0.18), transparent 40%), radial-gradient(ellipse at 30% 70%, rgba(255, 220, 150, 0.2), transparent 35%),
+    linear-gradient(180deg, #121a28, #1a2333);
+  overflow: hidden;
+  border: 10px solid #050608;
+}
+.cut-dash {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 34%;
+  background: linear-gradient(180deg, #111 0, #050505 40%);
+  box-shadow: inset 0 8px 20px rgba(120, 200, 255, 0.08);
+}
+.bg-boarding {
+  background: linear-gradient(180deg, #3a2e22, #1c150f);
+}
+.cut-beam {
+  position: absolute;
+  left: 10%;
+  top: 0;
+  width: 40%;
+  height: 100%;
+  background: linear-gradient(115deg, rgba(255, 230, 180, 0.24), transparent 65%);
+  clip-path: polygon(20% 0, 60% 0, 100% 100%, 30% 100%);
+}
+.bg-lounge {
+  background: radial-gradient(ellipse at 50% 25%, rgba(80, 140, 255, 0.3), transparent 50%), linear-gradient(180deg, #0a1428, #050a14);
+}
+.cut-lantern {
+  position: absolute;
+  left: 50%;
+  top: 10%;
+  width: 38px;
+  height: 54px;
+  transform: translateX(-50%);
+  border-radius: 10px;
+  background: #7fb2ff;
+  box-shadow: 0 0 40px 18px rgba(80, 140, 255, 0.45);
+}
+.bg-pier {
+  background: linear-gradient(180deg, #1a2026, #0c1014 60%, #070a0c);
+}
+.cut-fog {
+  position: absolute;
+  left: -50%;
+  right: -50%;
+  bottom: 15%;
+  height: 45%;
+  background: radial-gradient(ellipse at 30% 50%, rgba(200, 210, 220, 0.22), transparent 60%), radial-gradient(ellipse at 70% 60%, rgba(200, 210, 220, 0.18), transparent 55%);
+  animation: cut-fog 30s linear infinite alternate;
+}
+.cut-fog.two {
+  bottom: 35%;
+  opacity: 0.6;
+  animation-duration: 45s;
+  animation-direction: alternate-reverse;
+}
+@keyframes cut-fog {
+  to {
+    transform: translateX(20%);
+  }
+}
+.bg-ballroom {
+  background: radial-gradient(ellipse at 50% 10%, rgba(255, 215, 130, 0.3), transparent 55%), linear-gradient(180deg, #2a1e0c, #120c04);
+}
+.cut-chandeliers i {
+  margin-top: 6%;
+  width: 60px;
+  height: 30px;
+  border-radius: 0 0 50% 50%;
+  background: #ffdf8a;
+  box-shadow: 0 0 50px 20px rgba(255, 215, 130, 0.4);
+}
+.bg-penthouse {
+  background: linear-gradient(180deg, #050814, #0b1230 60%, #141c3c);
+}
+.cut-city {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 42%;
+  background: radial-gradient(circle, rgba(255, 220, 140, 0.9) 1px, transparent 1.6px) 0 0 / 14px 11px, radial-gradient(circle, rgba(160, 200, 255, 0.7) 1px, transparent 1.6px) 7px 5px / 19px 13px,
+    linear-gradient(180deg, transparent, rgba(255, 180, 90, 0.14));
+  mask-image: linear-gradient(180deg, transparent, #000 35%);
+}
+.cut-stage {
+  position: absolute;
+  inset: 0;
+  cursor: pointer;
+}
+.cut-place {
+  position: absolute;
+  left: max(16px, env(safe-area-inset-left));
+  top: max(14px, env(safe-area-inset-top));
+  max-width: calc(100% - 190px);
+  padding: 0.35em 0.7em;
+  border-left: 3px solid var(--gold);
+  background: rgba(0, 0, 0, 0.5);
+  font: italic 600 clamp(12px, 1.6vw, 16px) / 1.3 Georgia, serif;
+  letter-spacing: 0.05em;
+  color: rgba(244, 239, 226, 0.9);
+}
+.cut-actor {
+  position: absolute;
+  bottom: 22vh;
+  width: min(36vw, 300px, 46vh);
+  opacity: 0.5;
+  filter: brightness(0.55);
+  transition: opacity 0.3s, filter 0.3s;
+}
+.cut-actor.left {
+  left: 4%;
+}
+.cut-actor.right {
+  right: 4%;
+  transform: scaleX(-1);
+}
+.cut-actor.speaking {
+  opacity: 1;
+  filter: none;
+}
+.cut-actor .portrait {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.cut-box {
+  position: absolute;
+  z-index: 2;
+  left: 50%;
+  bottom: max(16px, env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  width: min(920px, calc(100% - 32px));
+  max-height: 40vh;
+  overflow: auto;
+  padding: 1.1em 3.2em 1.1em 1.3em;
+  border: 1px solid rgba(242, 193, 78, 0.45);
+  border-radius: 10px;
+  background: rgba(8, 8, 10, 0.88);
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+}
+.cut-name {
+  display: inline-block;
+  margin-bottom: 0.45em;
+  padding: 0.15em 0.75em;
+  border-radius: 4px;
+  background: var(--gold);
+  color: #1b1408;
+  font: 700 0.95rem / 1.4 system-ui, sans-serif;
+  letter-spacing: 0.03em;
+}
+.cut-box.you .cut-name {
+  background: #e9e4d8;
+}
+.cut-text {
+  margin: 0;
+  min-height: 3em;
+  font-size: clamp(16px, 2.1vw, 21px);
+  line-height: 1.5;
+}
+.cut-box.narration .cut-text {
+  font-style: italic;
+  color: #ddd6c6;
+}
+.cut-next {
+  position: absolute;
+  right: 0.6em;
+  bottom: 0.6em;
+  min-width: 2.4em;
+  padding: 0.2em 0.5em;
+  border: 1px solid rgba(242, 193, 78, 0.5);
+  background: transparent;
+  color: var(--gold);
+  font: 700 1rem system-ui, sans-serif;
+  animation: cut-bob 1.4s ease-in-out infinite;
+}
+@keyframes cut-bob {
+  50% {
+    opacity: 0.45;
+  }
+}
+.cut-choices {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5em;
+}
+.cut-choices button {
+  padding: 0.6em 0.9em;
+  border: 1px solid rgba(242, 193, 78, 0.5);
+  background: rgba(255, 255, 255, 0.06);
+  color: #f4efe2;
+  text-align: left;
+  font: inherit;
+  font-size: clamp(15px, 1.9vw, 19px);
+}
+.cut-choices button:hover,
+.cut-choices button:focus-visible {
+  background: rgba(242, 193, 78, 0.2);
+}
+.cut-controls {
+  position: absolute;
+  z-index: 3;
+  top: max(12px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
+}
+.cut-controls button,
+.cut-continue {
+  padding: 0.35em 0.8em;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  background: rgba(0, 0, 0, 0.55);
+  color: #f4efe2;
+  font: 600 0.9rem system-ui, sans-serif;
+}
+.cut-title {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  text-align: center;
+  background: radial-gradient(ellipse, rgba(40, 20, 10, 0.6), #000 75%);
+  cursor: pointer;
+  animation: cut-title-in 1.2s ease both;
+}
+.cut-title h2 {
+  margin: 0;
+  font: 400 clamp(16px, 2.6vw, 26px) Georgia, serif;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: rgba(242, 193, 78, 0.9);
+}
+.cut-title p {
+  margin: 0.25em 0 1.2em;
+  font: italic 700 clamp(34px, 8vw, 84px) / 1.1 Georgia, serif;
+  color: #f4efe2;
+  text-shadow: 0 0 30px rgba(242, 193, 78, 0.35);
+}
+@keyframes cut-title-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (max-height: 500px) {
+  .cut-box {
+    max-height: 46vh;
+    padding-top: 0.6em;
+    padding-bottom: 0.6em;
+  }
+  .cut-text {
+    min-height: 0;
+    font-size: 15px;
+  }
+  .cut-actor {
+    bottom: 30vh;
+    width: min(26vw, 48vh);
+  }
+}
+@media (max-width: 560px) {
+  .cut-actor {
+    bottom: 30vh;
+    width: min(44vw, 34vh);
+  }
+  .cut-place {
+    max-width: calc(100% - 150px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cut-rain,
+  .cut-fog,
+  .cut-neon,
+  .cut-next,
+  .cut-title {
+    animation: none;
+  }
+}
+
+/* ---- Career: the chapter list (components/Career.tsx) and lines after each hand ---- */
+.career-head {
+  text-align: center;
+}
+.career-title {
+  margin: 0;
+  font: italic 700 clamp(1.6rem, 4vw, 2.2rem) Georgia, serif;
+  letter-spacing: 0.04em;
+}
+.career-blurb {
+  margin: 0.2rem 0 0;
+  font-style: italic;
+  opacity: 0.8;
+}
+.career-name {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-end;
+  gap: 0.6rem;
+  margin: 1rem 0;
+}
+.career-name label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-weight: 600;
+}
+.career-name input {
+  min-width: 14rem;
+  padding: 0.45rem 0.6rem;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+  font: inherit;
+}
+.career-you {
+  margin: 0.5rem 0 0.8rem;
+  text-align: center;
+}
+.link-button {
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  text-decoration: underline;
+  font: inherit;
+  cursor: pointer;
+}
+.career-end {
+  text-align: center;
+  font: italic 1.1rem Georgia, serif;
+}
+.career-chapters {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.career-chapter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.8rem;
+  border: 1px solid var(--panel-line);
+  border-radius: 10px;
+}
+.career-chapter.next {
+  border-color: var(--accent);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+.career-chapter.locked {
+  opacity: 0.55;
+}
+.career-chapter-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+.career-number {
+  font-size: 0.75rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  opacity: 0.75;
+}
+.career-chapter-text strong {
+  font: italic 700 1.1rem Georgia, serif;
+}
+.career-tagline {
+  font-size: 0.9rem;
+}
+.career-goal,
+.career-tries {
+  opacity: 0.75;
+}
+.career-chapter-actions {
+  display: flex;
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.4rem;
+}
+@media (max-width: 560px) {
+  .career-chapter {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .career-chapter-actions {
+    justify-content: flex-start;
+  }
+}
+.career-banter {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.5rem 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: 10px;
+  background: #14110f;
+  color: #f4efe2;
+}
+.career-banter .portrait {
+  flex-shrink: 0;
+  width: 52px;
+  height: auto;
+}
+.career-banter p {
+  margin: 0;
+  font: italic 1rem Georgia, serif;
+}
+.career-banter strong {
+  display: block;
+  font: 700 0.8rem system-ui, sans-serif;
+  letter-spacing: 0.04em;
+  color: var(--gold);
+}
