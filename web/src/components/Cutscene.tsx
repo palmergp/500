@@ -1,83 +1,18 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { characterName, fill } from "../career/career";
-import { CHARACTERS, type Backdrop, type CharacterId, type Look, type Step } from "../career/story";
+import { CHARACTERS, PLACE_SOUND, type Backdrop, type CharacterId, type Step } from "../career/story";
+import { storyAudio, type Mood } from "../storyAudio";
+import { Portrait } from "./Portrait";
+
+export { Portrait };
 
 /** Characters per second while a line types out. */
 const TYPE_SPEED = 60;
 
 const reducedMotion = () => !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
-/** A character as a noir silhouette: their outline (hair or hat), coat, and a rim of light in their
- * colour. */
-export function Portrait({ look, className }: { look: Look; className?: string }) {
-  const id = useId();
-  const rim = { stroke: look.accent, strokeWidth: 2.5, strokeOpacity: 0.85 };
-  const hair = { fill: "#0b0908", ...rim };
-  const shoulders = look.big ? "M6 240 C12 176 48 154 100 152 C152 154 188 176 194 240 Z" : "M24 240 C30 184 60 162 100 160 C140 162 170 184 176 240 Z";
-  return (
-    <svg className={`portrait ${className ?? ""}`} viewBox="0 0 200 240" aria-hidden="true">
-      <defs>
-        <radialGradient id={`${id}-glow`} cx="50%" cy="45%" r="55%">
-          <stop offset="0%" stopColor={look.accent} stopOpacity="0.38" />
-          <stop offset="100%" stopColor={look.accent} stopOpacity="0" />
-        </radialGradient>
-      </defs>
-      <ellipse cx="100" cy="120" rx="100" ry="120" fill={`url(#${id}-glow)`} />
-      {look.style === "long" && <path d="M60 110 C54 60 84 50 100 50 C118 50 148 60 140 110 L148 178 C136 172 130 150 132 106 C122 84 80 84 68 106 C70 150 64 172 52 178 Z" {...hair} />}
-      <path d={shoulders} fill={look.coat} {...rim} />
-      <path d="M80 162 L100 198 L120 162" fill="none" stroke="rgba(255,255,255,0.22)" strokeWidth="3" />
-      <rect x="88" y="130" width="24" height="34" fill="#17110f" />
-      <ellipse cx="100" cy="100" rx="34" ry="42" fill="#1d1614" {...rim} />
-      {look.beard && <path d="M68 108 C70 140 88 148 100 148 C112 148 130 140 132 108 C122 126 78 126 68 108 Z" fill="#d9d2c3" fillOpacity="0.75" />}
-      {look.style === "slick" && <path d="M66 98 C62 62 86 52 104 54 C126 56 140 70 134 98 C128 80 112 72 96 74 C84 76 72 84 66 98 Z" {...hair} />}
-      {look.style === "bob" && <path d="M62 106 C58 60 86 50 102 52 C124 52 144 66 140 108 L140 134 C132 130 130 112 130 100 C120 84 86 82 72 98 C70 112 70 128 62 134 Z" {...hair} />}
-      {look.style === "bun" && (
-        <>
-          <circle cx="100" cy="46" r="15" {...hair} />
-          <path d="M66 94 C66 64 86 56 100 56 C118 56 136 66 134 94 C124 78 78 78 66 94 Z" fill="#8f8a84" {...rim} />
-        </>
-      )}
-      {look.style === "fedora" && (
-        <>
-          <path d="M70 72 C70 44 130 44 130 72 Z" {...hair} />
-          <rect x="70" y="62" width="60" height="8" fill="#3a1015" />
-          <ellipse cx="100" cy="74" rx="60" ry="10" {...hair} />
-        </>
-      )}
-      {look.style === "cap" && (
-        <>
-          <path d="M64 86 C66 58 132 56 136 86 Z" {...hair} />
-          <path d="M60 86 Q100 76 152 90 L150 97 Q100 84 62 92 Z" {...hair} />
-        </>
-      )}
-      {look.style === "curly" &&
-        [
-          [70, 84],
-          [80, 66],
-          [98, 58],
-          [116, 64],
-          [130, 82],
-          [66, 104],
-          [134, 102],
-        ].map(([cx, cy]) => <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="13" fill="#7a7470" {...rim} />)}
-      {look.style === "crop" && <path d="M68 88 C68 62 88 56 100 56 C114 56 134 62 132 88 C120 78 80 78 68 88 Z" {...hair} />}
-      {look.style === "long" && <path d="M66 100 C66 62 86 54 100 54 C116 54 136 62 134 100 C124 80 78 80 66 100 Z" {...hair} />}
-      {look.style === "bald" && (
-        <>
-          <path d="M66 96 C64 108 66 116 70 120 L72 100 Z" fill="#d9d2c3" fillOpacity="0.7" />
-          <path d="M134 96 C136 108 134 116 130 120 L128 100 Z" fill="#d9d2c3" fillOpacity="0.7" />
-        </>
-      )}
-      {look.glasses && (
-        <g fill="rgba(255,255,255,0.08)" stroke={look.accent} strokeWidth="2.5">
-          <circle cx="86" cy="102" r="9" />
-          <circle cx="114" cy="102" r="9" />
-          <path d="M95 102 H105" />
-        </g>
-      )}
-    </svg>
-  );
-}
+/** Steps that aren't shown but set the scene: the place, the score's mood, a sound. */
+const setsScene = (step: Step) => "bg" in step || "music" in step || "sfx" in step;
 
 /** The backdrop: a gradient and a few shapes for each place (styles.css `.bg-*`). */
 function Scene({ bg }: { bg: Backdrop | null }) {
@@ -142,9 +77,9 @@ function Scene({ bg }: { bg: Backdrop | null }) {
   );
 }
 
-/** The first step at or after `i` that's shown (a change of scene just sets it). */
+/** The first step at or after `i` that's shown (a change of scene, mood or a sound just happens). */
 function shownFrom(list: Step[], i: number): number {
-  while (i < list.length && "bg" in list[i]) i++;
+  while (i < list.length && setsScene(list[i])) i++;
   return i;
 }
 
@@ -155,13 +90,17 @@ function sceneAt(list: Step[], at: number) {
   let place = "";
   let slots: (CharacterId | null)[] = [null, null];
   let last: CharacterId | null = null;
+  let mood: Mood = "silence";
   for (let i = 0; i <= at && i < list.length; i++) {
     const step = list[i];
     if ("bg" in step) {
       bg = step.bg;
       place = step.place;
+      mood = PLACE_SOUND[step.bg].mood;
       slots = [null, null];
       last = null;
+    } else if ("music" in step) {
+      mood = step.music;
     } else if ("say" in step && step.say !== "you") {
       const who = step.say;
       if (!slots.includes(who)) {
@@ -171,14 +110,33 @@ function sceneAt(list: Step[], at: number) {
       last = who;
     }
   }
-  return { bg, place, slots };
+  return { bg, place, slots, mood };
 }
 
 /**
  * A story scene, full screen: the place, the people in it, and their lines typed out one at a time
  * (a click or Next shows the whole line, then moves on). Some lines are your choice of what to say.
  */
-export function Cutscene({ steps, name, label, onDone }: { steps: Step[]; name: string; label: string; onDone: () => void }) {
+export function Cutscene({
+  steps,
+  name,
+  label,
+  music,
+  sound,
+  onMusic,
+  onSound,
+  onDone,
+}: {
+  steps: Step[];
+  name: string;
+  label: string;
+  /** The score (the story-music setting), and the place's sound and effects (the sound setting). */
+  music: boolean;
+  sound: boolean;
+  onMusic: (on: boolean) => void;
+  onSound: (on: boolean) => void;
+  onDone: () => void;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
   const [list, setList] = useState(steps);
   const [at, setAt] = useState(() => shownFrom(steps, 0));
@@ -191,7 +149,29 @@ export function Cutscene({ steps, name, label, onDone }: { steps: Step[]; name: 
     return () => dialog?.close();
   }, []);
   const step: Step | undefined = list[at];
-  const { bg, place, slots } = useMemo(() => sceneAt(list, at), [list, at]);
+  const { bg, place, slots, mood } = useMemo(() => sceneAt(list, at), [list, at]);
+
+  // The sound: the score and the place's sound follow the scene; effects and a title's sting play
+  // as their moment comes.
+  useEffect(() => {
+    storyAudio.start();
+    return () => storyAudio.stop();
+  }, []);
+  useEffect(() => storyAudio.setMusic(music), [music]);
+  useEffect(() => storyAudio.setSound(sound), [sound]);
+  useEffect(() => {
+    storyAudio.setMood(mood);
+    storyAudio.setAmbience(bg ? PLACE_SOUND[bg].ambience : "none");
+  }, [mood, bg]);
+  const played = useRef(-1);
+  useEffect(() => {
+    for (let i = played.current + 1; i <= at && i < list.length; i++) {
+      const s = list[i];
+      if ("sfx" in s) storyAudio.sfx(s.sfx);
+      else if ("title" in s) storyAudio.sfx("sting");
+    }
+    played.current = Math.max(played.current, at);
+  }, [at, list]);
   const text = !step ? "" : "say" in step ? fill(step.text, name) : "narrate" in step ? fill(step.narrate, name) : "";
   useEffect(() => {
     setWhole(false);
@@ -283,6 +263,26 @@ export function Cutscene({ steps, name, label, onDone }: { steps: Step[]; name: 
         </div>
       )}
       <div className="cut-controls">
+        <button
+          type="button"
+          className={`cut-toggle${music ? "" : " off"}`}
+          aria-pressed={music}
+          aria-label="Story music"
+          title={music ? "Music on (click to turn it off)" : "Music off (click to turn it on)"}
+          onClick={() => onMusic(!music)}
+        >
+          🎵
+        </button>
+        <button
+          type="button"
+          className={`cut-toggle${sound ? "" : " off"}`}
+          aria-pressed={sound}
+          aria-label="Sound"
+          title={sound ? "Sound on (click to mute)" : "Sound off (click to turn it on)"}
+          onClick={() => onSound(!sound)}
+        >
+          {sound ? "🔊" : "🔇"}
+        </button>
         <button type="button" className="cut-skip" onClick={onDone} title="Skip the rest of this scene">
           Skip scene ⏭
         </button>

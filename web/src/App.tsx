@@ -693,7 +693,10 @@ export function App() {
         c.playing = { chapter, seed: null, tour: null, attempts };
       }
     });
-    playScene(won ? ch.win : ch.lose, `Chapter ${chapter + 1}: ${ch.title}`, () => setShowCareer(true));
+    // The scene opens where the chapter was played, unless it says otherwise.
+    const steps = won ? ch.win : ch.lose;
+    const setting = [...ch.intro].reverse().find((s) => "bg" in s);
+    playScene(setting && !("bg" in steps[0]) ? [setting, ...steps] : steps, `Chapter ${chapter + 1}: ${ch.title}`, () => setShowCareer(true));
   };
 
   /** "Continue the story" after a chapter's game. */
@@ -1719,6 +1722,10 @@ export function App() {
           steps={scene.steps}
           name={career.name}
           label={scene.label}
+          music={settings.storyMusic}
+          sound={settings.sound}
+          onMusic={(on) => changeSettings({ ...settings, storyMusic: on })}
+          onSound={(on) => changeSettings({ ...settings, sound: on })}
           onDone={() => {
             setScene(null);
             scene.then();

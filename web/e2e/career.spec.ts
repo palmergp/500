@@ -7,6 +7,8 @@ import { freshStart, takeTurn } from "./helpers";
 test("story mode: a chapter's scene, its game against the story's players, and the story going on", async ({ page }, info) => {
   test.setTimeout(300_000);
   const desktop = info.project.name === "desktop";
+  const errors: string[] = [];
+  page.on("pageerror", (e) => errors.push(e.message));
   await freshStart(page);
   const menu = page.getByRole("navigation", { name: "Main menu" });
   await menu.getByRole("button", { name: /^Story/ }).click();
@@ -21,6 +23,9 @@ test("story mode: a chapter's scene, its game against the story's players, and t
   // The opening scene: a title card, then the diner, typed lines with your name in them.
   const scene = page.getByRole("dialog", { name: "Chapter 1: Tuesday Night" });
   await expect(scene.getByText("Tuesday Night")).toBeVisible();
+  // The scene has its own music and sound, each with a switch.
+  await expect(scene.getByRole("button", { name: "Story music" })).toHaveAttribute("aria-pressed", "true");
+  await expect(scene.getByRole("button", { name: "Sound" })).toHaveAttribute("aria-pressed", "true");
   await page.screenshot({ path: `test-results/${info.project.name}-career-1-title.png` });
   await scene.getByRole("button", { name: /^Continue/ }).click();
   await expect(scene.locator(".cut-place")).toContainText("Mae's Diner");
@@ -37,8 +42,13 @@ test("story mode: a chapter's scene, its game against the story's players, and t
   await expect(scene.locator(".cut-name")).toHaveText("Sam");
   // The scene never makes the page scroll.
   expect(await page.evaluate(() => document.documentElement.scrollHeight <= window.innerHeight + 1)).toBe(true);
+  // Turning the music off keeps it off (it's a setting).
+  await scene.getByRole("button", { name: "Story music" }).click();
+  await expect(scene.getByRole("button", { name: "Story music" })).toHaveAttribute("aria-pressed", "false");
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("fh500.settings") ?? "{}").storyMusic)).toBe(false);
   await scene.getByRole("button", { name: /^Skip scene/ }).click();
   await expect(scene).toHaveCount(0);
+  expect(errors).toEqual([]);
 
   // The level: four hands with Danny against Earl and Dot.
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);

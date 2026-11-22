@@ -3,15 +3,45 @@
 // line from someone at the table after each hand. `{name}` in any text is what the player is called.
 // The player is "you" throughout, never given pronouns.
 
-/** How a character's silhouette is drawn (components/Cutscene.tsx `Portrait`). */
+import type { Ambience, Mood, Sfx } from "../storyAudio";
+
+/** How a character is drawn (components/Portrait.tsx): face, hair, expression and clothes. */
 export interface Look {
-  /** The outline: hair or hat. */
-  style: "fedora" | "slick" | "bob" | "bun" | "cap" | "bald" | "curly" | "long" | "crop";
-  /** Coat, and the rim light's colour. */
+  skin: string;
+  hair: string;
+  hairStyle: "bun" | "quiff" | "bob" | "bald" | "fedora" | "flatcap" | "buzz" | "trucker" | "perm" | "crew" | "pompadour" | "long";
+  eyes: "soft" | "sly" | "narrow" | "wide" | "stern";
+  eyeColor?: string;
+  brows: "arched" | "flat" | "angry" | "raised" | "worried";
+  browColor?: string;
+  mouth: "smile" | "smirk" | "grin" | "flat" | "frown" | "nervous" | "cheer";
+  /** Lipstick. */
+  lips?: string;
+  beard?: "stubble" | "mustache" | "trim" | "full";
+  beardColor?: string;
+  /** Lines of age. */
+  old?: boolean;
+  glasses?: "reading" | "wire";
+  /** A chain on the reading glasses. */
+  chain?: boolean;
+  scar?: boolean;
+  /** A broken nose. */
+  broken?: boolean;
+  bigEars?: boolean;
+  freckles?: boolean;
+  earring?: boolean;
+  pearls?: boolean;
+  brooch?: boolean;
+  goldTooth?: boolean;
+  /** Chin width (about 8 to 18). */
+  jaw?: number;
+  top: "cardigan" | "leather" | "trench" | "tweed" | "pinstripe" | "peacoat" | "track" | "flannel" | "trenchTie" | "suitOpen" | "turtleneck";
+  /** The garment (and a hat's) colour, what's under it, and a tie or stripe. */
   coat: string;
+  shirt?: string;
+  trim?: string;
+  /** The rim of light around them. */
   accent: string;
-  glasses?: boolean;
-  beard?: boolean;
   /** Broad shoulders. */
   big?: boolean;
 }
@@ -29,19 +59,90 @@ export type CharacterId =
   | "danny" | "mae" | "roz" | "silas" | "vincent" | "bruno" | "sal" | "earl" | "dot" | "cole" | "lou" | "ingrid" | "astrid";
 
 export const CHARACTERS: Record<CharacterId, Character> = {
-  danny: { name: "Danny Reyes", role: "your partner since the sixth grade", persona: "gambler", look: { style: "slick", coat: "#4a2f1d", accent: "#f2a65a" } },
-  mae: { name: "Mae Donnelly", role: "owns the diner; taught you to play", persona: "oracle", look: { style: "bun", coat: "#24504c", accent: "#f2d38a", glasses: true } },
-  roz: { name: "Roz Vance", role: "Castellane's best player", persona: "oracle", look: { style: "bob", coat: "#2b2f36", accent: "#9fd3ff" } },
-  silas: { name: "Silas Grant", role: "the Professor, a legend who vanished", persona: "counter", look: { style: "bald", coat: "#5a4630", accent: "#ffcf8a", glasses: true, beard: true } },
-  vincent: { name: "Vincent Castellane", role: "runs the Velvet Room", persona: "shark", look: { style: "fedora", coat: "#1c2233", accent: "#e0475b" } },
-  bruno: { name: "Bruno", role: "Castellane muscle", persona: "steady", look: { style: "cap", coat: "#3b3b3b", accent: "#c9c9c9", big: true } },
-  sal: { name: "Little Sal", role: "Bruno's shadow", persona: "rookie", look: { style: "crop", coat: "#2f4a2a", accent: "#b6e08a" } },
-  earl: { name: "Earl", role: "a Tuesday regular", persona: "rookie", look: { style: "cap", coat: "#6b2a24", accent: "#ffb38a" } },
-  dot: { name: "Dot", role: "a Tuesday regular", persona: "rookie", look: { style: "curly", coat: "#6a3a5a", accent: "#ffb0d8" } },
-  cole: { name: "Det. Harlan Cole", role: "a cop on the payroll", persona: "gambler", look: { style: "crop", coat: "#6b5a3a", accent: "#e8d27a" } },
-  lou: { name: "Lucky Lou", role: "says he's lucky", persona: "steady", look: { style: "slick", coat: "#3e2a55", accent: "#c8a2ff" } },
-  ingrid: { name: "Ingrid Lindqvist", role: "a Moreau twin who counts everything", persona: "counter", look: { style: "long", coat: "#202428", accent: "#f4f0d0" } },
-  astrid: { name: "Astrid Lindqvist", role: "a Moreau twin who never takes a risk", persona: "rock", look: { style: "long", coat: "#202428", accent: "#c0d8f0" } },
+  danny: {
+    name: "Danny Reyes",
+    role: "your partner since the sixth grade",
+    persona: "gambler",
+    look: { skin: "#c68a5e", hair: "#2a1a12", hairStyle: "quiff", eyes: "sly", brows: "arched", mouth: "smirk", beard: "stubble", jaw: 12, top: "leather", coat: "#5a3420", shirt: "#efe9dc", accent: "#f2a65a" },
+  },
+  mae: {
+    name: "Mae Donnelly",
+    role: "owns the diner; taught you to play",
+    persona: "oracle",
+    look: {
+      skin: "#e8c2a0", hair: "#c9c4bd", hairStyle: "bun", eyes: "soft", eyeColor: "#4a6a7a", brows: "arched", mouth: "smile", lips: "#a8585e", old: true,
+      glasses: "reading", chain: true, brooch: true, jaw: 9, top: "cardigan", coat: "#2f5f5a", shirt: "#f2ede2", accent: "#f2d38a",
+    },
+  },
+  roz: {
+    name: "Roz Vance",
+    role: "Castellane's best player",
+    persona: "oracle",
+    look: { skin: "#efd3bf", hair: "#111214", hairStyle: "bob", eyes: "narrow", eyeColor: "#3b4a5a", brows: "flat", mouth: "flat", lips: "#a3122a", earring: true, jaw: 9, top: "trench", coat: "#3a3f47", shirt: "#141518", accent: "#9fd3ff" },
+  },
+  silas: {
+    name: "Silas Grant",
+    role: "the Professor, a legend who vanished",
+    persona: "counter",
+    look: {
+      skin: "#8d5a3b", hair: "#e9e4da", hairStyle: "bald", eyes: "stern", brows: "flat", browColor: "#cfc8bb", mouth: "flat", beard: "trim", beardColor: "#e9e4da", old: true,
+      glasses: "wire", scar: true, jaw: 11, top: "tweed", coat: "#6b5236", shirt: "#f2ede2", trim: "#6e1f2a", accent: "#ffcf8a",
+    },
+  },
+  vincent: {
+    name: "Vincent Castellane",
+    role: "runs the Velvet Room",
+    persona: "shark",
+    look: { skin: "#d9a77f", hair: "#1a1410", hairStyle: "fedora", eyes: "sly", brows: "raised", mouth: "smirk", beard: "mustache", jaw: 12, top: "pinstripe", coat: "#1c2538", shirt: "#f4f1ea", trim: "#b3172c", accent: "#e0475b" },
+  },
+  bruno: {
+    name: "Bruno",
+    role: "Castellane muscle",
+    persona: "steady",
+    look: { skin: "#c99572", hair: "#3a2e26", hairStyle: "flatcap", eyes: "stern", brows: "angry", mouth: "frown", beard: "stubble", broken: true, jaw: 18, big: true, top: "peacoat", coat: "#3b3d40", shirt: "#151515", accent: "#c9c9c9" },
+  },
+  sal: {
+    name: "Little Sal",
+    role: "Bruno's shadow",
+    persona: "rookie",
+    look: { skin: "#e3b48f", hair: "#3b2a1c", hairStyle: "buzz", eyes: "wide", brows: "worried", mouth: "nervous", bigEars: true, freckles: true, jaw: 8, top: "track", coat: "#2f6b3a", trim: "#f2f2f2", accent: "#b6e08a" },
+  },
+  earl: {
+    name: "Earl",
+    role: "a Tuesday regular",
+    persona: "rookie",
+    look: { skin: "#e0ac88", hair: "#a9a39a", hairStyle: "trucker", eyes: "soft", brows: "flat", mouth: "smile", beard: "full", beardColor: "#b5afa6", old: true, jaw: 14, top: "flannel", coat: "#8a2a22", shirt: "#efe9dc", accent: "#ffb38a" },
+  },
+  dot: {
+    name: "Dot",
+    role: "a Tuesday regular",
+    persona: "rookie",
+    look: { skin: "#f0cfb3", hair: "#cfc3d6", hairStyle: "perm", eyes: "soft", brows: "arched", mouth: "cheer", lips: "#d46a8f", old: true, pearls: true, jaw: 9, top: "cardigan", coat: "#c45f8e", shirt: "#f6efe6", accent: "#ffb0d8" },
+  },
+  cole: {
+    name: "Det. Harlan Cole",
+    role: "a cop on the payroll",
+    persona: "gambler",
+    look: { skin: "#d8a383", hair: "#8a6a45", hairStyle: "crew", eyes: "narrow", brows: "angry", mouth: "frown", beard: "stubble", jaw: 16, top: "trenchTie", coat: "#a8895a", shirt: "#ece6d8", trim: "#2b2f3a", accent: "#e8d27a" },
+  },
+  lou: {
+    name: "Lucky Lou",
+    role: "says he's lucky",
+    persona: "steady",
+    look: { skin: "#b67a52", hair: "#0d0d0d", hairStyle: "pompadour", eyes: "sly", brows: "raised", mouth: "grin", goldTooth: true, jaw: 11, top: "suitOpen", coat: "#5b2f86", shirt: "#151515", accent: "#c8a2ff" },
+  },
+  ingrid: {
+    name: "Ingrid Lindqvist",
+    role: "a Moreau twin who counts everything",
+    persona: "counter",
+    look: { skin: "#f3dccb", hair: "#efe6c8", hairStyle: "long", eyes: "sly", eyeColor: "#5a7a9a", brows: "arched", mouth: "smirk", lips: "#8a3a4a", jaw: 8, top: "turtleneck", coat: "#1b1d21", shirt: "#0f1012", accent: "#f4f0d0" },
+  },
+  astrid: {
+    name: "Astrid Lindqvist",
+    role: "a Moreau twin who never takes a risk",
+    persona: "rock",
+    look: { skin: "#f3dccb", hair: "#efe6c8", hairStyle: "long", eyes: "stern", eyeColor: "#5a7a9a", brows: "flat", mouth: "flat", lips: "#7a3a46", jaw: 8, top: "turtleneck", coat: "#1b1d21", shirt: "#0f1012", accent: "#c0d8f0" },
+  },
 };
 
 /** The scene behind the dialogue (styles.css `.bg-*`). */
@@ -54,13 +155,35 @@ export type Step =
   | { title: string; sub?: string }
   | { say: CharacterId | "you"; text: string }
   | { narrate: string }
-  | { choose: { label: string; then: Step[] }[] };
+  | { choose: { label: string; then: Step[] }[] }
+  /** The score changes mood (each place has its own until then). */
+  | { music: Mood }
+  /** A sound, as the next line appears. */
+  | { sfx: Sfx };
+
+/** Each place's mood and sound, until a step says otherwise. */
+export const PLACE_SOUND: Record<Backdrop, { mood: Mood; ambience: Ambience }> = {
+  diner: { mood: "noir", ambience: "rain" },
+  "diner-dawn": { mood: "dawn", ambience: "birds" },
+  street: { mood: "noir", ambience: "rain" },
+  poolhall: { mood: "tension", ambience: "pool" },
+  velvet: { mood: "noir", ambience: "crowd" },
+  warehouse: { mood: "tension", ambience: "hum" },
+  car: { mood: "noir", ambience: "car" },
+  boarding: { mood: "sad", ambience: "clock" },
+  lounge: { mood: "noir", ambience: "crowd" },
+  pier: { mood: "tension", ambience: "waves" },
+  ballroom: { mood: "tension", ambience: "crowd" },
+  penthouse: { mood: "tension", ambience: "city" },
+};
 
 const at = (bg: Backdrop, place: string): Step => ({ bg, place });
 const card = (title: string, sub?: string): Step => ({ title, sub });
 const n = (narrate: string): Step => ({ narrate });
 const say = (who: CharacterId | "you", text: string): Step => ({ say: who, text });
 const you = (text: string): Step => ({ say: "you", text });
+const mus = (music: Mood): Step => ({ music });
+const fx = (sfx: Sfx): Step => ({ sfx });
 const choose = (...options: [string, ...Step[]][]): Step => ({ choose: options.map(([label, ...then]) => ({ label, then })) });
 
 /** A line someone at the table says after a hand: by who declared it and whether it made. */
@@ -123,6 +246,7 @@ export const CHAPTERS: Chapter[] = [
       say("mae", "Chairs down, {name}. Earl's been shuffling for ten minutes and he still can't do it."),
       say("earl", "I'm warming the deck up. It's a technique."),
       say("dot", "It's a stalling technique. He owes me two dollars from last week."),
+      fx("bell"),
       n("The bell over the door. Danny Reyes, soaked to the skin, grinning like he's already won."),
       say("danny", "Am I late? Don't answer that. Deal me in, partner."),
       choose(
@@ -152,7 +276,9 @@ export const CHAPTERS: Chapter[] = [
       say("mae", "Lock up when you're done, you two."),
       n("She takes her coat. At the door she stops beside the corner booth, just for a second, and says something to the man in gray. Then she's gone into the rain."),
       n("The man in gray stands. On his way out, he drops a card on your table."),
-      n("The Joker. Across its face, in fountain pen, a phone number and three words: FRIDAY. BRING YOUR PARTNER."),
+      fx("card"),
+      mus("tension"),
+      n("The Joker. Across its face, in fountain pen, a phone number and four words: FRIDAY. BRING YOUR PARTNER."),
       say("danny", "Huh."),
       n("Danny picks it up too fast. He isn't grinning any more."),
       you("Danny. Who was that?"),
@@ -164,7 +290,7 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: "Forty Thousand",
-    tagline: "Danny owes the wrong people.",
+    tagline: "Danny's waiting outside, and he isn't smiling.",
     intro: [
       card("Chapter Two", "Forty Thousand"),
       at("street", "Front Street · Friday, 2:15 a.m."),
@@ -206,10 +332,13 @@ export const CHAPTERS: Chapter[] = [
     win: [
       n("Sal stares at the score pad like it insulted his mother. Bruno just nods, slowly."),
       say("bruno", "Huh. The cook can play."),
+      fx("phone"),
       n("A phone rings behind the bar. Bruno answers, listens, says \"Yes, Mr. Castellane\" three times and hangs up."),
       say("bruno", "Debt's on hold. Not gone. On hold."),
       say("danny", "That wasn't the deal!"),
       say("bruno", "Deal changed. Mr. Castellane wants to meet your partner. Tomorrow night, the Velvet Room. Wear something nice, cook."),
+      mus("noir"),
+      fx("lighter"),
       n("Outside, the rain has stopped. Danny lights a cigarette with shaking hands."),
       say("danny", "I'm sorry, {name}. I swear I'll make this right."),
       n("You believe him. You've always believed him."),
@@ -228,6 +357,7 @@ export const CHAPTERS: Chapter[] = [
       at("velvet", "The Velvet Room, Harbor Street · Saturday, midnight"),
       n("Red velvet walls. A jazz trio that only plays in minor keys. Every table is a card table."),
       n("At the back, beneath a painting of a Joker in a crown, sits Vincent Castellane."),
+      fx("glass"),
       say("vincent", "So you're the cook who beat my Bruno. Sit. Have a drink. Don't have a drink. I'm not your mother."),
       say("vincent", "Do you know what this city runs on, {name}? Not money. Not guns. Favors. And the Kitty."),
       you("The kitty? The three cards in the middle?"),
@@ -259,6 +389,7 @@ export const CHAPTERS: Chapter[] = [
       },
     },
     win: [
+      fx("applause"),
       n("Vincent applauds, slowly."),
       say("vincent", "Beautiful. Did you see that, Harlan? Like a pianist."),
       say("cole", "I saw it. I don't like it."),
@@ -285,6 +416,7 @@ export const CHAPTERS: Chapter[] = [
       n("Across the room, a woman in a charcoal coat sits alone, writing in a small black notebook. She hasn't looked up once."),
       n("Through the loading door you'd swear you see a car you know: a green Buick with one headlight out. Like Mae's."),
       n("When you look again, it's gone."),
+      fx("buzz"),
       n("Your phone buzzes. Danny: \"Knock em dead partner. Top 4. I'm counting on you. Literally.\""),
     ],
     level: {
@@ -383,6 +515,8 @@ export const CHAPTERS: Chapter[] = [
       say("silas", "For a murder I didn't commit, at a table I never left. We built the Kitty together, my partner and I. Then the Kitty only needed one of us."),
       you("Who was your partner?"),
       say("silas", "A name won't help you. Watching will. My partner smiled every time they lost a trick. Watch for the one who smiles when they lose."),
+      fx("knock"),
+      mus("noir"),
       n("A knock. Danny, holding a bag of oranges, looking lost."),
       say("danny", "Roz said to meet here? Hi. Danny. I brought fruit. Is that weird?"),
       say("silas", "Excellent. Now we have four."),
@@ -441,16 +575,22 @@ export const CHAPTERS: Chapter[] = [
       },
     },
     win: [
+      mus("silence"),
       n("The last card hits the felt, and the front doors burst inward."),
+      fx("crash"),
+      mus("tension"),
       n("\"POLICE! EVERYBODY DOWN!\""),
+      fx("sirens"),
       n("Chaos. Chips everywhere. The bass player dives behind the bar."),
       say("danny", "This way! Come on!"),
+      fx("footsteps"),
       n("Danny grabs your arm and pulls you, not toward the back exit, but through the kitchen and a door you never knew existed."),
       n("He knew exactly where it was."),
       at("street", "The alley behind Harbor Street"),
       you("Where's Silas?"),
       n("Through the gap in the door: two officers walking the old man out in handcuffs. He doesn't struggle. He looks straight at the alley. Straight at Danny."),
       say("danny", "Somebody tipped them off. Somebody's a rat."),
+      fx("buzz"),
       n("Your phone buzzes. An unknown number, one line: \"Don't trust anyone. Not even me. —R\""),
     ],
     lose: [say("vincent", "Pathetic. Again, before I lose my appetite.")],
@@ -461,6 +601,7 @@ export const CHAPTERS: Chapter[] = [
     intro: [
       card("Chapter Eight", "The Kitty"),
       at("pier", "Pier Nine · before dawn"),
+      fx("foghorn"),
       n("Roz is waiting at the end of the pier, collar up, back to the water."),
       say("roz", "I don't have long. Listen carefully."),
       say("roz", "My name is Rosalind Vance. I'm a federal agent. I've been inside the Castellane family for three years."),
@@ -491,6 +632,8 @@ export const CHAPTERS: Chapter[] = [
       n("Your name climbs the board, past the Moreaus, past Hollis Crane, into the top three."),
       say("vincent", "Ha! Did I not say? Did I not say!"),
       n("The final is tomorrow night, in the penthouse."),
+      mus("noir"),
+      fx("buzz"),
       n("That night you can't sleep. At 3 a.m. your phone buzzes. Danny."),
       n("\"Meet me at the pier. Need to tell you something. Just you.\""),
     ],
@@ -498,14 +641,17 @@ export const CHAPTERS: Chapter[] = [
   },
   {
     title: "Thirty Pieces of Silver",
-    tagline: "The partner you trusted.",
+    tagline: "Danny wants to talk. Just the two of you.",
     intro: [
       card("Chapter Nine", "Thirty Pieces of Silver"),
       at("pier", "Pier Nine · 3:40 a.m."),
+      mus("sad"),
+      fx("foghorn"),
       n("Fog. A foghorn somewhere past the breakwater. Danny sits on a crate, staring at the water."),
       say("danny", "Remember sixth grade? Mr. Pruitt caught me cheating at cards and you said the cards were yours. A week of detention, for me."),
       you("You said you'd pay me back."),
       say("danny", "Yeah. I'm about to."),
+      mus("tension"),
       say("danny", "There's no debt, {name}. There never was."),
       n("The fog seems to get colder."),
       say("danny", "They came to me a year ago. They needed a player nobody knew. Clean. Good. Somebody they could own. I said I knew somebody."),
@@ -520,8 +666,11 @@ export const CHAPTERS: Chapter[] = [
       you("And if I don't?"),
       say("danny", "Then you have to win your seat first. Vincent's called a challenge: the seat goes to whoever wins tonight. Me and Vincent, against you and whoever you can find at four in the morning."),
       say("danny", "I'm sorry, partner. I really am."),
+      mus("sad"),
+      fx("footsteps"),
       n("He walks off into the fog. You stand there a long time."),
       at("diner", "Mae's Diner · 4:30 a.m."),
+      fx("bell"),
       n("The only light on in Port Calloway is Mae's. She's behind the counter with two cups of coffee already poured, as if she knew."),
       say("mae", "You look like somebody died."),
       you("Danny."),
@@ -564,10 +713,15 @@ export const CHAPTERS: Chapter[] = [
       n("Glass walls. The whole city below, lit up like a hand full of diamonds."),
       n("Every family boss in Port Calloway stands behind a velvet rope. At the head of the room, one chair sits empty."),
       say("vincent", "Ladies and gentlemen. Before we begin, the founder of the Kitty would like to say a few words."),
+      mus("silence"),
+      fx("elevator"),
       n("The elevator opens. Footsteps. Slow, and familiar."),
+      fx("footsteps"),
       n("A gray bun. Reading glasses on a chain. The same cardigan she wore when she taught you to count trumps at the counter, twelve years ago."),
+      fx("sting"),
       say("mae", "Hello, {name}."),
       you("…Mae?"),
+      mus("tension"),
       say("mae", "Don't look at me like that. You've looked at me like that since you were ten. Like I hung the moon."),
       say("mae", "I built this. Silas and I, forty years ago. Then Silas got sentimental about rules, so I let him take the fall."),
       say("mae", "Vincent is my nephew. He's very good at being looked at. And Danny is mine. He always was."),
@@ -577,6 +731,7 @@ export const CHAPTERS: Chapter[] = [
         ["Never.", say("mae", "Everyone says that, the first time.")],
         ["Why me?", say("mae", "Because you're the only one who ever beat me at my own counter. Ten years old, and you counted my trumps.")],
       ),
+      fx("elevator"),
       n("The elevator opens again."),
       say("silas", "Sorry I'm late. The federal government drives like my grandmother."),
       n("Silas Grant, in a borrowed suit, rubbing his wrists. Behind him, for half a second, a charcoal coat, before the doors slide shut."),
@@ -600,14 +755,18 @@ export const CHAPTERS: Chapter[] = [
       },
     },
     win: [
+      mus("silence"),
       n("The last trick. Yours."),
       n("For a long moment nobody in the penthouse breathes."),
       n("Then Mae Donnelly smiles. The smile Silas told you about."),
       say("mae", "Well. Look at that."),
+      fx("elevator"),
+      mus("tension"),
       n("The elevator doors open on a wall of FBI jackets. In front, badge raised: Roz."),
       say("roz", "Mary Ellen Donnelly, you're under arrest for racketeering, fraud, and the murder of Thomas Hale, nineteen eighty-four."),
       say("silas", "That was the one they gave me."),
       say("mae", "Took you long enough, Agent Vance. You think the Kitty is a room? It's a deck of cards. Somebody will always deal."),
+      fx("cuffs"),
       n("Vincent is already in cuffs. Danny is edging toward the stairwell."),
       choose(
         ["Let him go.", n("You watch him go. At the door he looks back, and for a second he's eleven years old again."), say("danny", "I'm sorry, {name}. I really am."), n("Roz sighs and speaks into her radio. He doesn't get far.")],

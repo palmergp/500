@@ -28,6 +28,8 @@ export interface Settings {
   sound: boolean;
   /** Background music. */
   music: boolean;
+  /** Music in the story's scenes. */
+  storyMusic: boolean;
   /** Four-color deck: diamonds blue, clubs green. */
   fourColor: boolean;
   /** Larger cards. */
@@ -50,6 +52,7 @@ export const DEFAULT_SETTINGS: Settings = {
   quizRate: "medium",
   sound: true,
   music: false,
+  storyMusic: true,
   fourColor: false,
   bigCards: false,
   pauseAfterBidding: false,

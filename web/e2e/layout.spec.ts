@@ -19,7 +19,7 @@ test("the main menu, and tooltips on the table's buttons", async ({ page }) => {
   const menu = page.getByRole("navigation", { name: "Main menu" });
   for (const name of [/^Play solo/, /^Play with friends/, /^Learn/, /^Settings/]) await expect(menu.getByRole("button", { name })).toBeVisible();
   await menu.getByRole("button", { name: /^Settings/ }).click();
-  await expect(page.getByRole("dialog", { name: "Settings" }).getByLabel("Music")).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Settings" }).getByLabel(/^Music/)).toBeVisible();
   await page.getByRole("dialog", { name: "Settings" }).getByRole("button", { name: "Done" }).click();
   await page.screenshot({ path: `test-results/menu-${test.info().project.name}.png` });
 

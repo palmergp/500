@@ -7,7 +7,7 @@ interface Props {
   onClose: () => void;
 }
 
-type Toggle = "grade" | "trumpCounter" | "tracker" | "voids" | "quiz" | "sound" | "music" | "fourColor" | "bigCards" | "pauseAfterBidding";
+type Toggle = "grade" | "trumpCounter" | "tracker" | "voids" | "quiz" | "sound" | "music" | "storyMusic" | "fourColor" | "bigCards" | "pauseAfterBidding";
 
 const COACH: { key: Toggle; label: string; detail: string }[] = [
   { key: "grade", label: "Grade my decisions", detail: "After each bid and card, see how it compares with the expert's choice, and undo mistakes." },
@@ -20,6 +20,7 @@ const COACH: { key: Toggle; label: string; detail: string }[] = [
 const SOUND: { key: Toggle; label: string; detail: string }[] = [
   { key: "sound", label: "Sound effects", detail: "Cards, bids, tricks and results." },
   { key: "music", label: "Music", detail: "Quiet background music." },
+  { key: "storyMusic", label: "Story music", detail: "The score in Story mode's scenes." },
 ];
 
 const DISPLAY: { key: Toggle; label: string; detail: string }[] = [

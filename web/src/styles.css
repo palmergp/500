@@ -3614,3 +3614,19 @@ dialog.cutscene::backdrop {
   letter-spacing: 0.04em;
   color: var(--gold);
 }
+.cut-controls {
+  display: flex;
+  gap: 0.4rem;
+}
+.cut-toggle.off {
+  opacity: 0.55;
+}
+.cut-place {
+  max-width: calc(100% - 300px);
+}
+@media (max-width: 640px) {
+  .cut-place {
+    top: calc(max(12px, env(safe-area-inset-top)) + 44px);
+    max-width: calc(100% - 32px);
+  }
+}

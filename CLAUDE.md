@@ -82,7 +82,10 @@
   (local storage). A level is a game against story characters (solo save, `careerGame` in App.tsx, "Continue the
   story" at its end) or a tournament with a story cast (`Tournament.career`, judged by place after the final reveal).
   Scenes play in `components/Cutscene.tsx` (a full-screen `<dialog>`; `{name}` is the player, who is never given
-  pronouns); the chapter list is `components/Career.tsx`. Test: `e2e/career.spec.ts`.
+  pronouns); characters are drawn by `components/Portrait.tsx` from their `Look`; the chapter list is
+  `components/Career.tsx`. Scene sound is `storyAudio.ts` (synthesized like `audio.ts`, whose music rests meanwhile):
+  each place has a mood and ambience (`PLACE_SOUND`), steps `{ music }` and `{ sfx }` change them, title cards sting;
+  the score follows `Settings.storyMusic`, the rest `Settings.sound`. Test: `e2e/career.spec.ts`.
 - A finished solo game stays saved (a reload shows its result) but is marked over (`savedGame.over`), so the main
   menu doesn't offer Continue; the game-over result has Main menu and New game.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,

@@ -26,6 +26,21 @@ class AudioEngine {
   private bar = 0;
   sfxOn = true;
   musicOn = false;
+  /** A story scene is playing its own score (storyAudio.ts): the table's music rests meanwhile. */
+  private resting = false;
+
+  /** The audio context and the master output, for the story's score and sounds; null until the
+   * first click has started audio. */
+  get output(): { ctx: AudioContext; out: GainNode } | null {
+    return this.ctx && this.master ? { ctx: this.ctx, out: this.master } : null;
+  }
+
+  /** Pauses the table's music for a story scene (true), and picks it up again after (false). */
+  rest(on: boolean) {
+    this.resting = on;
+    if (on) this.stopMusic();
+    else if (this.musicOn) this.startMusic();
+  }
 
   /** Starts the audio context; call from a user gesture. */
   unlock() {
@@ -146,7 +161,7 @@ class AudioEngine {
   // ---- Music: a gentle bossa nova -----------------------------------------------------------
 
   private startMusic() {
-    if (!this.ctx || this.musicTimer !== null) return;
+    if (!this.ctx || this.musicTimer !== null || this.resting) return;
     this.nextBar = this.ctx.currentTime + 0.1;
     const schedule = () => {
       while (this.ctx && this.nextBar < this.ctx.currentTime + 1.5) {
