@@ -62,8 +62,8 @@ impl NeuralBot {
             Action::Play(p) => scores[play_slot(p.card, trump)],
             _ => f32::MIN,
         };
-        // Never the Joker to the first trick of a no-trump hand (finding 54).
-        let hold_joker = crate::cardplay::opening_joker_lead(obs);
+        // Never the Joker to the first three tricks of a no-trump hand as declarer (findings 54, 56).
+        let hold_joker = crate::cardplay::early_joker_lead(obs).is_some();
         let allowed = |a: &&Action| !(hold_joker && matches!(a, Action::Play(p) if p.card.is_joker()));
         let best = legal.iter().filter(allowed).copied().max_by(|a, b| score(a).total_cmp(&score(b))).expect("legal plays");
         // Of touching cards, the one partner can read (the ace from A-K).

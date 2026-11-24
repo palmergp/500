@@ -383,7 +383,12 @@ Leading small toward partner's Joker draws the opponents' trumps without spendin
   0.2 tricks. **From about trick 7, lead it** (+0.2 tricks): it's a sure trick and the lead, and naming a suit makes
   the others give up cards in it. It isn't a stopper: you may play it only when you can't follow suit (finding 53).
   Played out both ways from the opening lead, the Joker lost 0.31 tricks and the bid was made 48% of the time
-  against 58% with the best other lead (finding 54); the bots no longer open with it.
+  against 58% with the best other lead (finding 54); the bots no longer open with it. In tricks 2–3 it still cost
+  (about 0.1 tricks, pooled over three runs), so the bots keep it through the third trick; in tricks 4–6 it came out
+  even, and from trick 7 it gained a third of a trick (finding 56).
+- **Which suit to name:** everyone else must play the suit you name, so name one where that costs the opponents,
+  not your partner. A suit you're out of costs you nothing and can strip the defenders in partner's suit. Don't name
+  a suit where partner may hold the last high cards: partner has to play one under your Joker and loses a trick.
 
 ### 10. Don't rush the Joker as declarer
 

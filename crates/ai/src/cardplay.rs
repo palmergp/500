@@ -48,6 +48,28 @@ pub fn opening_joker_lead(obs: &Observation) -> bool {
 /// bid and going down one, in `utility`'s units.
 pub const OPENING_JOKER_CHANCE: f64 = 0.10;
 
+/// A Joker lead in no trumps by the declaring side in the first three tricks, holding other cards:
+/// how much of the swing between making the bid and going down one it counts as costing (the
+/// search rates these leads well above what they take at the table; findings 54 and 56). None
+/// elsewhere: from trick 4 the search decides (tricks 4–6 came out even, 7 on the Joker lead pays).
+pub fn early_joker_lead(obs: &Observation) -> Option<f64> {
+    if opening_joker_lead(obs) {
+        return Some(OPENING_JOKER_CHANCE);
+    }
+    let (declarer, _) = obs.contract?;
+    let leading = obs.current_trick.as_ref().is_some_and(|t| t.cards().is_empty());
+    (obs.trump().is_none()
+        && declarer.team() == obs.seat.team()
+        && obs.tricks.len() < 3
+        && leading
+        && obs.hand.contains(Card::JOKER)
+        && obs.hand.len() > 1)
+        .then_some(EARLY_JOKER_CHANCE)
+}
+
+/// Tricks 2–3: the bid made about a twentieth less often with the Joker lead (finding 56).
+pub const EARLY_JOKER_CHANCE: f64 = 0.05;
+
 /// Early in a suit bid (tricks 1–3), the declaring side on lead, holding the top trump left while
 /// trumps may still be out: that top trump. From here, leading it or cashing a side ace came out
 /// even when both were played out (finding 55), though the search usually rates the ace higher.

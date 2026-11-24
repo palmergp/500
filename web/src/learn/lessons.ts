@@ -243,6 +243,7 @@ export const LESSONS: Lesson[] = [
       "Cash a side ace early rather than late: as the hand goes on the opponents run out of side suits, and an ace led after trick 6 was trumped 39% of the time (7% in the first three tricks). In the first three tricks, leading your top trump or cashing a side ace came out even when hands were played out both ways, even with many trumps out. Leading a side king early is the weak play: it ran into the ace more often than not.",
       "## No trumps",
       "Cash your side winners first: an ace or sure winner was the best lead 87% of the time. Don't lead the Joker early: in the first three tricks it cost about 0.2 tricks. Remember it isn't a stopper: you may play it only when you can't follow suit. Late in the hand (from about trick 7) leading it is better: a sure trick, the lead back, and the suit you name makes the others give up cards in it.",
+      "When you lead the Joker, name a suit that costs the opponents, not your partner. A suit you're out of costs you nothing and can strip the defenders in your partner's suit. Don't name a suit where your partner may hold the last high cards: they must play one under your Joker, and a winner is lost.",
     ],
     quiz: [
       {

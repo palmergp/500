@@ -826,6 +826,8 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     if chosen_play.is_some_and(|c| c.card.is_joker()) && !best_play.card.is_joker() && (trump.is_none() || partner_winning) {
         reasons.push(if crate::cardplay::opening_joker_lead(obs) {
             "Don't open with the Joker in no trumps: kept, it takes the lead back once you're out of a suit. Declarers who led it first made their bid 48% of the time, against 58% with another lead.".into()
+        } else if crate::cardplay::early_joker_lead(obs).is_some() {
+            "Not yet: keep the Joker through the first three tricks. Kept, it takes the lead back once you're out of a suit; declarers who led it this early took fewer tricks. From about trick 7 it's a good lead.".into()
         } else if trump.is_none() {
             "Keep the Joker: once you're out of the suit led, it wins the trick and gets you back in.".into()
         } else {
@@ -1581,6 +1583,36 @@ mod tests {
         obs.seat = Seat::SOUTH;
         obs.contract = Some((Seat::SOUTH, Contract::new(7, Strain::NoTrumps)));
         assert_eq!(crate::cardplay::early_top_trump(&obs), None);
+    }
+
+    /// The same holds through the third trick (finding 56): after cashing the A♠, the declarer
+    /// still doesn't lead the Joker, and the coach says why if you do.
+    #[test]
+    fn holds_the_joker_through_the_third_trick() {
+        let (mut obs, _) = opening_lead_with_the_joker();
+        let plays: Vec<Play> = ["AS", "5S", "6S", "7S"].iter().map(|c| Play::card(Card::parse(c).unwrap())).collect();
+        obs.tricks = vec![Trick::from_plays(Seat::SOUTH, &plays, None)];
+        obs.hand = CardSet::parse("Joker KS QS 9S AH KH 7H AD 6C").unwrap();
+        obs.tricks_won = [1, 0];
+        let trick = Trick::new(Seat::SOUTH);
+        obs.current_trick = Some(trick.clone());
+        let legal: Vec<Action> = fh_core::legal_plays(obs.hand, &trick, None).into_iter().map(Action::Play).collect();
+        let is_joker = |a: Action| matches!(a, Action::Play(p) if p.card.is_joker());
+        assert_eq!(crate::cardplay::early_joker_lead(&obs), Some(crate::cardplay::EARLY_JOKER_CHANCE));
+        for seed in 0..3 {
+            let mut bot = SearchBot::new("Oracle", SearchConfig::ORACLE, seed);
+            assert!(!is_joker(bot.choose(&obs, &legal)));
+        }
+        if let Some(natural) = crate::neural_play::NeuralBot::new("Natural", 1) {
+            assert!(!is_joker(natural.play(&obs, &legal)));
+        }
+        let joker = *legal.iter().find(|&&a| is_joker(a)).unwrap();
+        let grade = Coach::new(3).grade(&obs, &legal, joker);
+        assert!(!is_joker(grade.best));
+        assert!(grade.analysis.reasons.iter().any(|r| r.contains("keep the Joker through the first three tricks")), "{:?}", grade.analysis.reasons);
+        // From the fourth trick, the search decides.
+        obs.tricks = vec![obs.tricks[0].clone(); 3];
+        assert_eq!(crate::cardplay::early_joker_lead(&obs), None);
     }
 
     #[test]

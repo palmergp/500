@@ -1150,6 +1150,67 @@ the same bots and seeds, once with the top trump and once with the ace, and the 
   the coach grades the top trump or a side ace as good at no cost, whichever it prefers, and its hint offers the
   other as just as good, with the numbers (`cardplay::ace_or_top_trump`). The bots play as before.
 
+### 56. The Joker lead in no trumps, by trick and by the suit it names
+
+The user saw it again: partner, declaring 7 no trumps, cashed A♦ K♦ A♠ and then led the Joker naming diamonds; the
+user held the last two diamonds (Q♦ 10♦), had to play one under the Joker, and the bid went down two.
+`fh-lab whatif` played that position out both ways over 1,000 deals North thought possible (The Oracle in every
+seat): naming diamonds lost 0.25 ± 0.08 tricks and 25 ± 13 points to leading the 4♦ (bid made 77% against 82%),
+though the search had rated it 68 points better. In the deals North imagined, the user held both diamonds only 20%
+of the time, and wherever West held one the Joker pulled it; the play-outs said keeping the Joker was better anyway.
+
+`fh-lab jokerlead` (16,000 deals, without the opening rule) again played every Joker lead The Oracle was about to
+make out both ways, now through trick 9 and split by the suit named:
+
+| Declaring side | n | Tricks (Joker − other, 95%) | Points | Bid made: Joker / other |
+|---|---|---|---|---|
+| Trick 1 | 60 | −0.50 | −52 | 43% / 53% |
+| Tricks 2–3 | 241 | **−0.29 ± 0.20** | −36 ± 37 | 59% / 65% |
+| Tricks 4–6 | 753 | −0.02 ± 0.09 | −3 ± 19 | 71% / 71% |
+| Tricks 7+ | 616 | **+0.34 ± 0.07** | +26 ± 13 | 92% / 87% |
+
+(Naming a suit the leader is out of was rare, 99 of 1,670, and no different from naming its own suit within the
+noise.) Pooled with finding 54's runs, tricks 2–3 come to about −0.12 ± 0.10 tricks. The search rated its Joker
+leads 46 points better than the best other lead on average; played out they came to +1 ± 11.
+
+- **The rule now covers tricks 1–3** (`cardplay::early_joker_lead`): search bots and The Natural don't lead the
+  Joker as the declaring side in the first three tricks of a no-trump hand, and the coach counts it as costing a
+  tenth (trick 1) or a twentieth (tricks 2–3) of the swing between making the bid and going down one, and says why.
+- **Tricks 4–6 are left to the search.** On average its Joker leads there came out even, so the user's hand (trick
+  4) was a mid-hand lead that the play-outs found worse in that position, not a pattern a rule can catch.
+- **From trick 7, lead it.** A third of a trick better, as findings 53 and 54 found.
+- **Naming:** the suit named only decides what the others must give up. A suit the leader is out of costs nothing
+  (the user's second hand: naming spades dropped West's lone K♠ under partner's A Q J); naming a suit where partner
+  may hold the last high cards crashes one of them, as in the first hand.
+
+### 57. The declarer's opening lead of a low side card
+
+The user asked why a declarer would win the bid and lead a sure loser, an off-suit 6. Rule bots never do it in a
+suit bid (they draw trumps first); the search bots and The Natural do. `fh-lab offlead` (4,000 deals): The Oracle's
+opening lead as declarer in suit bids was the top trump or a side ace about half the time, the Joker 15%, a lower
+trump 16%, and a low side card 29% (from four or more 13%, from three 10%, from two 3%, a singleton 3%). In no trumps
+it cashed an ace 61% of the time and led low 38%, mostly from three or four. Valued by the solver alone (every card
+seen) the low leads looked 0.16–0.47 tricks worse than the top trump. Played out both ways by The Oracle in every
+seat (`fh-lab offlead --playout 1`, 8,000 deals), they weren't:
+
+| Bid | Low lead from | n | Tricks (low − other, 95%) | Points | Bid made |
+|---|---|---|---|---|---|
+| Suit | four or more | 307 | +0.07 ± 0.12 | +15 ± 22 | +4% |
+| Suit | three | 279 | +0.09 ± 0.10 | +4 ± 21 | +1% |
+| Suit | two | 72 | +0.01 ± 0.26 | +26 ± 49 | +6% |
+| Suit | a singleton | 77 | +0.00 ± 0.19 | +24 ± 45 | +5% |
+| Suit | all | 735 | **+0.06 ± 0.07** | **+13 ± 14** | +3% |
+| No trumps | all | 687 | +0.02 ± 0.11 | +8 ± 20 | +1% |
+
+(Against the top trump in a suit bid; in no trumps against the search's best lead that isn't a low side card.)
+
+- **Not a leak:** the low lead is a loser either way, and losing it first, while the declarer still holds every
+  trump (or every stopper), costs nothing: whatever comes back, the declarer can win or trump. Lost later, after
+  the trumps are drawn, the same loser can let the opponents run a suit. From a long suit it starts setting the
+  suit up; from a short one it heads for a void to trump in; and partner, unseen, may hold the high card in it.
+- The solver-only comparison was the blind spot again (findings 53, 55): with every card seen, the declarer never
+  needs to keep control, so giving up a trick early always looks like a waste. No rule.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

@@ -106,8 +106,12 @@
 - Bots follow the house discard signal (first throw-off from the strongest side suit; `crates/ai/src/signals.rs`).
 - Of touching cards, bots (and the coach) play the boss while partner is still to play to the trick: the ace from
   A-K, so a short partner can read it (`cardplay::show_winner`, applied in every bot's card choice).
-- Search bots and The Natural never open a no-trump hand with the Joker while holding other cards
-  (`cardplay::opening_joker_lead`, finding 54); the coach grades that lead as costing the bid's chance.
+- Search bots and The Natural never lead the Joker as the declaring side in the first three tricks of a no-trump
+  hand while holding other cards (`cardplay::early_joker_lead`, findings 54 and 56); the coach grades that lead as
+  costing the bid's chance. From trick 4 the search decides (tricks 4–6 came out even, 7+ the Joker lead pays).
+- Rule bots stop drawing trumps once both opponents have shown out (`cardplay::opponents_may_hold_trumps`).
+- `fh-lab show --code C --at N` shows any seat's decision at action N (its bot, The Oracle's ranking, the solver's
+  values); `fh-lab whatif --code C --at N --a X --b Y` plays two choices out over that seat's possible deals.
 - Early in a suit bid (tricks 1–3), the top trump and a side ace lead come out even when played out (finding 55,
   `fh-lab acelead`): the coach grades either as good and offers the other in its hint (`cardplay::ace_or_top_trump`).
 - Offline: `web/public/sw.js` precaches the build (from `dist/precache.json`, written by `vite.config.ts`; Vite's

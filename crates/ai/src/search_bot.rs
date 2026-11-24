@@ -328,8 +328,8 @@ impl SearchBot {
             return vec![(*legal.iter().min_by_key(|a| cost(a)).expect("legal actions"), 0.0)];
         }
         let mut scored: Vec<(Action, f64)> = result.stats.iter().map(|s| (s.action, s.ev)).collect();
-        if self.config.hold_opening_joker && crate::cardplay::opening_joker_lead(obs) {
-            self.hold_joker(obs, &mut scored);
+        if let Some(chance) = crate::cardplay::early_joker_lead(obs).filter(|_| self.config.hold_opening_joker) {
+            self.hold_joker(obs, &mut scored, chance);
         }
         scored.sort_by(|a, b| b.1.total_cmp(&a.1));
         let top = scored[0].1;
@@ -350,16 +350,16 @@ impl SearchBot {
         scored
     }
 
-    /// The opening Joker lead in no trumps counts as below the best other lead, by
-    /// `OPENING_JOKER_CHANCE` of the swing between making the bid and going down one.
-    fn hold_joker(&self, obs: &Observation, scored: &mut [(Action, f64)]) {
+    /// An early Joker lead in no trumps counts as below the best other lead, by `chance` of the
+    /// swing between making the bid and going down one (`cardplay::early_joker_lead`).
+    fn hold_joker(&self, obs: &Observation, scored: &mut [(Action, f64)], chance: f64) {
         let is_joker = |a: &Action| matches!(a, Action::Play(p) if p.card.is_joker());
         let Some(other) = scored.iter().filter(|(a, _)| !is_joker(a)).map(|&(_, ev)| ev).max_by(f64::total_cmp) else { return };
         let Some((declarer, contract)) = obs.contract else { return };
         let won = obs.tricks_won[declarer.team().index()];
         let made = self.utility(obs, contract, declarer, contract.level.max(won));
         let down = self.utility(obs, contract, declarer, contract.level.saturating_sub(1).max(won));
-        let cost = (crate::cardplay::OPENING_JOKER_CHANCE * (made - down).abs()).max(1.0);
+        let cost = (chance * (made - down).abs()).max(1.0);
         for entry in scored.iter_mut().filter(|e| is_joker(&e.0)) {
             entry.1 = entry.1.min(other) - cost;
         }

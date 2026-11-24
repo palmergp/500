@@ -188,6 +188,11 @@ fn main() {
             flag(&flags, "seed", 7_200_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
+        "offlead" if flags.contains_key("playout") => offlead::playout(
+            flag(&flags, "deals", 8000),
+            flag(&flags, "seed", 7_800_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
         "offlead" => offlead::run(
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 7_700_000),
