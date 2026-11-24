@@ -200,10 +200,15 @@ impl RuleBot {
         let declaring = obs.declarer().map(|d| d.team()) == Some(obs.seat.team());
         let my_trumps = trumps(hand, trump);
 
-        // Declarers draw trumps while the defenders may still hold some.
+        // Declarers draw trumps while the defenders may still hold some (not once both have shown
+        // out: the trumps left are partner's, and drawing them only pulls partner's trumps).
         if declaring && !my_trumps.is_empty() {
-            let outstanding = trumps(CardSet::pack(), trump).minus(seen);
-            if !outstanding.is_empty() {
+            let out = if self.style.remembers_cards {
+                crate::cardplay::opponents_may_hold_trumps(obs, seen)
+            } else {
+                !trumps(CardSet::pack(), trump).minus(seen).is_empty()
+            };
+            if out {
                 let top = my_trumps.iter().max_by_key(|&c| trick_strength(c, trump.unwrap(), trump)).unwrap();
                 return if is_boss(top, seen, trump) {
                     top
@@ -456,6 +461,55 @@ mod tests {
     use super::*;
     use crate::{play_out, RandomBot};
     use fh_core::{Game, Rules, Seat, Team};
+
+    /// Once both opponents have shown out of trumps, the declarer stops leading them: the trumps
+    /// left are partner's, and drawing them only pulls partner's (a user saw The Gambler do it).
+    #[test]
+    fn stops_drawing_trumps_once_the_opponents_are_out() {
+        use fh_core::{Call, Contract, Observation, Phase, Play, Strain, Trick};
+        let rules = Rules::default();
+        let mut auction = fh_core::Auction::new(Seat::SOUTH, false);
+        assert!(auction.apply(Call::Bid(Contract::new(7, Strain::Spades)), &rules));
+        for _ in 0..3 {
+            assert!(auction.apply(Call::Pass, &rules));
+        }
+        let trick = |leader: Seat, cards: &str| {
+            let plays: Vec<Play> = cards.split(' ').map(|c| Play::card(Card::parse(c).unwrap())).collect();
+            Trick::from_plays(leader, &plays, Some(Suit::Spades))
+        };
+        // South leads the right bower and the ace of trumps; West shows out on the first, East on the second.
+        let tricks = vec![trick(Seat::SOUTH, "JS 7H 5S 6S"), trick(Seat::SOUTH, "AS 8H 7S 9D")];
+        let obs = |tricks: Vec<Trick>| Observation {
+            seat: Seat::SOUTH,
+            phase: Phase::Playing,
+            to_act: Some(Seat::SOUTH),
+            rules: rules.clone(),
+            scores: [0, 0],
+            dealer: Seat::EAST,
+            deal_number: 1,
+            hand: CardSet::parse("QS 10S AH KH QH 6C 5C 4D").unwrap(),
+            auction: auction.clone(),
+            contract: Some((Seat::SOUTH, Contract::new(7, Strain::Spades))),
+            kitty: None,
+            discards: Some(CardSet::parse("4H 7C 5D").unwrap()),
+            tricks_won: [tricks.len() as u8, 0],
+            tricks,
+            current_trick: Some(Trick::new(Seat::SOUTH)),
+            hands_played: 0,
+        };
+        let lead = |o: &Observation| {
+            let legal: Vec<Action> = fh_core::legal_plays(o.hand, o.current_trick.as_ref().unwrap(), o.trump()).into_iter().map(Action::Play).collect();
+            match RuleBot::new("Gambler", Style::BOLD, 1).choose(o, &legal) {
+                Action::Play(p) => p.card,
+                other => panic!("{other:?}"),
+            }
+        };
+        let trump = |c: Card| is_trump(c, Some(Suit::Spades));
+        assert!(!trump(lead(&obs(tricks.clone()))), "the opponents are out of trumps");
+        // With East not yet shown out (followed with a spade), it draws trumps as before.
+        let east_follows = vec![trick(Seat::SOUTH, "JS 7H 5S 6S"), trick(Seat::SOUTH, "AS 8H 7S 8S")];
+        assert!(trump(lead(&obs(east_follows))), "East may still hold trumps");
+    }
 
     /// A user's hand (code NQE9-5DH3): Joker, J♣ 7♣, A♦ K♦ 4♦, A♥ K♥ J♥ 10♥. The rule bots' estimate
     /// rates clubs and hearts exactly equal; the tie goes to hearts, the longer trump suit.

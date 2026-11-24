@@ -1,12 +1,14 @@
 //! `fh-lab show --code H7K2-9QXA`: the game a hand code names, as the player saw it, with the
 //! coach's view of the decision there. Codes come from the web app's code button: a short code
 //! is looked up in `%LOCALAPPDATA%/500/hands` (the host saves them there); a long one ("500:…")
-//! carries the game itself.
+//! carries the game itself. `--at N` also shows the decision at action N, whoever made it: what
+//! that seat's bot would do, The Oracle's ranking of every choice, and (in card play) what each is
+//! worth with every card visible.
 
 use fh_core::{Action, Seat};
 use fh_wasm::table::{hands_dir, replay, SaveData, Table};
 
-pub fn run(code: &str) {
+pub fn run(code: &str, at: Option<usize>) {
     let save = match load(code) {
         Ok(save) => save,
         Err(e) => {
@@ -73,6 +75,11 @@ pub fn run(code: &str) {
         }
     }
 
+    if let Some(at) = at {
+        decision_at(&save, at);
+        return;
+    }
+
     // The coach at the code's position, if it's South's decision.
     match game.to_act() {
         Some(Seat::SOUTH) if game.legal_actions().len() > 1 => match fh_wasm::coach::hint_for(&save, Seat::SOUTH) {
@@ -108,7 +115,46 @@ pub fn run(code: &str) {
     }
 }
 
-fn load(code: &str) -> Result<SaveData, String> {
+/** The decision at action `at`: the seat's bot, The Oracle's ranking, and the solver's values. */
+fn decision_at(save: &SaveData, at: usize) {
+    use fh_ai::search_bot::{SearchBot, SearchConfig};
+    use fh_ai::solver::{Position, Solver};
+    let game = match replay(save, at) {
+        Ok(g) => g,
+        Err(e) => return println!("
+(can't replay to action {at}: {e})"),
+    };
+    let Some(seat) = game.to_act() else { return println!("
+Nobody acts at action {at}.") };
+    let legal = game.legal_actions();
+    let obs = game.observe(seat);
+    let persona = save.players[seat.index()].as_str();
+    let chosen = save.log.get(at).map(|&i| legal[i as usize]);
+    println!("
+Action {at}: {seat} ({persona}) to act, holding {}", game.hand(seat));
+    if let Some(c) = chosen {
+        println!("  In the game: {c}");
+    }
+    if let Some(mut bot) = fh_ai::personas::make_bot(persona, save.seed) {
+        println!("  {persona} now would choose: {}", bot.choose(&obs, &legal));
+    }
+    let mut oracle = SearchBot::new("The Oracle", SearchConfig::ORACLE, save.seed);
+    let ranked = oracle.evaluate_plays(&obs, &legal);
+    let solved = (game.phase() == fh_core::Phase::Playing).then(|| {
+        let (_, contract) = game.contract().expect("a contract in play");
+        let trump = contract.trump();
+        let hands: [fh_core::CardSet; 4] = std::array::from_fn(|i| game.hand(Seat::new(i)));
+        let trick = game.current_trick().cloned().unwrap_or_else(|| fh_core::Trick::new(seat));
+        Solver::new(trump).analyze(&Position { hands, trump, trick }, seat.team())
+    });
+    println!("  The Oracle's ranking (expected points), and tricks for {seat}'s side from here with every card seen:");
+    for (action, ev) in &ranked {
+        let tricks = solved.as_ref().and_then(|v| v.iter().find(|(p, _)| Action::Play(*p) == *action).map(|&(_, t)| t));
+        println!("    {:<12} ev {:>7.1}   {}", action.to_string(), ev, tricks.map_or(String::new(), |t| format!("{t} tricks")));
+    }
+}
+
+pub(crate) fn load(code: &str) -> Result<SaveData, String> {
     let json = if let Some(data) = code.strip_prefix("500:") {
         String::from_utf8(base64url(data).ok_or("the long code is damaged")?).map_err(|_| "the long code is damaged".to_string())?
     } else {

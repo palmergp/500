@@ -34,6 +34,8 @@ mod kxkitty;
 mod bareking;
 mod leadcheck;
 mod acelead;
+mod whatif;
+mod offlead;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -186,7 +188,20 @@ fn main() {
             flag(&flags, "seed", 7_200_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
-        "show" => show::run(flags.get("code").map_or("", |s| s.as_str())),
+        "offlead" => offlead::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 7_700_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "whatif" => whatif::run(
+            flags.get("code").map_or("", |s| s.as_str()),
+            flag(&flags, "at", 0) as usize,
+            flags.get("a").map_or("", |s| s.as_str()),
+            flags.get("b").map_or("", |s| s.as_str()),
+            flag(&flags, "worlds", 200) as usize,
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "show" => show::run(flags.get("code").map_or("", |s| s.as_str()), flags.get("at").and_then(|s| s.parse().ok())),
         "handpuzzles" => handpuzzles::run(
             flag(&flags, "count", 40) as usize,
             flag(&flags, "seed", 7_000_000),

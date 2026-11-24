@@ -816,7 +816,7 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
     } else if declaring && trump.is_some() && is_trump(best_play.card, trump) {
         // Leading: drawing trumps.
         let out = trumps(CardSet::pack(), trump).minus(seen).len();
-        if out > 0 {
+        if out > 0 && crate::cardplay::opponents_may_hold_trumps(obs, seen) {
             reasons.push(format!("Draw trumps: the opponents may still hold {out}."));
         }
     } else if is_boss(best_play.card, seen, trump) && !best_play.card.is_joker() {

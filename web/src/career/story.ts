@@ -62,7 +62,9 @@ export const CHARACTERS: Record<CharacterId, Character> = {
   danny: {
     name: "Danny Reyes",
     role: "your partner since the sixth grade",
-    persona: "gambler",
+    // The Shark: bold bidding (Danny loves a swing) with an expert's card play, so a chapter with
+    // him as partner is winnable. The Gambler's rule-based play made those chapters a slog.
+    persona: "shark",
     look: { skin: "#c68a5e", hair: "#2a1a12", hairStyle: "quiff", eyes: "sly", brows: "arched", mouth: "smirk", beard: "stubble", jaw: 12, top: "leather", coat: "#5a3420", shirt: "#efe9dc", accent: "#f2a65a" },
   },
   mae: {

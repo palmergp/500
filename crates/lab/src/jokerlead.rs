@@ -182,9 +182,21 @@ fn deal(seed: u64, before: usize, out: &mut Out) -> bool {
                     let band = match k {
                         0 => "trick 1",
                         1..=2 => "tricks 2–3",
-                        _ => "tricks 4+",
+                        3..=5 => "tricks 4–6",
+                        _ => "tricks 7+",
                     };
-                    let t = out.entry((who.to_string(), band.to_string())).or_default();
+                    // What the Joker names: a suit the leader still holds (its own suit, where
+                    // partner may hold the rest), or one it's out of.
+                    let named = match joker {
+                        Action::Play(p) => p.named_suit,
+                        _ => None,
+                    };
+                    let kind = match named {
+                        Some(suit) if hand.iter().any(|c| !c.is_joker() && fh_core::effective_suit(c, None) == Some(suit)) => "names its own suit",
+                        Some(_) => "names a suit it's out of",
+                        None => "names no suit",
+                    };
+                    let t = out.entry((who.to_string(), format!("{band}, {kind}"))).or_default();
                     t.n += 1;
                     t.tricks += (ta - tb) as f64;
                     t.points += (pa - pb) as f64;

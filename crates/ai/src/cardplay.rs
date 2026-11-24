@@ -81,6 +81,23 @@ pub fn ace_or_top_trump(obs: &Observation, a: Action, b: Action) -> bool {
     }
 }
 
+/// Whether `seat` has shown out of `suit` this hand: failed to follow when it was led.
+pub fn shown_out(obs: &Observation, seat: fh_core::Seat, suit: Suit) -> bool {
+    let trump = obs.trump();
+    obs.tricks.iter().chain(obs.current_trick.iter()).any(|trick| {
+        trick.led_suit() == Some(suit) && trick.plays().any(|(s, c)| s == seat && s != trick.leader() && effective_suit(c, trump) != Some(suit))
+    })
+}
+
+/// Whether the opponents may still hold a trump: some trump is unseen, and they haven't both
+/// shown out of trumps. (Trumps only partner can hold don't count: drawing them pulls partner's.)
+pub fn opponents_may_hold_trumps(obs: &Observation, seen: CardSet) -> bool {
+    let Some(suit) = obs.trump() else { return false };
+    let unseen = trumps(CardSet::pack(), Some(suit)).minus(seen);
+    let [left, right] = [obs.seat.next(), obs.seat.partner().next()];
+    !unseen.is_empty() && !(shown_out(obs, left, suit) && shown_out(obs, right, suit))
+}
+
 /// The cheapest card of `cards` to give up; ties go to the card from the shorter suit in `hand`.
 pub fn cheapest(cards: &[Card], hand: CardSet, trump: Option<Suit>) -> Card {
     let suit_len = |c: Card| hand.iter().filter(|&h| effective_suit(h, trump) == effective_suit(c, trump)).count();
