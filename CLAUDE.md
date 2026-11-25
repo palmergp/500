@@ -35,6 +35,8 @@
 - The coach's card-play analysis takes a closer look (up to 64 more deals) when its best play isn't clearly ahead of
   the next different play, and reports plays it still can't separate as close calls (`Analysis::close`), so a near
   tie never reads as a firm answer. Its significance test weights deals as the averages do (effective sample size).
+  Kitty grades do the same (`discard_comparison`): 12 deals, then 60 fresh ones when the gap is unclear or small;
+  a gap the deals can't confirm is a close call (good) within `CLOSE_POINTS`, at most an inaccuracy beyond.
 - Winning (H23–H24, games to 500 only): declarers who make their bid and reach 500 win; defensive points never win
   (no cap, they just keep counting); −500 or worse loses. `game_winner(rules, scores, declarers, made)`.
 - Near the end of a game to 500 (either side within 160 of 500 or of −500) the coach plays for the game
@@ -110,8 +112,9 @@
   hand while holding other cards (`cardplay::early_joker_lead`, findings 54 and 56); the coach grades that lead as
   costing the bid's chance. From trick 4 the search decides (tricks 4–6 came out even, 7+ the Joker lead pays).
 - Rule bots stop drawing trumps once both opponents have shown out (`cardplay::opponents_may_hold_trumps`).
-- `fh-lab show --code C --at N` shows any seat's decision at action N (its bot, The Oracle's ranking, the solver's
-  values); `fh-lab whatif --code C --at N --a X --b Y` plays two choices out over that seat's possible deals.
+- `fh-lab show --code C --at N` shows any seat's decision at action N (your own: the coach's grade and reasons; its
+  bot, The Oracle's ranking, the solver's values; `--discards "6S 8S 4H"` grades a kitty on five seeds and 400
+  deals); `fh-lab whatif --code C --at N --a X --b Y` plays two choices out over that seat's possible deals.
 - Early in a suit bid (tricks 1–3), the top trump and a side ace lead come out even when played out (finding 55,
   `fh-lab acelead`): the coach grades either as good and offers the other in its hint (`cardplay::ace_or_top_trump`).
 - Offline: `web/public/sw.js` precaches the build (from `dist/precache.json`, written by `vite.config.ts`; Vite's
