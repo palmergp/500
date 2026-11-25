@@ -206,7 +206,7 @@ fn main() {
             flag(&flags, "worlds", 200) as usize,
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
-        "show" => show::run(flags.get("code").map_or("", |s| s.as_str()), flags.get("at").and_then(|s| s.parse().ok())),
+        "show" => show::run(flags.get("code").map_or("", |s| s.as_str()), flags.get("at").and_then(|s| s.parse().ok()), flags.get("discards").map(|s| s.as_str())),
         "handpuzzles" => handpuzzles::run(
             flag(&flags, "count", 40) as usize,
             flag(&flags, "seed", 7_000_000),

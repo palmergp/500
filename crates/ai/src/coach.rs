@@ -470,17 +470,24 @@ impl Coach {
         let plan = heuristic_discards(obs.hand, trump, 3 - obs.discards.map_or(0, |d| d.len()));
         let best = Action::Discard(plan[0]);
         let mut options = vec![OptionEval { action: best, ev: 0.0, makes: None }];
+        let mut worlds = DISCARD_DEALS;
+        let mut close = vec![];
         if let Some(c) = chosen.filter(|&c| c != best && legal.contains(&c)) {
             // Compare the kitty plans: the expert's, and the player's choice completed the same way.
             let Action::Discard(card) = c else { unreachable!() };
             let rest = heuristic_discards(obs.hand.minus([card].into_iter().collect()), trump, plan.len() - 1);
             let mine: Vec<Card> = std::iter::once(card).chain(rest).collect();
-            let (expert_ev, mine_ev) = self.compare_discards(obs, &plan, &mine);
-            options[0].ev = expert_ev;
-            options.push(OptionEval { action: c, ev: mine_ev, makes: None });
+            let cmp = self.discard_comparison(obs, &plan, &mine);
+            options[0].ev = cmp.a;
+            options.push(OptionEval { action: c, ev: cmp.b, makes: None });
+            worlds = cmp.deals;
+            // The deals can't tell them apart: a close call, not a mistake.
+            if !cmp.clear() && cmp.a - cmp.b < CLOSE_POINTS {
+                close.push(c);
+            }
         }
         let reasons = discard_reasons(obs, &plan, chosen);
-        Analysis { options, best, reasons, worlds: 12, close: vec![], close_note: None, units: Units::Points, play: None }
+        Analysis { options, best, reasons, worlds, close, close_note: None, units: Units::Points, play: None }
     }
 
     /// Grades a whole discard: `chosen` against the coach's plan, from `obs`, the declarer's
@@ -493,13 +500,21 @@ impl Coach {
         // The plan, then how yours compares and any cards you shouldn't have let go, then voids.
         let mut notes = discard_reasons(obs, &plan, None);
         let mut reasons = vec![notes.remove(0)];
+        let mut clear = true;
         let loss = if set(&plan) == set(chosen) {
             0.0
         } else {
-            let (plan_ev, chosen_ev) = self.compare_discards(obs, &plan, chosen);
-            let loss = (plan_ev - chosen_ev).max(0.0);
-            if loss >= 2.0 {
-                reasons.push(format!("{} across 12 likely deals.", self.units.compare("The plan", "your discards", loss)));
+            let cmp = self.discard_comparison(obs, &plan, chosen);
+            let loss = (cmp.a - cmp.b).max(0.0);
+            clear = cmp.clear();
+            if loss >= 2.0 && clear {
+                reasons.push(format!("{} across {} likely deals.", self.units.compare("The plan", "your discards", loss), cmp.deals));
+            } else if loss >= 2.0 {
+                reasons.push(format!(
+                    "A close call: {} on average, but the {} likely deals don't clearly separate your discards from the plan.",
+                    self.units.compare("the plan", "yours", loss),
+                    cmp.deals
+                ));
             } else {
                 reasons.push("Your discards do about as well as the plan.".into());
             }
@@ -514,18 +529,40 @@ impl Coach {
         }
         reasons.extend(notes);
         reasons.truncate(4);
-        DiscardGrade { chosen: chosen.to_vec(), plan, loss, verdict: Verdict::from_loss(loss, false), reasons }
+        // As in card play, a gap the deals can't confirm is a close call (good) within
+        // `CLOSE_POINTS`, and at most an inaccuracy beyond.
+        let verdict = match (clear, loss < CLOSE_POINTS) {
+            (true, _) => Verdict::from_loss(loss, false),
+            (false, true) => Verdict::from_loss(loss, false).min(Verdict::Good),
+            (false, false) => Verdict::from_loss(loss, false).min(Verdict::Inaccuracy),
+        };
+        DiscardGrade { chosen: chosen.to_vec(), plan, loss, verdict, reasons }
     }
 
-    /// Expected points for two sets of discards on the same worlds.
-    fn compare_discards(&mut self, obs: &Observation, a: &[Card], b: &[Card]) -> (f64, f64) {
+    /// Two sets of discards compared on the same likely deals: first `DISCARD_DEALS` of them. If
+    /// those can't separate them (or find only a small gap), the verdict comes from `DISCARD_CLOSER_LOOK` fresh deals (not
+    /// counting the first look's, which were looked past for being unclear). A kitty grade on a
+    /// dozen deals once called putting back the 4♥ rather than the 4♦ a blunder; over 400 deals
+    /// each did better about as often.
+    fn discard_comparison(&mut self, obs: &Observation, a: &[Card], b: &[Card]) -> DiscardComparison {
+        let first = DiscardComparison::from(&self.compare_discards(obs, a, b, DISCARD_DEALS));
+        // A clear gap of CLOSE_POINTS or more stands. A small one gets the closer look too: on a
+        // dozen deals, the few where a kitty card decides the bid may not have come up.
+        let gap = (first.a - first.b).abs();
+        if gap < 2.0 || (first.clear() && gap >= CLOSE_POINTS) {
+            return first;
+        }
+        DiscardComparison::from(&self.compare_discards(obs, a, b, DISCARD_CLOSER_LOOK))
+    }
+
+    /// Each likely deal's weight and its value with discards `a` and with `b` (in `utility`'s units).
+    fn compare_discards(&mut self, obs: &Observation, a: &[Card], b: &[Card], deals: usize) -> Vec<(f64, f64, f64)> {
         let (declarer, contract) = obs.contract.expect("discarding without a contract");
         let trump = contract.trump();
         let belief = Belief::new_with(obs, self.search.config().inference, true);
-        let worlds = belief.sample_fitting(&mut self.search_rng(), obs.hand, 12);
+        let worlds = belief.sample_fitting(&mut self.search_rng(), obs.hand, deals);
         let mut solver = Solver::with_limit(trump, 1_500_000);
-        let mut totals = [0.0, 0.0];
-        let mut weight = 0.0;
+        let mut out = Vec::new();
         for world in &worlds {
             let mut results = [0u8; 2];
             let mut ok = true;
@@ -536,14 +573,61 @@ impl Coach {
                 ok &= !solver.aborted();
             }
             if ok {
-                for i in 0..2 {
-                    totals[i] += world.weight * self.search.utility(obs, contract, declarer, results[i]);
-                }
-                weight += world.weight;
+                let value = |r: u8| self.search.utility(obs, contract, declarer, r);
+                out.push((world.weight, value(results[0]), value(results[1])));
             }
         }
-        (totals[0] / weight.max(1e-9), totals[1] / weight.max(1e-9))
+        out
     }
+}
+
+/// The likely deals a kitty grade first compares discards on, and how many more it looks at when
+/// those can't separate them.
+const DISCARD_DEALS: usize = 12;
+const DISCARD_CLOSER_LOOK: usize = 60;
+
+/// Two sets of discards, compared: their average values (`a` the plan's), the deals compared on,
+/// and each deal's weight and difference.
+struct DiscardComparison {
+    a: f64,
+    b: f64,
+    deals: usize,
+    per_world: Vec<(f64, f64)>,
+}
+
+impl DiscardComparison {
+    fn from(worlds: &[(f64, f64, f64)]) -> DiscardComparison {
+        let weight: f64 = worlds.iter().map(|w| w.0).sum::<f64>().max(1e-9);
+        DiscardComparison {
+            a: worlds.iter().map(|w| w.0 * w.1).sum::<f64>() / weight,
+            b: worlds.iter().map(|w| w.0 * w.2).sum::<f64>() / weight,
+            deals: worlds.len(),
+            per_world: worlds.iter().map(|w| (w.0, w.1 - w.2)).collect(),
+        }
+    }
+
+    /// Whichever set is ahead, it's clearly ahead (more than two standard errors).
+    fn clear(&self) -> bool {
+        let diffs: Vec<(f64, f64)> = self.per_world.iter().map(|&(w, d)| (w, if self.a >= self.b { d } else { -d })).collect();
+        clearly_ahead(&diffs)
+    }
+}
+
+/// Whether weighted per-deal differences (weight, difference) are clearly above zero: their mean
+/// beats two standard errors, counting the deals by their effective number, (Σw)² / Σw².
+fn clearly_ahead(diffs: &[(f64, f64)]) -> bool {
+    let total: f64 = diffs.iter().map(|(w, _)| w).sum();
+    let squares: f64 = diffs.iter().map(|(w, _)| w * w).sum();
+    if total <= 0.0 {
+        return false;
+    }
+    let n = total * total / squares;
+    if n < 3.0 {
+        return false;
+    }
+    let mean = diffs.iter().map(|(w, d)| w * d).sum::<f64>() / total;
+    let var = diffs.iter().map(|(w, d)| w * (d - mean).powi(2)).sum::<f64>() / total * n / (n - 1.0);
+    mean > 2.0 * (var / n).sqrt()
 }
 
 /// How many more deals to look at when the first look can't separate the best plays: up to
@@ -613,18 +697,8 @@ fn significant(play: Option<&PlayStats>, best: Action, chosen: Action) -> bool {
     let Some(play) = play else { return true };
     let index = |a: Action| play.stats.iter().position(|s| s.action == a);
     let (Some(b), Some(c)) = (index(best), index(chosen)) else { return true };
-    let total: f64 = play.per_world.iter().map(|(w, _)| w).sum();
-    let squares: f64 = play.per_world.iter().map(|(w, _)| w * w).sum();
-    if total <= 0.0 {
-        return false;
-    }
-    let n = total * total / squares;
-    if n < 3.0 {
-        return false;
-    }
-    let mean = play.per_world.iter().map(|(w, u)| w * (u[b] - u[c])).sum::<f64>() / total;
-    let var = play.per_world.iter().map(|(w, u)| w * (u[b] - u[c] - mean).powi(2)).sum::<f64>() / total * n / (n - 1.0);
-    mean > 2.0 * (var / n).sqrt()
+    let diffs: Vec<(f64, f64)> = play.per_world.iter().map(|(w, u)| (*w, u[b] - u[c])).collect();
+    clearly_ahead(&diffs)
 }
 
 // ---- Explanations ---------------------------------------------------------------------------
@@ -821,6 +895,21 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
         }
     } else if is_boss(best_play.card, seen, trump) && !best_play.card.is_joker() {
         reasons.push(top_card_note(best_play.card, obs.hand, trump));
+    }
+    // In no trumps, cashing the only card you hold in a suit gives up its stopper: once it's gone,
+    // whoever gets the lead can run that suit against you.
+    if let Some(c) = chosen_play.filter(|c| trump.is_none() && trick.is_empty() && !c.card.is_joker() && is_boss(c.card, seen, trump)) {
+        let suit = effective_suit(c.card, None);
+        let holding = obs.hand.iter().filter(|&h| effective_suit(h, None) == suit).count();
+        let out = CardSet::pack().iter().filter(|&x| !x.is_joker() && effective_suit(x, None) == suit).filter(|&x| !seen.contains(x)).count();
+        if let Some(suit) = suit.filter(|_| holding == 1 && out >= 4) {
+            let joker = if seen.contains(Card::JOKER) { "" } else { " (the Joker is one way in)" };
+            // Second, after how the bid fares: it's the reason, so it shouldn't be cut.
+            reasons.insert(reasons.len().min(1), format!(
+                "Keep {} for now: it's your only {suit}, so it's what stops them running {suit} when they get the lead{joker}, with {out} still out. Cash the suit you're setting up first: {} is a trick whenever you want it.",
+                c.card, c.card
+            ));
+        }
     }
     let partner_winning = trick.winner(trump) == Some(me.partner());
     if chosen_play.is_some_and(|c| c.card.is_joker()) && !best_play.card.is_joker() && (trump.is_none() || partner_winning) {
@@ -1613,6 +1702,72 @@ mod tests {
         // From the fourth trick, the search decides.
         obs.tricks = vec![obs.tricks[0].clone(); 3];
         assert_eq!(crate::cardplay::early_joker_lead(&obs), None);
+    }
+
+    /// A user's deal: the game from its first call, with `actions` applied.
+    fn deal_from(dealer: Seat, hands: [&str; 4], kitty: &str, actions: &[Action]) -> fh_core::Game {
+        let hands = hands.map(|h| CardSet::parse(h).unwrap());
+        let mut game = fh_core::Game::from_deal(Rules::default(), 1, dealer, hands, CardSet::parse(kitty).unwrap());
+        for &a in actions {
+            game.apply(a).expect("legal");
+        }
+        game
+    }
+
+    /// A user's 7 no trumps: after the A♥, leading the lone A♦ gives up the only diamond stopper,
+    /// and the coach says so (not just that A♣ is a winner).
+    #[test]
+    fn cashing_a_lone_ace_in_no_trumps_is_explained_as_losing_the_stopper() {
+        let card = |c: &str| Card::parse(c).unwrap();
+        let play = |c: &str| Action::Play(Play::card(card(c)));
+        let game = deal_from(
+            Seat::SOUTH,
+            ["9S QS KS JC KC AC 4D AD KH AH", "6S 7S 10S JS 5C 5D 7H 9H JH Joker", "7C 8C QC 6D 9D 10D 4H 8H 10H QH", "5S AS 6C 7D 8D JD QD KD 5H 6H"],
+            "8S 9C 10C",
+            &[
+                Action::Call(Call::Six(Strain::Spades)),
+                Action::Call(Call::Pass),
+                Action::Call(Call::Pass),
+                Action::Call(Call::Bid(Contract::new(7, Strain::NoTrumps))),
+                Action::Discard(card("8S")),
+                Action::Discard(card("4D")),
+                Action::Discard(card("9C")),
+                play("AH"),
+                play("9H"),
+                play("4H"),
+                play("5H"),
+            ],
+        );
+        let obs = game.observe(Seat::SOUTH);
+        let grade = Coach::new(5).grade(&obs, &game.legal_actions(), play("AD"));
+        assert_ne!(grade.best, play("AD"));
+        assert!(grade.analysis.reasons.iter().any(|r| r.starts_with("Keep A♦ for now")), "{:?}", grade.analysis.reasons);
+    }
+
+    /// A user's 8♣: the plan puts back 6♠ 8♠ 4♦; putting back the 4♥ instead is a tie over 400
+    /// deals, but a grade on a dozen of them once called it a blunder. Now it's at worst a close
+    /// call, on any seed, while putting back the right bower is still a mistake.
+    #[test]
+    fn a_kitty_choice_the_deals_cannot_separate_is_not_a_blunder() {
+        let card = |c: &str| Card::parse(c).unwrap();
+        let game = deal_from(
+            Seat::WEST,
+            ["6S 8S JS 10C JC 5D 6D AD 9H KH", "9S 10S QS AS 7D 8D 10D KD 5H 7H", "KS 5C 7C 8C 9C 9D 8H JH AH Joker", "5S 7S 6C QC KC AC JD QD 10H QH"],
+            "4D 4H 6H",
+            &[
+                Action::Call(Call::Bid(Contract::new(7, Strain::Clubs))),
+                Action::Call(Call::Pass),
+                Action::Call(Call::Bid(Contract::new(8, Strain::Clubs))),
+                Action::Call(Call::Pass),
+            ],
+        );
+        let obs = game.observe(Seat::SOUTH);
+        for seed in 0..3 {
+            let grade = Coach::new(seed).grade_discard_set(&obs, &[card("6S"), card("8S"), card("4H")]);
+            assert!(grade.verdict <= Verdict::Good, "seed {seed}: {:?} {:.0} {:?}", grade.verdict, grade.loss, grade.reasons);
+        }
+        let grade = Coach::new(0).grade_discard_set(&obs, &[card("6S"), card("8S"), card("JC")]);
+        assert!(grade.verdict >= Verdict::Mistake, "{:?} {:.0}", grade.verdict, grade.loss);
     }
 
     #[test]

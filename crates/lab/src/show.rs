@@ -8,7 +8,7 @@
 use fh_core::{Action, Seat};
 use fh_wasm::table::{hands_dir, replay, SaveData, Table};
 
-pub fn run(code: &str, at: Option<usize>) {
+pub fn run(code: &str, at: Option<usize>, discards: Option<&str>) {
     let save = match load(code) {
         Ok(save) => save,
         Err(e) => {
@@ -77,6 +77,9 @@ pub fn run(code: &str, at: Option<usize>) {
 
     if let Some(at) = at {
         decision_at(&save, at);
+        if let Some(cards) = discards {
+            grade_discards(&save, at, cards);
+        }
         return;
     }
 
@@ -116,6 +119,58 @@ pub fn run(code: &str, at: Option<usize>) {
 }
 
 /** The decision at action `at`: the seat's bot, The Oracle's ranking, and the solver's values. */
+/// `--discards "6S 8S 4H"` at the declarer's first discard: the coach's grade of putting those
+/// back, against its plan, with five different seeds (each compares the two sets over its own
+/// sampled deals), so a close kitty choice shows how steady the verdict is.
+fn grade_discards(save: &SaveData, at: usize, cards: &str) {
+    let Ok(game) = replay(save, at) else { return };
+    let Some(seat) = game.to_act() else { return };
+    let chosen: Vec<fh_core::Card> = cards.split_whitespace().filter_map(fh_core::Card::parse).collect();
+    let obs = game.observe(seat);
+    println!("
+  Putting back {}:", chosen.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" "));
+    let mut plan = Vec::new();
+    for k in 0..5u64 {
+        let g = fh_ai::coach::Coach::new(save.seed ^ at as u64 ^ (k << 32)).grade_discard_set(&obs, &chosen);
+        println!("    seed {k}: {:?}, {:.0} points behind the plan {}", g.verdict, g.loss, g.plan.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" "));
+        if let Some(r) = g.reasons.get(1) {
+            println!("      {r}");
+        }
+        plan = g.plan;
+    }
+    // The two sets on many more deals: where each is better, and by how many tricks.
+    let (declarer, contract) = game.contract().expect("a contract");
+    let trump = contract.trump();
+    let belief = fh_ai::belief::Belief::new_with(&obs, false, true);
+    let worlds = belief.sample_fitting(&mut fh_core::Rng::new(save.seed ^ 0xd15c), obs.hand, 400);
+    let mut solver = fh_ai::solver::Solver::with_limit(trump, 3_000_000);
+    let (mut plan_better, mut yours_better, mut same, mut made) = (0, 0, 0, [0, 0]);
+    let mut examples = Vec::new();
+    for w in &worlds {
+        let mut tricks = [0u8; 2];
+        for (i, set) in [&plan, &chosen].iter().enumerate() {
+            let mut hands = w.hands;
+            hands[declarer.index()] = obs.hand.minus(set.iter().copied().collect());
+            tricks[i] = solver.solve(&fh_ai::solver::Position { hands, trump, trick: fh_core::Trick::new(declarer) }, declarer.team());
+            made[i] += usize::from(tricks[i] >= contract.level);
+        }
+        match tricks[0].cmp(&tricks[1]) {
+            std::cmp::Ordering::Greater => {
+                plan_better += 1;
+                if examples.len() < 3 {
+                    examples.push((w.hands, tricks));
+                }
+            }
+            std::cmp::Ordering::Less => yours_better += 1,
+            std::cmp::Ordering::Equal => same += 1,
+        }
+    }
+    println!("    over {} deals (every card seen): the plan takes more tricks in {plan_better}, yours in {yours_better}, the same in {same}; the bid makes {} times with the plan, {} with yours", worlds.len(), made[0], made[1]);
+    for (hands, tricks) in examples {
+        println!("      e.g. plan {} tricks, yours {}: {}", tricks[0], tricks[1], Seat::ALL.iter().filter(|&&s| s != seat).map(|&s| format!("{s} {}", hands[s.index()])).collect::<Vec<_>>().join(" | "));
+    }
+}
+
 fn decision_at(save: &SaveData, at: usize) {
     use fh_ai::search_bot::{SearchBot, SearchConfig};
     use fh_ai::solver::{Position, Solver};
@@ -137,6 +192,22 @@ Action {at}: {seat} ({persona}) to act, holding {}", game.hand(seat));
     }
     if let Some(mut bot) = fh_ai::personas::make_bot(persona, save.seed) {
         println!("  {persona} now would choose: {}", bot.choose(&obs, &legal));
+    }
+    // Your own decision: the coach's grade of it, as the app showed it.
+    if seat == Seat::SOUTH && save.players[0] == "human" {
+        match fh_wasm::coach::grade_for(save, at, seat) {
+            Ok(Some(g)) => {
+                println!("  The coach: {} ({} {:.0}{}), best {}", g.verdict, g.chosen_label, g.loss, if g.units == "win" { " tenths of a percent" } else { " points" }, g.best_label);
+                for r in &g.reasons {
+                    println!("    · {r}");
+                }
+            }
+            Ok(None) => println!("  (no choice to grade)"),
+            Err(e) => println!("  (no grade: {e})"),
+        }
+    }
+    if game.phase() != fh_core::Phase::Playing {
+        return;
     }
     let mut oracle = SearchBot::new("The Oracle", SearchConfig::ORACLE, save.seed);
     let ranked = oracle.evaluate_plays(&obs, &legal);
