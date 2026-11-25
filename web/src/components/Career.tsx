@@ -10,6 +10,10 @@ interface Props {
   onName: (name: string) => void;
   /** Play a chapter: from its opening scene, or (trying again) straight into the level. */
   onPlay: (chapter: number, skipIntro: boolean) => void;
+  /** A finished chapter's opening or ending scene again. */
+  onWatch: (chapter: number, which: "opening" | "ending") => void;
+  /** Helper settings now on (they keep a chapter from counting as unaided). */
+  helpers: string[];
   onResume: () => void;
   onReset: () => void;
   onClose: () => void;
@@ -18,7 +22,10 @@ interface Props {
 const NUMBERS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight", "Nine", "Ten", "Eleven", "Twelve"];
 
 /** Story mode: the story's chapters, where you are in it, and the way into each level. */
-export function CareerDialog({ career, resumable, onName, onPlay, onResume, onReset, onClose }: Props) {
+/** What "unaided" means, for the 🙌 marks. */
+const UNAIDED = "Beaten with no help: no hints, undos or Finish hand, and grading, the trump counter, the card tracker and out-of-suit marks all off.";
+
+export function CareerDialog({ career, resumable, onName, onPlay, onWatch, helpers, onResume, onReset, onClose }: Props) {
   const [naming, setNaming] = useState(!career.name);
   const [draft, setDraft] = useState(career.name);
   const next = nextChapter(career);
@@ -69,6 +76,11 @@ export function CareerDialog({ career, resumable, onName, onPlay, onResume, onRe
                     <div className="career-chapter-text">
                       <span className="career-number">
                         Chapter {NUMBERS[i]} {done && <span aria-label="finished">✓</span>}
+                        {done && career.unaided.includes(i) && (
+                          <span className="career-unaided" role="img" aria-label="beaten unaided" title={UNAIDED}>
+                            🙌
+                          </span>
+                        )}
                         {locked && <span aria-label="locked">🔒</span>}
                       </span>
                       <strong>{locked ? "???" : ch.title}</strong>
@@ -97,9 +109,21 @@ export function CareerDialog({ career, resumable, onName, onPlay, onResume, onRe
                             </button>
                           </>
                         ) : (
-                          <button type="button" className={i === next ? "primary" : ""} onClick={() => onPlay(i, false)}>
-                            {done ? "Play again" : "Play"}
-                          </button>
+                          <>
+                            {done && (
+                              <>
+                                <button type="button" onClick={() => onWatch(i, "opening")} title="Watch the chapter's opening scene again">
+                                  Opening
+                                </button>
+                                <button type="button" onClick={() => onWatch(i, "ending")} title="Watch the chapter's ending scene again">
+                                  Ending
+                                </button>
+                              </>
+                            )}
+                            <button type="button" className={i === next ? "primary" : ""} onClick={() => onPlay(i, false)}>
+                              {done ? "Play again" : "Play"}
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
@@ -107,6 +131,10 @@ export function CareerDialog({ career, resumable, onName, onPlay, onResume, onRe
                 );
               })}
             </ol>
+            <p className="note career-unaided-note">
+              <span aria-hidden="true">🙌</span> marks a chapter you've beaten with no help: no hints, undos or Finish hand, and the helpers off.
+              {helpers.length > 0 && ` Right now ${helpers.join(", ")} ${helpers.length > 1 ? "are" : "is"} on (Settings), so a chapter won't count.`}
+            </p>
           </>
         )}
         <div className="actions">

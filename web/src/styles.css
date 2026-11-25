@@ -3630,3 +3630,13 @@ dialog.cutscene::backdrop {
     max-width: calc(100% - 32px);
   }
 }
+.career-unaided {
+  margin-left: 0.3em;
+  font-size: 0.95rem;
+  letter-spacing: 0;
+  text-transform: none;
+  opacity: 1;
+}
+.career-unaided-note {
+  margin-top: 0.6rem;
+}

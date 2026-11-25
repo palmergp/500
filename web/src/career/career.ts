@@ -9,8 +9,12 @@ export interface CareerState {
   name: string;
   /** Chapters finished, by index. */
   done: number[];
-  /** The chapter under way: its level's game (seed) or tournament (id), and tries that fell short. */
-  playing: { chapter: number; seed: number | null; tour: string | null; attempts: number } | null;
+  /** Chapters ever beaten with no help: no hints, undos or Finish hand, and the helpers off (as
+   * an unaided tournament). Kept through Start over, like an achievement. */
+  unaided: number[];
+  /** The chapter under way: its level's game (seed) or tournament (id), tries that fell short, and
+   * whether this try has had help (a story tournament keeps its own, `Tournament.assisted`). */
+  playing: { chapter: number; seed: number | null; tour: string | null; attempts: number; assisted?: boolean } | null;
 }
 
 const KEY = "fh500.career";
@@ -18,11 +22,11 @@ const KEY = "fh500.career";
 export function loadCareer(): CareerState {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return { name: "", done: [], playing: null, ...(JSON.parse(raw) as Partial<CareerState>) };
+    if (raw) return { name: "", done: [], unaided: [], playing: null, ...(JSON.parse(raw) as Partial<CareerState>) };
   } catch {
     // A fresh career.
   }
-  return { name: "", done: [], playing: null };
+  return { name: "", done: [], unaided: [], playing: null };
 }
 
 export function saveCareer(c: CareerState) {

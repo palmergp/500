@@ -88,6 +88,9 @@
   `components/Career.tsx`. Scene sound is `storyAudio.ts` (synthesized like `audio.ts`, whose music rests meanwhile):
   each place has a mood and ambience (`PLACE_SOUND`), steps `{ music }` and `{ sfx }` change them, title cards sting;
   the score follows `Settings.storyMusic`, the rest `Settings.sound`. Test: `e2e/career.spec.ts`.
+  Finished chapters offer their opening and ending scenes again (`watchScene`). A chapter beaten with no help (no
+  hint, undo or Finish hand, helpers off: `career.playing.assisted`, or a story tournament's `assisted`) is kept in
+  `CareerState.unaided` and marked 🙌; achievements' Story group has one per chapter and Clean hands (all ten unaided).
 - A finished solo game stays saved (a reload shows its result) but is marked over (`savedGame.over`), so the main
   menu doesn't offer Continue; the game-over result has Main menu and New game.
 - "Finish hand" (solo, card play) lets The Natural play your cards at a tenth of the pace (`Table::auto_act`,

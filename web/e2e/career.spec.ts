@@ -83,13 +83,58 @@ test("story mode: a chapter's scene, its game against the story's players, and t
   await expect(after.locator(".cut-text")).not.toBeEmpty();
   await after.getByRole("button", { name: /^Skip scene/ }).click();
   await expect(hub).toBeVisible();
+  // Grading was on (and Finish hand used), so the chapter can't count as unaided; the list says why.
+  await expect(hub.locator(".career-unaided-note")).toContainText("Right now");
   if (won) {
-    await expect(hub.locator(".career-chapter").first()).toContainText("✓");
+    const first = hub.locator(".career-chapter").first();
+    await expect(first).toContainText("✓");
+    await expect(first.getByRole("img", { name: "beaten unaided" })).toHaveCount(0);
     await expect(hub.locator(".career-chapter").nth(1)).toContainText("Forty Thousand");
+    // A finished chapter's scenes can be watched again, without playing it.
+    await first.getByRole("button", { name: "Ending" }).click();
+    const again = page.getByRole("dialog", { name: "Chapter 1: Tuesday Night" });
+    await expect(again.locator(".cut-text")).not.toBeEmpty();
+    await again.getByRole("button", { name: /^Skip scene/ }).click();
+    await expect(hub).toBeVisible();
+    await expect(page.getByLabel("Your hand")).toHaveCount(0);
   } else {
     await expect(hub.locator(".career-chapter").first().getByRole("button", { name: "Try again" })).toBeVisible();
   }
   // The main menu says where the story's up to.
   await hub.locator(".actions").getByRole("button", { name: "Close" }).click();
   await expect(menu.getByRole("button", { name: /^Story/ })).toContainText(won ? "Chapter 2: Forty Thousand" : "Chapter 1: Tuesday Night");
+});
+
+test("story: chapters beaten unaided are marked, and the story has its achievements", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  await freshStart(page);
+  // Two chapters done, the first with no help at all.
+  await page.evaluate(() => localStorage.setItem("fh500.career", JSON.stringify({ name: "Sam", done: [0, 1], unaided: [0], playing: null })));
+  await page.reload();
+  const menu = page.getByRole("navigation", { name: "Main menu" });
+  await expect(menu.getByRole("button", { name: /^Story/ })).toContainText("🙌 1 of 10 unaided");
+  await menu.getByRole("button", { name: /^Story/ }).click();
+  const hub = page.getByRole("dialog", { name: "Story" });
+  const chapters = hub.locator(".career-chapter");
+  await expect(chapters.nth(0).getByRole("img", { name: "beaten unaided" })).toBeVisible();
+  await expect(chapters.nth(1).getByRole("img", { name: "beaten unaided" })).toHaveCount(0);
+  await expect(chapters.nth(0).getByRole("button", { name: "Opening" })).toBeVisible();
+  await page.screenshot({ path: `test-results/${info.project.name}-story-list.png` });
+  // The opening plays and leads back to the list.
+  await chapters.nth(0).getByRole("button", { name: "Opening" }).click();
+  const scene = page.getByRole("dialog", { name: "Chapter 1: Tuesday Night" });
+  await expect(scene.getByText("Tuesday Night")).toBeVisible();
+  await scene.getByRole("button", { name: /^Skip scene/ }).click();
+  await expect(hub).toBeVisible();
+  await hub.locator(".actions").getByRole("button", { name: "Close" }).click();
+
+  // Learn → Achievements: the Story group counts the chapters done and the unaided one.
+  await menu.getByRole("button", { name: /^Learn/ }).click();
+  await page.getByRole("tab", { name: "Achievements" }).click();
+  await expect(page.getByRole("heading", { name: "Story" })).toBeVisible();
+  const achievement = (title: string) => page.locator(".achievement").filter({ hasText: title });
+  await expect(achievement("Tuesday regular")).toHaveClass(/done/);
+  await expect(achievement("Square with the house")).toHaveClass(/done/);
+  await expect(achievement("Past the velvet rope")).not.toHaveClass(/done/);
+  await expect(achievement("Clean hands")).toContainText("1 of 10");
 });

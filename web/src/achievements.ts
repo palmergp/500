@@ -10,8 +10,9 @@ import { solvedMistakes } from "./mistakes";
 import { loadLessonsDone, loadProgress } from "./progress";
 import { loadRecords, tournamentsWon } from "./records";
 import { awards, EXPERT_STYLES, standings, type Tournament } from "./tournament";
+import { loadCareer } from "./career/career";
 
-export type Group = "Bidding" | "Play and defence" | "Games" | "Tournaments" | "Learning";
+export type Group = "Bidding" | "Play and defence" | "Games" | "Tournaments" | "Story" | "Learning";
 
 export interface Achievement {
   id: string;
@@ -78,6 +79,36 @@ export const ACHIEVEMENTS: Achievement[] = [
     text: "Win a tournament with no hints, no undos, no Finish hand, and grading, the trump counter, the card tracker and out-of-suit marks all off.",
     target: 1,
   },
+  // Story mode: a chapter each (titles that don't give the plot away), and every chapter unaided.
+  ...(
+    [
+      ["🃏", "Tuesday regular"],
+      ["💵", "Square with the house"],
+      ["🥂", "Past the velvet rope"],
+      ["⚓", "Qualified"],
+      ["❄️", "Cold hands"],
+      ["📖", "Star pupil"],
+      ["🚨", "Out the back door"],
+      ["💎", "A seat at the final"],
+      ["🌫️", "Fog on the pier"],
+      ["🎬", "Last hand dealt"],
+    ] as const
+  ).map(([icon, title], i): Achievement => ({
+    id: `story-${i + 1}`,
+    group: "Story",
+    icon,
+    title,
+    text: `Finish chapter ${i + 1} of the story.`,
+    target: 1,
+  })),
+  {
+    id: "story-unaided",
+    group: "Story",
+    icon: "🙌",
+    title: "Clean hands",
+    text: "Beat every chapter of the story with no hints, no undos, no Finish hand, and grading, the trump counter, the card tracker and out-of-suit marks all off.",
+    target: 10,
+  },
   { id: "scholar", group: "Learning", icon: "📚", title: "Scholar", text: "Finish every lesson.", target: LESSONS.length },
   { id: "card-counter", group: "Learning", icon: "🧮", title: "Card counter", text: "Answer 25 counting-quiz questions right.", target: 25 },
   { id: "auctioneer", group: "Learning", icon: "🔨", title: "Auctioneer", text: "Get 50 right in the bidding trainer.", target: 50 },
@@ -85,7 +116,7 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: "second-chance", group: "Learning", icon: "🔁", title: "Second chance", text: "Solve 10 of your own mistakes in Your mistakes.", target: 10 },
 ];
 
-export const GROUPS: Group[] = ["Bidding", "Play and defence", "Games", "Tournaments", "Learning"];
+export const GROUPS: Group[] = ["Bidding", "Play and defence", "Games", "Tournaments", "Story", "Learning"];
 
 /** The strongest bots, for Giant killer. */
 const EXPERTS = new Set(EXPERT_STYLES);
@@ -223,7 +254,11 @@ function measure(m: Moments): Record<string, number> {
   const strains = new Set(made.map(([label]) => label.replace(/^\d+/, "")));
   const t = records.tournaments;
   const lessons = new Set(loadLessonsDone());
+  const career = loadCareer();
+  const story = Object.fromEntries(Array.from({ length: 10 }, (_, i) => [`story-${i + 1}`, career.done.includes(i) ? 1 : 0]));
   return {
+    ...story,
+    "story-unaided": career.unaided.length,
     "first-bid": madeTotal,
     "every-strain": strains.size,
     "no-trumps": strains.has("NT") ? 1 : 0,

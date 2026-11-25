@@ -626,6 +626,23 @@ export function App() {
     saveCareer(next);
   }, []);
 
+  /** You've had help in a story game: this try can't count as unaided. */
+  const markCareerAssisted = useCallback(() => {
+    const p = careerRef.current.playing;
+    if (!p || p.assisted || replayRef.current || puzzleRef.current) return;
+    updateCareer((c) => {
+      if (c.playing) c.playing.assisted = true;
+    });
+  }, [updateCareer]);
+  useEffect(() => {
+    if (careerGame && helped) markCareerAssisted();
+  }, [careerGame, helped, replaying, markCareerAssisted]);
+  /** A hint, an undo or Finish hand: help, for an unaided tournament or story chapter. */
+  const noteHelp = () => {
+    if (inTour) markAssisted();
+    if (careerGame) markCareerAssisted();
+  };
+
   /** Plays a story scene, then whatever comes next. */
   const playScene = (steps: Step[], label: string, then: () => void) => setScene({ id: Date.now(), steps, label, then });
 
@@ -647,7 +664,7 @@ export function App() {
       return;
     }
     updateCareer((c) => {
-      if (c.playing) Object.assign(c.playing, { seed, tour: null });
+      if (c.playing) Object.assign(c.playing, { seed, tour: null, assisted: false });
     });
     const [west, north, east] = [level.west, level.partner, level.east].map((id) => CHARACTERS[id]);
     toSolo();
@@ -680,23 +697,41 @@ export function App() {
     else playScene(ch.intro, `Chapter ${chapter + 1}: ${ch.title}`, () => startLevel(chapter));
   };
 
-  /** A level is over: the scene for how it went, then the chapter list (the next chapter, or another try). */
-  const endLevel = (chapter: number, won: boolean) => {
+  /** A chapter's closing scene (how it went), opening where the chapter was played unless it says otherwise. */
+  const closingScene = (chapter: number, won: boolean): Step[] => {
+    const ch = CHAPTERS[chapter];
+    const steps = won ? ch.win : ch.lose;
+    const setting = [...ch.intro].reverse().find((s) => "bg" in s);
+    return setting && !("bg" in steps[0]) ? [setting, ...steps] : steps;
+  };
+
+  /** A level is over (`unaided`: won with no help at all): the scene for how it went, then the
+   * chapter list (the next chapter, or another try). */
+  const endLevel = (chapter: number, won: boolean, unaided: boolean) => {
     const ch = CHAPTERS[chapter];
     setCareerGame(false);
     updateCareer((c) => {
       if (won) {
         if (!c.done.includes(chapter)) c.done.push(chapter);
+        if (unaided && !c.unaided.includes(chapter)) c.unaided.push(chapter);
         if (c.playing?.chapter === chapter) c.playing = null;
       } else {
         const attempts = c.playing?.chapter === chapter ? c.playing.attempts + 1 : 1;
         c.playing = { chapter, seed: null, tour: null, attempts };
       }
     });
-    // The scene opens where the chapter was played, unless it says otherwise.
-    const steps = won ? ch.win : ch.lose;
-    const setting = [...ch.intro].reverse().find((s) => "bg" in s);
-    playScene(setting && !("bg" in steps[0]) ? [setting, ...steps] : steps, `Chapter ${chapter + 1}: ${ch.title}`, () => setShowCareer(true));
+    playScene(closingScene(chapter, won), `Chapter ${chapter + 1}: ${ch.title}`, () => {
+      setShowCareer(true);
+      // After the scene, so its banner doesn't land on top of it.
+      checkAchievements();
+    });
+  };
+
+  /** From the chapter list: a finished chapter's opening or ending scene again. */
+  const watchScene = (chapter: number, which: "opening" | "ending") => {
+    const ch = CHAPTERS[chapter];
+    setShowCareer(false);
+    playScene(which === "opening" ? ch.intro : closingScene(chapter, true), `Chapter ${chapter + 1}: ${ch.title}`, () => setShowCareer(true));
   };
 
   /** "Continue the story" after a chapter's game. */
@@ -704,6 +739,7 @@ export function App() {
     const p = careerRef.current.playing;
     if (!view || !p) return;
     const won = view.winner === 0;
+    const unaided = !p.assisted && assistHelpers(settings).length === 0;
     setResult(null);
     savedGame.clear();
     savedGrades.clear();
@@ -711,7 +747,7 @@ export function App() {
     clearTable();
     setScreen("menu");
     tabGame.set(null);
-    endLevel(p.chapter, won);
+    endLevel(p.chapter, won, unaided);
   };
 
   /** Back to the chapter under way: its game, or its tournament. */
@@ -1048,7 +1084,7 @@ export function App() {
     (lookAhead.current?.save === save ? lookAhead.current.hint : coach.hint(save))
       .then((h) => {
         hintedRef.current.add(forAction);
-        if (inTour) markAssisted();
+        noteHelp();
         setHint({ forAction, hint: h });
         audio.play("hint");
       })
@@ -1063,7 +1099,7 @@ export function App() {
     while (busy.current) await new Promise((r) => setTimeout(r, 50));
     const data = JSON.parse(save) as { log: number[] };
     data.log = data.log.slice(0, grade.actionNumber);
-    if (inTour) markAssisted();
+    noteHelp();
     setHeld(null);
     setResult(null);
     setHint(null);
@@ -1266,6 +1302,7 @@ export function App() {
     : careerAt >= CHAPTERS.length
       ? "The end… for now. Play any chapter again"
       : `Chapter ${careerAt + 1}: ${CHAPTERS[careerAt].title}`;
+  const careerUnaided = career.unaided.length > 0 ? ` · 🙌 ${career.unaided.length} of ${CHAPTERS.length} unaided` : "";
   const careerResumable = (() => {
     const p = career.playing;
     if (!p) return false;
@@ -1288,7 +1325,7 @@ export function App() {
           onContinue={() => void continueSolo()}
           tournament={tour && !tour.finished ? { round: Math.min(tour.current + 1, ROUNDS), chapter: tour.career?.chapter } : null}
           onTournament={openTournament}
-          career={careerLabel}
+          career={careerLabel + careerUnaided}
           onCareer={() => setShowCareer(true)}
           onSolo={() => setShowNewGame(true)}
           onFriends={joinHost}
@@ -1442,7 +1479,7 @@ export function App() {
                           className="finish-button"
                           onClick={() => {
                             setHint(null);
-                            if (!finishing && inTour) markAssisted();
+                            if (!finishing) noteHelp();
                             setFinishing((f) => !f);
                           }}
                           title={
@@ -1690,7 +1727,7 @@ export function App() {
             const done = tourRef.current;
             if (done?.career) {
               const you = standings(done).find((s) => s.participant.id === 0);
-              endLevel(done.career.chapter, !!you && you.place <= done.career.place);
+              endLevel(done.career.chapter, !!you && you.place <= done.career.place, done.assisted === false);
             }
           }}
         />
@@ -1705,6 +1742,8 @@ export function App() {
             })
           }
           onPlay={startChapter}
+          onWatch={watchScene}
+          helpers={helpers}
           onResume={resumeCareer}
           onReset={() => {
             updateCareer((c) => {
