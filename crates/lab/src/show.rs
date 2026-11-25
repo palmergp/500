@@ -141,7 +141,8 @@ fn grade_discards(save: &SaveData, at: usize, cards: &str) {
     // The two sets on many more deals: where each is better, and by how many tricks.
     let (declarer, contract) = game.contract().expect("a contract");
     let trump = contract.trump();
-    let belief = fh_ai::belief::Belief::new_with(&obs, false, true);
+    // Deals that fit the auction, as the coach's kitty grades sample them (finding 58).
+    let belief = fh_ai::belief::Belief::new_with(&obs, true, true);
     let worlds = belief.sample_fitting(&mut fh_core::Rng::new(save.seed ^ 0xd15c), obs.hand, 400);
     let mut solver = fh_ai::solver::Solver::with_limit(trump, 3_000_000);
     let (mut plan_better, mut yours_better, mut same, mut made) = (0, 0, 0, [0, 0]);

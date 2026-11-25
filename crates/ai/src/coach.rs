@@ -559,7 +559,10 @@ impl Coach {
     fn compare_discards(&mut self, obs: &Observation, a: &[Card], b: &[Card], deals: usize) -> Vec<(f64, f64, f64)> {
         let (declarer, contract) = obs.contract.expect("discarding without a contract");
         let trump = contract.trump();
-        let belief = Belief::new_with(obs, self.search.config().inference, true);
+        // The deals fit the auction (partner's bid, mentions and passes), unlike the search's card
+        // play: with partner's call read, a kitty comparison's error fell by a tenth and its chance
+        // for the bid went from 61% to 79% against a real 86% (finding 58).
+        let belief = Belief::new_with(obs, true, true);
         let worlds = belief.sample_fitting(&mut self.search_rng(), obs.hand, deals);
         let mut solver = Solver::with_limit(trump, 1_500_000);
         let mut out = Vec::new();
@@ -1766,8 +1769,11 @@ mod tests {
             let grade = Coach::new(seed).grade_discard_set(&obs, &[card("6S"), card("8S"), card("4H")]);
             assert!(grade.verdict <= Verdict::Good, "seed {seed}: {:?} {:.0} {:?}", grade.verdict, grade.loss, grade.reasons);
         }
-        let grade = Coach::new(0).grade_discard_set(&obs, &[card("6S"), card("8S"), card("JC")]);
-        assert!(grade.verdict >= Verdict::Mistake, "{:?} {:.0}", grade.verdict, grade.loss);
+        // With partner's 7♣ read into the deals, the right bower's worth shows on every seed.
+        for seed in 0..3 {
+            let grade = Coach::new(seed).grade_discard_set(&obs, &[card("6S"), card("8S"), card("JC")]);
+            assert!(grade.verdict >= Verdict::Mistake, "seed {seed}: {:?} {:.0}", grade.verdict, grade.loss);
+        }
     }
 
     #[test]

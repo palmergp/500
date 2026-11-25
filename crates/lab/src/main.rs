@@ -36,6 +36,7 @@ mod leadcheck;
 mod acelead;
 mod whatif;
 mod offlead;
+mod kittyworlds;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -186,6 +187,11 @@ fn main() {
         "leadcheck" => leadcheck::run(
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 7_200_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "kittyworlds" => kittyworlds::run(
+            flag(&flags, "deals", 600),
+            flag(&flags, "seed", 7_900_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "offlead" if flags.contains_key("playout") => offlead::playout(

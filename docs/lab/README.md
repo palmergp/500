@@ -1211,6 +1211,35 @@ seat (`fh-lab offlead --playout 1`, 8,000 deals), they weren't:
 - The solver-only comparison was the blind spot again (findings 53, 55): with every card seen, the declarer never
   needs to keep control, so giving up a trick early always looks like a waste. No rule.
 
+### 58. Kitty grades: a closer look, and partner's bid read into the deals
+
+A user put back the 4♥ instead of the coach's 4♦ (with 6♠ 8♠, voiding spades in an 8♣ bid) and was graded a
+blunder. Over 400 deals the two sets each took more tricks about as often (34 deals to 29, the same in 337) and the
+bid made 94 times against 92: a tie. The grade had compared them on 12 sampled deals, and on that game's seed a few
+odd deals decided it; four other seeds called it best.
+
+- **A closer look:** a kitty grade now looks at 60 fresh deals when its first 12 can't separate the two sets or show
+  only a small gap (a dozen deals may not include the few where a kitty card decides the bid). The verdict comes
+  from the fresh deals alone: the first look was set aside for being unclear, so counting it would bias the result.
+  A gap the deals still can't confirm is a close call (good) within 30 points and at most an inaccuracy beyond, as
+  in card play.
+- **Partner's bid:** the deals ignored the auction, as the search's card play does (finding 21), so partner's 7♣
+  bid didn't make partner long in clubs. `fh-lab kittyworlds` (1,500 deals) checked kitty comparisons each way
+  against the real deal, solved with every card seen (the plan against the next-ranked set and against a random
+  one-card swap):
+
+| Partner | Deals | Gap error (mean abs.) | Plan's make chance: predicted / real | Brier |
+|---|---|---|---|---|
+| Called | ignore the auction | 79 | 61% / 86% | 0.215 |
+| Called | **read it** | **71** | **79% / 86%** | **0.111** |
+| Passed | ignore the auction | 66 | 81% / 81% | 0.136 |
+| Passed | read it | 67 | 80% / 81% | 0.134 |
+
+  Read, the auction makes the comparisons closer to the truth when partner called, and changes nothing when partner
+  passed, so kitty grades now sample deals that fit it. Ignoring partner's call made the bid look far harder than it
+  was, so kitty cards that decide the bid were undercounted: putting back the right bower in the user's deal was
+  graded good on two of five seeds before, a blunder on all five now.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

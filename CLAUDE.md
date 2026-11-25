@@ -37,6 +37,8 @@
   tie never reads as a firm answer. Its significance test weights deals as the averages do (effective sample size).
   Kitty grades do the same (`discard_comparison`): 12 deals, then 60 fresh ones when the gap is unclear or small;
   a gap the deals can't confirm is a close call (good) within `CLOSE_POINTS`, at most an inaccuracy beyond.
+  Their deals fit the auction (partner's bid read in, unlike the search's card play): closer to the truth (finding 58,
+  `fh-lab kittyworlds`).
 - Winning (H23–H24, games to 500 only): declarers who make their bid and reach 500 win; defensive points never win
   (no cap, they just keep counting); −500 or worse loses. `game_winner(rules, scores, declarers, made)`.
 - Near the end of a game to 500 (either side within 160 of 500 or of −500) the coach plays for the game
