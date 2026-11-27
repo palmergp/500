@@ -1274,6 +1274,108 @@ level changes.)
   model's guess at what an opponent bid from still uses the plain hand estimate). With the user's hand The Gambler
   now mentions no trumps instead of bidding 7♦.
 
+### 60. The coach's card play, played out
+
+The coach ranks cards by solving a few dozen sampled deals with every card seen, the blind spot behind findings 53–57.
+`fh-lab coachaudit` (16,000 deals) took one card play at random in each (any seat, any trick; 6,293 with a real
+choice), and played the coach's best card and its runner-up (the best that plays differently) out to the end of the
+hand, The Oracle in every seat and the same seed both ways. Gaps are the best card's points less the runner-up's, for
+the player's side:
+
+| | n | Predicted | Real (95%) | Real tricks | Best did worse / better |
+|---|---|---|---|---|---|
+| All | 6,293 | +28.6 | **+17.8 ± 3.4** | +0.14 | 9% / 22% |
+| The declarer, following | 710 | +53.8 | +51.7 ± 11.9 | +0.38 | 6% / 41% |
+| A defender, following | 2,215 | +28.3 | +14.4 ± 4.8 | +0.15 | 5% / 18% |
+| Leading (all players) | 2,291 | +23.0 | +12.7 ± 6.3 | +0.07 | 14% / 20% |
+| Trick 1 | 726 | +15.9 | +5.1 ± 11.2 | +0.03 | 18% / 20% |
+| Tricks 7–10 | 1,525 | +40.7 | +25.8 ± 5.7 | +0.19 | 2% / 20% |
+| **A discard over a discard** | 1,230 | +19.2 | **+1.1 ± 3.7** | +0.03 | 4% / 6% |
+| Trumping over discarding | 287 | +80.0 | +70.6 ± 18.4 | +0.52 | 4% / 55% |
+| Taking a trick for sure over playing low | 261 | +73.8 | +44.4 ± 19.0 | +0.43 | 7% / 46% |
+
+- **The coach's choice holds up:** better than its runner-up at the table, worse only 9% of the time. But by about
+  60% of what it predicts: picking the best of a few dozen solved deals flatters the winner.
+- **Discards are the exception:** the coach separates one discard from another by 19 points on average, and played
+  out they come to the same (+1 ± 4). With every card seen, the opponents always know which suit you let go.
+- **Reading the auction (the third experiment):** the same positions went to a coach whose deals fit the auction
+  (partner's bid, mentions and passes; finding 21 turned this off for the bots). Its predictions were no closer
+  (error 131 against 130), and where it preferred the runner-up (452 times) the runner-up came out 7 ± 11 points
+  better: no clear gain overall. For leads alone it looked better (17 ± 14 points from 238 leads), a hint taken up in
+  finding 64.
+
+### 61. How steady the coach's grades are, and whether its reasons say why
+
+`fh-lab gradestab` (800 deals): Steady or Rookie as South (so there are slips) against expert bots; a sample of South's
+decisions graded three times by differently seeded coaches, as two people seeing the same position might be.
+
+| Decision | n | Same verdict all three times | Good on one, a mistake on another | Spread of the loss |
+|---|---|---|---|---|
+| Bidding | 618 | 100% | 0% | 0 |
+| Card play | 1,722 | 81% | 4.1% | 5.5 points |
+| Kitty (one card off the plan) | 110 | **44%** | **15.5%** | 42.7 points |
+
+- Bidding grades come from the network, so they never vary. Card play is steady enough. Kitty grades are not:
+  whether a kitty card decides the bid turns on a few deals in a hundred, so 72 deals can't settle it (finding 66).
+- **Reasons:** of 124 card-play mistakes and blunders, 72 (58%) had only general reasons: how the bid fares with
+  each card, "A♥ is the highest card left in its suit", the points between the plays. The most common were leads (a
+  lower trump or a low side card instead of a side winner) and follows (a low card, or one that wins only for now,
+  instead of a sure winner).
+- **Change:** following to a trick, the reasons now say what the card does to it: "You're last to play: A♦ takes
+  this trick, and 9♦ hands it to their K♦"; "7♣ leaves their Q♣ winning, with only your partner left to beat it";
+  "8♦ may not hold: an opponent plays after you, and J♥, A♦ and K♦ are still out among others. J♦ wins it for sure."
+  Leads are left general for now: why one lead beats another is rarely a fact about the cards that can be stated
+  truthfully.
+
+### 62. The kitty plan against a searched choice, played out
+
+The coach grades a kitty against a plan made by a rule (finding 40; in no trumps one card at a time, finding 23).
+`fh-lab kittyplay` (2,000 deals, The Oracle's auctions): at each declarer's discard, the plan and the next two sets the
+rule ranks were compared on 20 deals fitting the auction, and the best taken as "the searched choice". Where it
+differed from the plan, both were played out by The Oracle:
+
+| Bid | Declared | Searched choice differs | Predicted gain | Real gain (95%) | Real tricks | Bid made: plan / searched |
+|---|---|---|---|---|---|---|
+| No trumps | 471 | 46% | +31.8 | **+34.2 ± 31.9** | **+0.34 ± 0.20** | 65% / 71% |
+| Suit bids | 1,523 | 25% | +25.9 | −2.5 ± 19.7 | −0.09 ± 0.10 | 64% / 64% |
+
+- **No trumps:** the search's gain was real, and as large as it predicted. **Change:** the coach's no-trump plan is
+  now chosen that way (`SearchBot::nt_kitty_plan`), on deals seeded by the position, so every coach gives the same
+  plan and it holds as its cards go back; so do The Counter, The Shark, The Oracle and The Natural, which put back
+  the rule's plan before (`oracle-rulekitty` keeps it, for the lab).
+- **What the search changes:** of 114 no-trump hands, it chose differently from the rule in 63. Half the time it
+  emptied a short suit to keep length in the long ones (which run once their top cards are gone), sometimes putting
+  back a guarded king or queen: against lesson 6, which says a void gains nothing in no trumps and a guarded king is
+  worth keeping. Finding 67 plays that choice out on its own.
+- **Suit bids:** nothing gained, so the rule's set stays: the void-and-honours rule is as good as a search here.
+
+### 63. The coach's bidding (the network) against the count, played out
+
+The coach's bidding advice is The Oracle's: the network's trick estimates, trained on deals solved with every card
+seen. `fh-lab bidplay` (4,000 deals, The Oracle's auctions) took the first call in each where the network and the
+count's rule (the best strain by count; 7 from a count of 7, 8 from 8½, else pass, finding 14) disagreed, and played
+out both calls (the rest of the auction and the play by The Oracle, the same seed). Points for the caller's side:
+
+| The network | n | Network − count (95%) | Bid made when declared: network / count |
+|---|---|---|---|
+| Bids 7, the count passes | 1,468 | +5.6 ± 12.6 | 62% / 79% |
+| Bids 8, the count passes (mostly over their bid) | 396 | **+91.6 ± 28.5** | 62% / 61% |
+| **Bids no trumps, the count a suit** | 340 | **−32.3 ± 29.0** | 73% / 84% |
+| Bids another suit | 184 | −3.3 ± 33.1 | 74% / 74% |
+| Bids a level lower | 175 | −7.0 ± 37.1 | 87% / 76% |
+| Passes, the count bids 8 | 131 | +23.5 ± 43.4 | 92% / 75% |
+| Bids a level higher | 74 | +18.1 ± 60.5 | 79% / 91% |
+| Passes, the count bids 7 | 64 | +23.6 ± 63.4 | 87% / 70% |
+| All | 2,887 | **+13.2 ± 9.5** | |
+
+- **The network's advice stands:** it beats the count where they differ, most of all by competing at the 8 level
+  over the opponents' bid where the count has no legal bid to make.
+- **But not its no trumps:** where it chose no trumps and the count a suit, the suit scored 32 points more and was made
+  84% of the time against 73%. Solved with every card seen, a no-trump bid looks better than it plays (the declarer
+  always knows which suit to set up, and the defenders which to attack). Bids take off half a trick for real play
+  (`dd_bias`, finding 2, measured on 120 deals, every strain together); no trumps now has its own allowance
+  (`dd_bias_nt`), set by `fh-lab ntbias`, which plays out the calls a larger one changes.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.
