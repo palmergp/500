@@ -139,6 +139,20 @@ pub struct Analysis {
     play: Option<PlayStats>,
 }
 
+impl Analysis {
+    /// Card play: the best option that plays differently from the best (not a card that wins the
+    /// same tricks in every sampled deal), with its value.
+    pub fn runner_up(&self) -> Option<(Action, f64)> {
+        let play = self.play.as_ref()?;
+        self.options.iter().find(|o| o.action != self.best && !equivalent(play, self.best, o.action)).map(|o| (o.action, o.ev))
+    }
+
+    /// An option's value, if it was evaluated.
+    pub fn value(&self, action: Action) -> Option<f64> {
+        self.options.iter().find(|o| o.action == action).map(|o| o.ev)
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Grade {
     pub chosen: Action,
@@ -178,6 +192,15 @@ impl Coach {
             rules_bot: RuleBot::new("Coach", Style { aggression: SearchConfig::COUNTER.rule_aggression, ..Style::STEADY }, seed),
             units: Units::Points,
         }
+    }
+
+    /// The coach with card play read through the auction too (partner's bid, mentions and passes
+    /// weigh the sampled deals), for the lab's comparisons (`fh-lab coachaudit`).
+    pub fn with_inference(seed: u64, inference: bool) -> Coach {
+        let mut coach = Coach::new(seed);
+        let config = SearchConfig { inference, ..*coach.search.config() };
+        coach.search = SearchBot::new("Coach", config, seed);
+        coach
     }
 
     /// The best action here and why. `chosen`, if given, is also evaluated so it can be compared.
@@ -307,6 +330,8 @@ impl Coach {
     /// and grades of a position use the same seed, so the numbers are the same either way.
     fn play_result(&mut self, obs: &Observation, legal: &[Action]) -> PlayStats {
         let units = self.units;
+        // Keyed by how the deals are read too: a coach reading the auction samples different deals.
+        let units = (units, self.search.config().inference);
         if let Some(hit) = PLAY_CACHE.with(|c| c.borrow().iter().find(|(o, u, _)| o == obs && *u == units).map(|(_, _, r)| r.clone())) {
             return hit;
         }
@@ -732,7 +757,16 @@ const PLAY_CURVE: &[(f64, f64)] = &[
 const PLAY_CACHE_SIZE: usize = 6;
 
 thread_local! {
-    static PLAY_CACHE: std::cell::RefCell<Vec<(Observation, Units, PlayStats)>> = const { std::cell::RefCell::new(Vec::new()) };
+    static PLAY_CACHE: std::cell::RefCell<Vec<CachedPlay>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A remembered analysis: the position, its units and whether the deals read the auction, and the result.
+type CachedPlay = (Observation, (Units, bool), PlayStats);
+
+/// Forgets the remembered card-play analyses, so the next one samples afresh (the lab, grading the
+/// same position with differently seeded coaches).
+pub fn clear_play_cache() {
+    PLAY_CACHE.with(|c| c.borrow_mut().clear());
 }
 
 pub const BID_CURVE: &[(f64, f64)] = &[

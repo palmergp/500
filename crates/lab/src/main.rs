@@ -38,6 +38,11 @@ mod whatif;
 mod offlead;
 mod kittyworlds;
 mod strainpick;
+mod playout;
+mod coachaudit;
+mod gradestab;
+mod kittyplay;
+mod bidplay;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -188,6 +193,26 @@ fn main() {
         "leadcheck" => leadcheck::run(
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 7_200_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "kittyplay" => kittyplay::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 8_300_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "bidplay" => bidplay::run(
+            flag(&flags, "deals", 6000),
+            flag(&flags, "seed", 8_400_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "gradestab" => gradestab::run(
+            flag(&flags, "deals", 800),
+            flag(&flags, "seed", 8_200_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "coachaudit" => coachaudit::run(
+            flag(&flags, "deals", 3000),
+            flag(&flags, "seed", 8_100_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "strainpick" => strainpick::run(
