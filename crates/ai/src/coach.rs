@@ -180,6 +180,8 @@ pub struct Coach {
     rules_bot: RuleBot,
     /// The units of the analysis under way (for the wording of its reasons).
     units: Units,
+    /// Kitty grades: the deals of the first look, and of the closer look (`discard_comparison`).
+    kitty_deals: (usize, usize),
 }
 
 impl Coach {
@@ -191,7 +193,15 @@ impl Coach {
             search: SearchBot::new("Coach", config, seed),
             rules_bot: RuleBot::new("Coach", Style { aggression: SearchConfig::COUNTER.rule_aggression, ..Style::STEADY }, seed),
             units: Units::Points,
+            kitty_deals: (DISCARD_DEALS, DISCARD_CLOSER_LOOK),
         }
+    }
+
+    /// The coach with kitty grades on other numbers of deals (a first look of 0 goes straight to
+    /// the closer look), for the lab's comparisons (`fh-lab kittystab`).
+    pub fn with_kitty_deals(mut self, first: usize, closer: usize) -> Coach {
+        self.kitty_deals = (first, closer);
+        self
     }
 
     /// The coach with card play read through the auction too (partner's bid, mentions and passes
@@ -570,14 +580,17 @@ impl Coach {
     /// dozen deals once called putting back the 4♥ rather than the 4♦ a blunder; over 400 deals
     /// each did better about as often.
     fn discard_comparison(&mut self, obs: &Observation, a: &[Card], b: &[Card]) -> DiscardComparison {
-        let first = DiscardComparison::from(&self.compare_discards(obs, a, b, DISCARD_DEALS));
-        // A clear gap of CLOSE_POINTS or more stands. A small one gets the closer look too: on a
-        // dozen deals, the few where a kitty card decides the bid may not have come up.
-        let gap = (first.a - first.b).abs();
-        if gap < 2.0 || (first.clear() && gap >= CLOSE_POINTS) {
-            return first;
+        let (first_deals, closer_deals) = self.kitty_deals;
+        if first_deals > 0 {
+            let first = DiscardComparison::from(&self.compare_discards(obs, a, b, first_deals));
+            // A clear gap of CLOSE_POINTS or more stands. A small one gets the closer look too: on a
+            // dozen deals, the few where a kitty card decides the bid may not have come up.
+            let gap = (first.a - first.b).abs();
+            if gap < 2.0 || (first.clear() && gap >= CLOSE_POINTS) {
+                return first;
+            }
         }
-        DiscardComparison::from(&self.compare_discards(obs, a, b, DISCARD_CLOSER_LOOK))
+        DiscardComparison::from(&self.compare_discards(obs, a, b, closer_deals))
     }
 
     /// Each likely deal's weight and its value with discards `a` and with `b` (in `utility`'s units).
@@ -597,7 +610,10 @@ impl Coach {
             for (i, set) in [a, b].iter().enumerate() {
                 let mut hands = world.hands;
                 hands[declarer.index()] = obs.hand.minus(set.iter().copied().collect());
-                results[i] = solver.solve(&Position { hands, trump, trick: Trick::new(declarer) }, declarer.team());
+                // The search starts from a guess: the bid's level, then the first set's tricks
+                // (the same answers, about a quarter sooner than guessing half the tricks).
+                let guess = if i == 0 { contract.level } else { results[0] };
+                results[i] = solver.solve_near(&Position { hands, trump, trick: Trick::new(declarer) }, declarer.team(), guess);
                 ok &= !solver.aborted();
             }
             if ok {

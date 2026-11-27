@@ -230,9 +230,16 @@ impl Solver {
 
     /// Tricks `team` takes from this position with perfect play.
     pub fn solve(&mut self, pos: &Position, team: Team) -> u8 {
+        let most = pos.hands[pos.to_play().index()].len() as u8;
+        self.solve_near(pos, team, most / 2)
+    }
+
+    /// As [`Solver::solve`], starting the search from a guess at the answer: the same result,
+    /// found sooner the closer the guess (the bid's level for the declarers, say).
+    pub fn solve_near(&mut self, pos: &Position, team: Team, guess: u8) -> u8 {
         let state = self.setup(pos, team);
         let most = pos.hands[pos.to_play().index()].len() as i8;
-        Self::mtd(most / 2, most, |a, b| self.search(state, a, b)) as u8
+        Self::mtd(guess as i8, most, |a, b| self.search(state, a, b)) as u8
     }
 
     /// The exact value of a search, found with a sequence of null-window tests (MTD(f)).
@@ -757,6 +764,22 @@ mod tests {
             let ns = solver.solve(&pos, Team::NorthSouth);
             let ew = Solver::new(Some(Suit::Hearts)).solve(&pos, Team::EastWest);
             assert_eq!(ns + ew, 10, "seed {seed}: the two sides' optimal tricks must sum to 10");
+        }
+    }
+
+    #[test]
+    fn a_guess_changes_only_how_fast_the_answer_comes() {
+        for seed in 0..3 {
+            let game = Game::new(Rules::default(), seed);
+            let mut hands: [CardSet; 4] = std::array::from_fn(|i| game.hand(Seat::new(i)));
+            let south = hands[0].union(game.kitty());
+            let dropped: CardSet = south.iter().take(3).collect();
+            hands[0] = south.minus(dropped);
+            let pos = Position { hands, trump: Some(Suit::Spades), trick: Trick::new(Seat::SOUTH) };
+            let exact = Solver::new(Some(Suit::Spades)).solve(&pos, Team::NorthSouth);
+            for guess in [0, 3, 7, 10] {
+                assert_eq!(Solver::new(Some(Suit::Spades)).solve_near(&pos, Team::NorthSouth, guess), exact, "seed {seed}, guess {guess}");
+            }
         }
     }
 }
