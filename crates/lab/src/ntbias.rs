@@ -4,8 +4,9 @@
 //! real play (`dd_bias`, finding 2: 120 deals, every strain together). `bidplay` (finding 63) found
 //! the bidding network's no-trump bids, where the count bid a suit, 32 points worse at the table.
 //! Here The Oracle bids as it does today, and at each call the same position goes to Oracles that
-//! take more off no-trump bids (`dd_bias_nt`); where one calls differently, both calls are played
-//! out (the rest of the auction and the play by today's Oracle in every seat, same seed).
+//! take more or less off no-trump bids (`dd_bias_nt`, `--gaps 0.75,1,1.25` by default); where one
+//! calls differently, both calls are played out (the rest of the auction and the play by today's
+//! Oracle in every seat, same seed).
 
 use std::collections::BTreeMap;
 
@@ -14,7 +15,8 @@ use fh_ai::search_bot::{SearchBot, SearchConfig};
 use fh_ai::Bot;
 use fh_core::{Action, Call, Event, Game, Phase, Rules, Strain};
 
-const GAPS: [f64; 3] = [0.75, 1.0, 1.25];
+/// The gaps tried unless `--gaps` names others.
+pub const GAPS: [f64; 3] = [0.75, 1.0, 1.25];
 
 #[derive(Default, Clone)]
 struct Tally {
@@ -25,7 +27,7 @@ struct Tally {
     declared: [f64; 2],
 }
 
-pub fn run(deals: u64, seed: u64, threads: u64) {
+pub fn run(deals: u64, seed: u64, threads: u64, gaps: &[f64]) {
     let parts: Vec<(BTreeMap<String, Tally>, u64)> = std::thread::scope(|scope| {
         let handles: Vec<_> = (0..threads)
             .map(|t| {
@@ -34,7 +36,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
                     let mut nt = 0;
                     let mut d = t;
                     while d < deals {
-                        nt += deal(seed + d, &mut out);
+                        nt += deal(seed + d, gaps, &mut out);
                         d += threads;
                     }
                     (out, nt)
@@ -57,7 +59,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
             }
         }
     }
-    println!("{deals} deals ({nt} won by a no-trump bid as today's Oracle bids). At each call, Oracles taking more off no-trump bids;");
+    println!("{deals} deals ({nt} won by a no-trump bid as today's Oracle bids). At each call, Oracles taking a different allowance off no-trump bids;");
     println!("where one calls differently, both calls played out by today's Oracle. Points for the caller's side, the variant less today.\n");
     println!("| No-trump gap | The variant | n | Points (95%) | Tricks | Bid made when declared: today / variant |");
     println!("|---|---|---|---|---|---|");
@@ -71,19 +73,22 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
 fn describe(today: Call, variant: Call) -> &'static str {
     match (today, variant) {
         (Call::Bid(a), Call::Bid(b)) if a.strain == Strain::NoTrumps && b.strain != Strain::NoTrumps => "bids a suit instead of no trumps",
+        (Call::Bid(a), Call::Bid(b)) if a.strain != Strain::NoTrumps && b.strain == Strain::NoTrumps => "bids no trumps instead of a suit",
         (Call::Bid(a), Call::Bid(b)) if a.strain == b.strain && b.level < a.level => "bids lower",
+        (Call::Bid(a), Call::Bid(b)) if a.strain == b.strain && b.level > a.level => "bids higher",
         (Call::Bid(a), _) if a.strain == Strain::NoTrumps => "passes or signals instead of bidding no trumps",
+        (_, Call::Bid(b)) if b.strain == Strain::NoTrumps => "bids no trumps instead of passing or signalling",
         (Call::Bid(_), Call::Bid(_)) => "bids differently",
         _ => "other",
     }
 }
 
 /// One deal: 1 if today's Oracle ends in a no-trump bid.
-fn deal(seed: u64, out: &mut BTreeMap<String, Tally>) -> u64 {
+fn deal(seed: u64, gaps: &[f64], out: &mut BTreeMap<String, Tally>) -> u64 {
     let mut game = Game::new(Rules::default(), seed);
     let bot = |gap: f64, i: usize| SearchBot::new("The Oracle", SearchConfig { dd_bias_nt: gap, ..SearchConfig::ORACLE }, seed * 4 + i as u64);
     let mut today: [SearchBot; 4] = std::array::from_fn(|i| bot(SearchConfig::ORACLE.dd_bias_nt, i));
-    let mut done = [false; GAPS.len()];
+    let mut done = vec![false; gaps.len()];
     // Play-outs already made: (call number, the call) -> outcome (the gaps often differ at the same call).
     let mut played: Vec<((usize, Action), Option<crate::playout::Outcome>)> = Vec::new();
     let mut call = 0;
@@ -93,7 +98,7 @@ fn deal(seed: u64, out: &mut BTreeMap<String, Tally>) -> u64 {
         let obs = game.observe(seat);
         let legal = game.legal_actions();
         let action = today[seat.index()].choose(&obs, &legal);
-        for (g, &gap) in GAPS.iter().enumerate() {
+        for (g, &gap) in gaps.iter().enumerate() {
             if done[g] {
                 continue;
             }

@@ -229,6 +229,7 @@ fn main() {
             flag(&flags, "deals", 6000),
             flag(&flags, "seed", 9_000_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+            &flags.get("gaps").map_or(ntbias::GAPS.to_vec(), |s| s.split(',').map(|g| g.trim().parse().expect("--gaps 0.25,0.75")).collect()),
         ),
         "ntguard" => ntguard::run(
             flag(&flags, "deals", 4000),

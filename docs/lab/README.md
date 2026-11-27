@@ -1434,6 +1434,9 @@ real one, for South's side:
   blunder at 110). The early Joker lead in no trumps keeps its cost, measured at the table already (findings 54 and
   56). One discard against another is good at worst ("Discards are hard to judge…"), and so is one low lead against
   another ("A close call…"). Bidding and kitty grades are unchanged: this audit measured card play.
+- **Checked on 2,000 fresh deals** with the change in (`--seed 8520000`): the coach's loss and the real one now agree.
+  Good: 4.9 stated, 5.4 ± 6 real; inaccuracies 17.4 and 17.5 ± 20; mistakes 38 and 27 ± 27; blunders 118 and 119 ± 55.
+  By player: the declarer 25 and 32 ± 16, partner 16 and 19 ± 13, defenders 13 and 5 ± 13.
 - **Lead reasons:** a lead that can lose the trick names the cards still out above it ("9♠ can lose the trick: A♠, J♠
   and 10♠ are still out").
 
