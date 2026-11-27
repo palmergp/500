@@ -226,8 +226,6 @@ interface Props {
   onClose: () => void;
   /** After a round: the round just played, to show its tables. */
   after?: number;
-  /** Abandon this tournament and start a new one. */
-  onRestart?: () => void;
   /** The helpers on now (grading, the trump counter…), which would count as help. */
   helpers?: string[];
   /** After a round: to the main menu, the tournament kept for later. */
@@ -313,7 +311,7 @@ export function RecapDialog({ t, progress, onClose }: { t: Tournament; progress:
 }
 
 /** The tournament's state: after a round, its results; always, the standings and the awards. */
-export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [], onLeave, onQuit, onHelpOff }: Props) {
+export function TournamentDialog({ t, personas, onPlay, onClose, after, helpers = [], onLeave, onQuit, onHelpOff }: Props) {
   const waiting = after !== undefined && !roundComplete({ ...t, current: after });
   const { highGame, highHand } = awards(t);
   const done = t.current >= ROUNDS;
@@ -367,24 +365,15 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
       {!done && !waiting && <YourTable t={t} r={t.current} personas={personas} />}
       <UnaidedNote t={t} helpers={helpers} onHelpOff={onHelpOff} />
       <div className="actions">
-        {onRestart && t.current > 0 && (
-          <button
-            type="button"
-            onClick={() => {
-              if (confirm("Abandon this tournament and start a new one?")) onRestart();
-            }}
-          >
-            New tournament
-          </button>
-        )}
         {onQuit && !done && (
           <button
             type="button"
+            title="Quit this tournament: it ends here. Start a new one from the main menu."
             onClick={() => {
               if (confirm("Quit this tournament? It ends here, and its standings are lost.")) onQuit();
             }}
           >
-            Quit tournament
+            Quit
           </button>
         )}
         {!closable && onLeave && (

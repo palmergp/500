@@ -1768,14 +1768,6 @@ export function App() {
           after={tourDialog.after}
           onPlay={playTourRound}
           onClose={() => setTourDialog(null)}
-          onRestart={
-            tourDialog.after === undefined && !inTour
-              ? () => {
-                  setTourDialog(null);
-                  setShowNewTour(true);
-                }
-              : undefined
-          }
           helpers={helpers}
           onHelpOff={turnOffHelp}
           onLeave={leaveTourRound}

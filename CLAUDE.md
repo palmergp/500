@@ -82,7 +82,7 @@
   the background (`gradeGame`, coach op `decisions`), a grade at a time, pausing while you play a game it grades live.
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
-  the next round. Quit tournament is offered any time before the results (`quitTournament` clears the saved game only
+  the next round. Quit (the only way to end one; a new tournament starts from the menu) is offered any time before the results (`quitTournament` clears the saved game only
   if it's the tournament's), and the unaided note's Turn off all help switches every helper off (`turnOffHelp`; the
   story's chapter list has it too).
 - Hand review with grading off: opening a finished hand's review grades your decisions in it after the fact

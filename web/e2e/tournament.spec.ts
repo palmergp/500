@@ -58,7 +58,7 @@ test("a tournament round: play your table, see the standings, a new partner next
   await expect(after.getByText(/You've had help in this tournament/)).toBeVisible();
   await page.screenshot({ path: "test-results/tournament-round.png", fullPage: true });
   // Leaving for now: to the menu, and the tournament carries on from there.
-  await expect(after.getByRole("button", { name: "Quit tournament" })).toBeVisible();
+  await expect(after.getByRole("button", { name: "Quit", exact: true })).toBeVisible();
   await after.getByRole("button", { name: "Main menu" }).click();
   const menu = page.getByRole("navigation", { name: "Main menu" });
   await expect(menu.getByRole("button", { name: /^Tournament.*Round 2 of 8/ })).toBeVisible();
@@ -336,8 +336,28 @@ test("turn off all help before a tournament, and quit it during the first game",
   // Mid-game: the standings offer a way out.
   await page.getByRole("button", { name: "Standings" }).click();
   page.once("dialog", (d) => void d.accept());
-  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Quit tournament" }).click();
+  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Quit", exact: true }).click();
   await expect(menu).toBeVisible();
   await expect(menu.getByRole("button", { name: /^Tournament/ })).toContainText("12 players");
   await expect(menu.getByRole("button", { name: /^Continue/ })).toHaveCount(0);
+});
+
+test("on a phone, the tournament's buttons fit on one row", async ({ page }, info) => {
+  test.skip(info.project.name !== "phone", "phone layout only");
+  await freshStart(page);
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "New tournament" }).getByRole("button", { name: /Random/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Tournament" });
+  // Closed and opened again from the menu: an existing tournament.
+  await dialog.getByRole("button", { name: "Close", exact: true }).last().click();
+  await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
+  const actions = dialog.locator(".actions").last();
+  const buttons = actions.getByRole("button");
+  await expect(buttons).toHaveText(["Quit", "Close", "Play round 1"]);
+  await actions.scrollIntoViewIfNeeded();
+  const boxes = await buttons.evaluateAll((els) => els.map((e) => e.getBoundingClientRect()).map((r) => ({ top: Math.round(r.top), right: r.right })));
+  expect(new Set(boxes.map((b) => b.top)).size).toBe(1);
+  const width = await dialog.evaluate((d) => d.getBoundingClientRect().right);
+  for (const b of boxes) expect(b.right).toBeLessThanOrEqual(width);
+  await page.screenshot({ path: `test-results/${info.project.name}-tournament-actions.png` });
 });
