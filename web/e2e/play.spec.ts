@@ -186,3 +186,30 @@ test("with grading off, a finished hand's review still grades your decisions, af
   if (slips > 0) await expect(review.locator(".trick-note").first()).toContainText(/would (each )?have kept par/);
   await page.screenshot({ path: `test-results/${info.project.name}-review-tricks.png`, fullPage: true });
 });
+
+test("time played is counted while you play, and shown in Learn → Progress", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(120_000);
+  await startGame(page);
+  // Play (each turn a click) for about 25 seconds: the clock counts every 10.
+  const until = Date.now() + 25_000;
+  while (Date.now() < until) {
+    if (!(await takeTurn(page))) await page.waitForTimeout(200);
+    const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+    if (await result.isVisible()) await result.getByRole("button", { name: "Next hand" }).click().catch(() => {});
+  }
+  const time = await page.evaluate(() => JSON.parse(localStorage.getItem("fh500.playtime") ?? "{}"));
+  expect(time.modes.solo).toBeGreaterThanOrEqual(15);
+  expect(time.days).toBe(1);
+  // Shown with the records (a minute or more shows as minutes; less, "under a minute").
+  await page.evaluate(() => {
+    const t = JSON.parse(localStorage.getItem("fh500.playtime") ?? "{}");
+    t.modes.solo = 2 * 3600 + 5 * 60;
+    t.modes.story = 40 * 60;
+    localStorage.setItem("fh500.playtime", JSON.stringify(t));
+  });
+  await page.getByRole("button", { name: "Learn" }).click();
+  await page.getByRole("tab", { name: "Progress" }).click();
+  await expect(page.locator(".stat").filter({ hasText: "time played over 1 day" })).toContainText("2 h 45 min");
+  await expect(page.getByLabel("Time by mode")).toContainText("Solo games 2 h 5 min · Story 40 min");
+});

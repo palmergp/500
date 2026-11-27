@@ -55,6 +55,8 @@
 - Records and bid stats (`web/src/records.ts`): high game, best hand (with its bid and who declared it), highest bid made, each bid you declared,
   and tournaments (won, podiums, average place, highest total; counted when the final reveal is done);
   counted once per game and hand, shown on Learn → Progress, with a popover banner when you set one.
+- Time played (`web/src/playtime.ts`): by mode (solo, tournament, story, friends, puzzles, Learn), counted every
+  10 seconds while the window is visible and there's been input within `IDLE_MS`; shown with the records.
 - Achievements (`web/src/achievements.ts`, Learn → Achievements): measured mostly from what's already kept (records, drill
   scores, lessons, solved mistakes), so past play counts; moments the records don't keep (slams, sets, streaks, comebacks,
   clean games) are noted as they happen. Anything that changes progress calls `checkAchievements()`, which announces new

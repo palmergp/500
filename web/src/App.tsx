@@ -34,6 +34,7 @@ import { banterFor, fill, loadCareer, nextChapter, saveCareer, type CareerState 
 import { CHAPTERS, CHARACTERS, goal, type Step } from "./career/story";
 import { CareerDialog } from "./components/Career";
 import { Cutscene, Portrait } from "./components/Cutscene";
+import { addPlayTime, IDLE_MS, type PlayMode } from "./playtime";
 import { assistHelpers, loadSettings, savedGame, savedGrades, saveSettings, SPEED_FACTOR, type Settings, type Speed } from "./settings";
 
 const DELAY = { bidding: 700, discarding: 300, playing: 650, gameOver: 0 };
@@ -931,6 +932,48 @@ export function App() {
   }, [mode, view, paused, factor, request, finishing]);
   /** Your actions that Finish hand made (The Natural played them), by game: never graded as yours. */
   const autoActed = useRef(new Set<string>());
+
+  // Time played, by mode: counted every 10 seconds while the window is in view and there's been a
+  // click, tap or key in the last few minutes (playtime.ts).
+  const lastInput = useRef(Date.now());
+  useEffect(() => {
+    const mark = () => (lastInput.current = Date.now());
+    window.addEventListener("pointerdown", mark);
+    window.addEventListener("keydown", mark);
+    return () => {
+      window.removeEventListener("pointerdown", mark);
+      window.removeEventListener("keydown", mark);
+    };
+  }, []);
+  const playMode: PlayMode | null = scene
+    ? "story"
+    : showLearn
+      ? "learn"
+      : screen === "table" && view
+        ? lan
+          ? "friends"
+          : puzzle
+            ? "puzzles"
+            : careerGame
+              ? "story"
+              : inTour
+                ? "tournament"
+                : "solo"
+        : null;
+  useEffect(() => {
+    if (!playMode) return;
+    let last = Date.now();
+    const count = () => {
+      const now = Date.now();
+      if (document.visibilityState === "visible" && now - lastInput.current < IDLE_MS) addPlayTime(playMode, Math.min(now - last, 15_000) / 1000);
+      last = now;
+    };
+    const timer = window.setInterval(count, 10_000);
+    return () => {
+      window.clearInterval(timer);
+      count(); // the time since the last tick, as the mode changes
+    };
+  }, [playMode]);
 
   /** Keeps a grade: shown at the table as it comes (`quiet`: kept without showing, for a hand
    * graded after the fact in its review). */

@@ -4,6 +4,7 @@ import { SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { LESSONS, type Lesson } from "../learn/lessons";
 import { leaks, loadLessonsDone, loadProgress, recordScore, resetProgress, saveLessonsDone, type Progress } from "../progress";
 import { bestHandBid, loadRecords, ordinal, resetRecords, type Records } from "../records";
+import { duration, loadPlayTime, PLAY_MODES, resetPlayTime, timePlayed } from "../playtime";
 import { achievements, checkAchievements, doneDate, GROUPS, resetAchievements, type Status } from "../achievements";
 import { PATTERNS } from "../learn/patterns";
 import { HAND_PUZZLES, loadHandPuzzles, type HandPuzzle } from "../learn/handPuzzles";
@@ -488,6 +489,8 @@ const VERDICTS = ["best", "good", "inaccuracy", "mistake", "blunder"] as const;
 
 /** Your records, and each bid you've declared with how often you made it. */
 function RecordsView({ records }: { records: Records }) {
+  const time = loadPlayTime();
+  const played = timePlayed(time);
   const bids = Object.entries(records.bids).sort((a, b) => b[1].bids - a[1].bids || a[0].localeCompare(b[0]));
   const declared = bids.reduce((s, [, b]) => s + b.bids, 0);
   const made = bids.reduce((s, [, b]) => s + b.made, 0);
@@ -511,7 +514,19 @@ function RecordsView({ records }: { records: Records }) {
           <span className="stat-value">{records.gamesPlayed ? `${records.gamesWon} of ${records.gamesPlayed}` : "—"}</span>
           <span className="stat-label">games won</span>
         </div>
+        <div className="stat">
+          <span className="stat-value">{played > 0 ? duration(played) : "—"}</span>
+          <span className="stat-label">time played{time.days > 0 ? ` over ${time.days} day${time.days === 1 ? "" : "s"}` : ""}</span>
+        </div>
       </div>
+      {(played > 0 || time.modes.learn > 0) && (
+        <p className="note play-time" aria-label="Time by mode">
+          {PLAY_MODES.filter((m) => time.modes[m.mode] >= 60)
+            .map((m) => `${m.label} ${duration(time.modes[m.mode])}`)
+            .join(" · ")}
+          {time.since && ` (since ${doneDate(time.since)}). Counted while you're playing: the clock stops after a few minutes with no click or key.`}
+        </p>
+      )}
       <TournamentRecords records={records} />
       <h4>Your bids</h4>
       {declared === 0 ? (
@@ -781,10 +796,11 @@ function ProgressView({ onLesson }: { onLesson: (id: string) => void }) {
         <button
           type="button"
           onClick={() => {
-            if (confirm("Clear all progress, records, bid stats and achievements?")) {
+            if (confirm("Clear all progress, records, bid stats, time played and achievements?")) {
               resetProgress();
               resetRecords();
               resetAchievements();
+              resetPlayTime();
               setProgress(loadProgress());
               setRecords(loadRecords());
             }
