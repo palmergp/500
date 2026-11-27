@@ -9,7 +9,7 @@ use crate::belief::Belief;
 use crate::cardplay::{is_boss, suit_order, trumps};
 use crate::evaluate::has_bower;
 use crate::thumb;
-use crate::rule_bot::{heuristic_discards, ranked_discards, KittyWeights, RuleBot, Style};
+use crate::rule_bot::{heuristic_discards, RuleBot, Style};
 use crate::search_bot::{Goal, PlayStat, PlayStats, SearchBot, SearchConfig};
 use crate::solver::{Position, Solver};
 use crate::Bot;
@@ -576,80 +576,13 @@ impl Coach {
 
     /// The coach's kitty plan: the `count` cards to put back. In a suit bid, the rule's set
     /// (`heuristic_discards`, finding 40): searching among the sets it ranks next gained nothing
-    /// when played out. In no trumps, the rule's card-by-card plan and the two sets ranked next are
-    /// compared on `NT_PLAN_DEALS` deals that fit the auction, and the best taken: played out, that
-    /// took 0.34 tricks more where it differed (finding 62). The deals are seeded by the position,
-    /// so the plan is the same whichever coach asks, and stays the plan as its cards go back.
+    /// when played out. In no trumps, the search bots' plan (`SearchBot::nt_kitty_plan`), which
+    /// took 0.34 tricks more played out where it differed from the rule (finding 62).
     pub fn kitty_plan(&mut self, obs: &Observation, count: usize) -> Vec<Card> {
-        let trump = obs.trump();
-        let rule = heuristic_discards(obs.hand, trump, count);
-        if trump.is_some() || count == 0 {
-            return rule;
+        if obs.trump().is_some() {
+            return heuristic_discards(obs.hand, obs.trump(), count);
         }
-        // Part of the way through: the plan for all thirteen cards, if the cards already put back
-        // are the first of it.
-        let gone = obs.discards.unwrap_or_default();
-        if !gone.is_empty() {
-            let mut full = obs.clone();
-            full.hand = obs.hand.union(gone);
-            full.discards = None;
-            let plan = self.kitty_plan(&full, count + gone.len());
-            if gone.iter().all(|c| plan.contains(&c)) {
-                return plan.into_iter().filter(|&c| !gone.contains(c)).collect();
-            }
-        }
-        let set = |cards: &[Card]| cards.iter().copied().collect::<CardSet>();
-        let mut candidates = vec![rule];
-        for c in ranked_discards(obs.hand, trump, count, KittyWeights::DEFAULT) {
-            if candidates.len() >= 3 {
-                break;
-            }
-            if !candidates.iter().any(|x| set(x) == set(&c)) {
-                candidates.push(c);
-            }
-        }
-        if candidates.len() == 1 {
-            return candidates.remove(0);
-        }
-        // Remembered: the hint for each card and the grade of the set ask for the same plan.
-        let key = (obs.clone(), count);
-        if let Some(plan) = KITTY_PLANS.with(|c| c.borrow().iter().find(|(k, _)| *k == key).map(|(_, p)| p.clone())) {
-            return plan;
-        }
-        let (declarer, contract) = obs.contract.expect("discarding without a contract");
-        let belief = Belief::new_with(obs, true, true);
-        let seed = obs.hand.bits() ^ 0x6b17_0000 ^ (u64::from(contract.level) << 56);
-        let worlds = belief.sample_fitting(&mut fh_core::Rng::new(seed), obs.hand, NT_PLAN_DEALS);
-        let mut solver = Solver::with_limit(trump, 1_500_000);
-        let mut values = vec![(0.0, 0.0); candidates.len()];
-        for world in &worlds {
-            let mut results = Vec::with_capacity(candidates.len());
-            for c in &candidates {
-                let mut hands = world.hands;
-                hands[declarer.index()] = obs.hand.minus(set(c));
-                let guess = results.first().copied().unwrap_or(contract.level);
-                results.push(solver.solve_near(&Position { hands, trump, trick: Trick::new(declarer) }, declarer.team(), guess));
-                if solver.aborted() {
-                    break;
-                }
-            }
-            if results.len() == candidates.len() {
-                for (v, &r) in values.iter_mut().zip(&results) {
-                    v.0 += world.weight * self.search.utility(obs, contract, declarer, r);
-                    v.1 += world.weight;
-                }
-            }
-        }
-        let value = |i: usize| values[i].0 / values[i].1.max(1e-9);
-        let best = (1..candidates.len()).max_by(|&a, &b| value(a).total_cmp(&value(b))).filter(|&i| value(i) - value(0) >= 1.0).unwrap_or(0);
-        let plan = candidates.swap_remove(best);
-        KITTY_PLANS.with(|c| {
-            let mut cache = c.borrow_mut();
-            cache.push((key, plan.clone()));
-            let excess = cache.len().saturating_sub(4);
-            cache.drain(..excess);
-        });
-        plan
+        self.search.nt_kitty_plan(obs, count)
     }
 
     /// Two sets of discards compared on the same likely deals: first `DISCARD_DEALS` of them. If
@@ -706,8 +639,6 @@ impl Coach {
 /// The likely deals a kitty grade first compares discards on, and how many more it looks at when
 /// those can't separate them.
 const DISCARD_DEALS: usize = 12;
-/// The deals a no-trump kitty plan is chosen on (`Coach::kitty_plan`).
-const NT_PLAN_DEALS: usize = 20;
 const DISCARD_CLOSER_LOOK: usize = 60;
 
 /// Two sets of discards, compared: their average values (`a` the plan's), the deals compared on,
@@ -855,14 +786,6 @@ const PLAY_CACHE_SIZE: usize = 6;
 thread_local! {
     static PLAY_CACHE: std::cell::RefCell<Vec<CachedPlay>> = const { std::cell::RefCell::new(Vec::new()) };
 }
-
-thread_local! {
-    /// No-trump kitty plans lately searched (`Coach::kitty_plan`).
-    static KITTY_PLANS: std::cell::RefCell<Vec<KittyPlan>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
-/// A remembered kitty plan: the position and the number of cards, and the plan.
-type KittyPlan = ((Observation, usize), Vec<Card>);
 
 /// A remembered analysis: the position, its units and whether the deals read the auction, and the result.
 type CachedPlay = (Observation, (Units, bool), PlayStats);

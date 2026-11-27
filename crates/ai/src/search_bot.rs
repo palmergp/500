@@ -13,7 +13,7 @@ use crate::cardplay::card_cost;
 use crate::evaluate::{has_bower, hand_tricks};
 use crate::features::{bid_features, strain_block};
 use crate::nn::{softmax, Mlp};
-use crate::rule_bot::{heuristic_discards, RuleBot, Style};
+use crate::rule_bot::{heuristic_discards, ranked_discards, KittyWeights, RuleBot, Style};
 use crate::solver::{Position, Solver};
 use crate::Bot;
 use fh_core::cards::ACE;
@@ -136,6 +136,9 @@ pub struct SearchConfig {
     pub hold_opening_joker: bool,
     /// Bid with the network from `FH_ALT_BID_MODEL` instead of the embedded one (a lab variant).
     pub alt_bid_model: bool,
+    /// In no trumps, choose the kitty by search among the rule's plan and the sets ranked next
+    /// (`nt_kitty_plan`, finding 62), even without `search_discards`; a lab variant turns it off.
+    pub nt_kitty_search: bool,
 }
 
 impl SearchConfig {
@@ -177,6 +180,7 @@ impl SearchConfig {
         lead_winners: false,
         hold_opening_joker: true,
         alt_bid_model: false,
+        nt_kitty_search: true,
     };
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
@@ -186,6 +190,17 @@ impl SearchConfig {
     pub const FAST: SearchConfig =
         SearchConfig { play_samples: 8, min_play_samples: 3, node_budget: 800_000, bid_samples: 5, discard_samples: 3, ..SearchConfig::COUNTER };
 }
+
+/// The deals a no-trump kitty plan is chosen on (`SearchBot::nt_kitty_plan`).
+const NT_PLAN_DEALS: usize = 20;
+
+thread_local! {
+    /// No-trump kitty plans lately searched.
+    static NT_PLANS: std::cell::RefCell<Vec<NtPlan>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// A remembered no-trump kitty plan: the position, the number of cards and the goal; the plan.
+type NtPlan = ((Observation, usize, Goal), Vec<Card>);
 
 pub struct SearchBot {
     name: String,
@@ -411,6 +426,83 @@ impl SearchBot {
             }
         }
         candidates
+    }
+
+    /// The kitty plan in no trumps: the rule's card-by-card plan (finding 23) and the two sets the
+    /// set rule ranks next, compared on `NT_PLAN_DEALS` deals that fit the auction (finding 58),
+    /// the best taken if it gains a point. Played out, the searched choice took 0.34 tricks more
+    /// where it differed from the rule (finding 62): it often empties a short suit to keep length
+    /// in the long ones. The deals are seeded by the position, so the plan is the same for every
+    /// bot and the coach, and stays the plan as its cards go back.
+    pub fn nt_kitty_plan(&mut self, obs: &Observation, count: usize) -> Vec<Card> {
+        let rule = heuristic_discards(obs.hand, None, count);
+        if count == 0 {
+            return rule;
+        }
+        // Part of the way through: the plan for all thirteen cards, if the cards already put back
+        // are the first of it.
+        let gone = obs.discards.unwrap_or_default();
+        if !gone.is_empty() {
+            let mut full = obs.clone();
+            full.hand = obs.hand.union(gone);
+            full.discards = None;
+            let plan = self.nt_kitty_plan(&full, count + gone.len());
+            if gone.iter().all(|c| plan.contains(&c)) {
+                return plan.into_iter().filter(|&c| !gone.contains(c)).collect();
+            }
+        }
+        let set = |cards: &[Card]| cards.iter().copied().collect::<CardSet>();
+        let mut candidates = vec![rule];
+        for c in ranked_discards(obs.hand, None, count, KittyWeights::DEFAULT) {
+            if candidates.len() >= 3 {
+                break;
+            }
+            if !candidates.iter().any(|x| set(x) == set(&c)) {
+                candidates.push(c);
+            }
+        }
+        if candidates.len() == 1 {
+            return candidates.remove(0);
+        }
+        // Remembered: each card's choice (and the coach's hints and grade) ask for the same plan.
+        let key = (obs.clone(), count, self.config.goal);
+        if let Some(plan) = NT_PLANS.with(|c| c.borrow().iter().find(|(k, _)| *k == key).map(|(_, p)| p.clone())) {
+            return plan;
+        }
+        let Some((declarer, contract)) = obs.contract else { return candidates.remove(0) };
+        let belief = Belief::new_with(obs, true, true);
+        let seed = obs.hand.bits() ^ 0x6b17_0000 ^ (u64::from(contract.level) << 56);
+        let worlds = belief.sample_fitting(&mut Rng::new(seed), obs.hand, NT_PLAN_DEALS);
+        let mut solver = Solver::with_limit(None, 1_500_000);
+        let mut values = vec![(0.0, 0.0); candidates.len()];
+        for world in &worlds {
+            let mut results = Vec::with_capacity(candidates.len());
+            for c in &candidates {
+                let mut hands = world.hands;
+                hands[declarer.index()] = obs.hand.minus(set(c));
+                let guess = results.first().copied().unwrap_or(contract.level);
+                results.push(solver.solve_near(&Position { hands, trump: None, trick: Trick::new(declarer) }, declarer.team(), guess));
+                if solver.aborted() {
+                    break;
+                }
+            }
+            if results.len() == candidates.len() {
+                for (v, &r) in values.iter_mut().zip(&results) {
+                    v.0 += world.weight * self.utility(obs, contract, declarer, r);
+                    v.1 += world.weight;
+                }
+            }
+        }
+        let value = |i: usize| values[i].0 / values[i].1.max(1e-9);
+        let best = (1..candidates.len()).max_by(|&a, &b| value(a).total_cmp(&value(b))).filter(|&i| value(i) - value(0) >= 1.0).unwrap_or(0);
+        let plan = candidates.swap_remove(best);
+        NT_PLANS.with(|c| {
+            let mut cache = c.borrow_mut();
+            cache.push((key, plan.clone()));
+            let excess = cache.len().saturating_sub(4);
+            cache.drain(..excess);
+        });
+        plan
     }
 
     fn plan_discards(&mut self, obs: &Observation) -> Vec<Card> {
@@ -727,6 +819,10 @@ impl Bot for SearchBot {
                 None => self.fallback.choose(obs, legal),
             },
             Phase::Bidding if !self.config.search_bidding => self.fallback.choose(obs, legal),
+            Phase::Discarding if !self.config.search_discards && self.config.nt_kitty_search && obs.trump().is_none() => {
+                let left = 3 - obs.discards.map_or(0, |d| d.len());
+                Action::Discard(self.nt_kitty_plan(obs, left)[0])
+            }
             Phase::Discarding if !self.config.search_discards => self.fallback.choose(obs, legal),
             Phase::Bidding => self.call(obs, legal),
             Phase::Discarding => {

@@ -169,6 +169,11 @@ pub fn make_bot(id: &str, seed: u64) -> Option<Box<dyn Bot>> {
             let config = SearchConfig { track_voids: false, ..SearchConfig::ORACLE };
             return Some(Box::new(SearchBot::new("Oracle (doesn't track voids)", config, seed)));
         }
+        "oracle-rulekitty" => {
+            // The rule's kitty in no trumps too (before finding 62).
+            let config = SearchConfig { nt_kitty_search: false, ..SearchConfig::ORACLE };
+            return Some(Box::new(SearchBot::new("Oracle (rule's no-trump kitty)", config, seed)));
+        }
         "counter-search-kitty" => {
             let config = SearchConfig { search_discards: true, ..SearchConfig::COUNTER };
             return Some(Box::new(SearchBot::new("Counter (searched kitty)", config, seed)));
