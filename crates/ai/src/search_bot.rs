@@ -99,7 +99,8 @@ pub struct SearchConfig {
     /// Tricks subtracted from simulated declarer results when bidding: double-dummy analysis
     /// assumes the declarer sees every card, which real declarers don't.
     pub dd_bias: f64,
-    /// The same gap for no-trump bids, which lose more to the unseen cards (finding 63).
+    /// The same gap for no-trump bids. Half a trick here too: played out, both more and less lost
+    /// points (finding 63, `fh-lab ntbias`).
     pub dd_bias_nt: f64,
     /// Use search for bidding and for the kitty (otherwise a rule bot decides).
     pub search_bidding: bool,

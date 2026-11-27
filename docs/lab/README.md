@@ -1374,7 +1374,22 @@ out both calls (the rest of the auction and the play by The Oracle, the same see
   84% of the time against 73%. Solved with every card seen, a no-trump bid looks better than it plays (the declarer
   always knows which suit to set up, and the defenders which to attack). Bids take off half a trick for real play
   (`dd_bias`, finding 2, measured on 120 deals, every strain together); no trumps now has its own allowance
-  (`dd_bias_nt`), set by `fh-lab ntbias`, which plays out the calls a larger one changes.
+  (`dd_bias_nt`), tried both ways below.
+- **The no-trump allowance, played out:** `fh-lab ntbias` (3,000 deals, The Oracle bidding): at each call, Oracles
+  taking another allowance off no-trump bids; the first call each makes differently is played out both ways (the rest
+  by today's Oracle, the same seed). Points for the caller's side, the variant less today's half a trick:
+
+  | No-trump allowance | Calls changed | Points (95%) | Bid made when declared: today / variant |
+  |---|---|---|---|
+  | 0 | 1,304 | −44.7 ± 16.7 | 76% / 61% |
+  | ¼ | 571 | −36.0 ± 25.0 | 77% / 63% |
+  | ¾ | 375 | −27.4 ± 26.9 | 73% / 75% |
+  | 1 | 609 | −29.3 ± 21.7 | 74% / 75% |
+  | 1¼ | 758 | −31.8 ± 19.2 | 74% / 75% |
+
+  Half a trick is right for no trumps too: less bids no trumps that go down, more gives up no-trump bids that score
+  (it bids a suit or passes instead). `dd_bias_nt` stays 0.5. Why the network's no trumps lose to the count's suit
+  where they differ is still open: not the allowance.
 
 ### 64. Reading the auction for leads, played out
 
@@ -1469,3 +1484,5 @@ each way of choosing the deals, and once on 400 deals as the reference:
 - **The forced dealer:** strategy on the third deal.
 - **Score-aware bidding:** answered for bid levels (finding 48, which replaces 20 under the made-bid rule).
 - **The playbook:** the 30 hypotheses in `docs/research/02-strategy-playbook.md` still need checking under these rules.
+- **No trumps against the count's suit:** where the bidding network chose no trumps and the count a suit, the suit
+  scored 32 points more (finding 63), and the no-trump allowance isn't why. Which hands those are is the next question.
