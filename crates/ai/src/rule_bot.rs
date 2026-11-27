@@ -35,6 +35,17 @@ pub struct Style {
     pub signal_after_partner: bool,
 }
 
+/// How much a suit with fewer than four trumps falls short as trumps: 0.9 a trump. The hand
+/// estimate counts side aces and kings the same whatever the trumps, so A-K-x of hearts and two
+/// small diamonds rated diamonds above hearts (a user saw The Gambler open 7♦ on 4♦ 8♦); with
+/// the opponents holding most of the trumps, those side winners get trumped. Measured over 20,000
+/// opening hands (finding 59), the penalty never cost a style anything and helped The Gambler most.
+pub fn short_trumps(hand: CardSet, strain: Strain) -> f32 {
+    let Some(suit) = strain.trump() else { return 0.0 };
+    let n = hand.iter().filter(|&c| is_trump(c, Some(suit)) || c.is_joker()).count();
+    0.9 * 4usize.saturating_sub(n) as f32
+}
+
 /// When a player holding the Joker, without a bid, calls 6 in their best strain.
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum SixPolicy {
@@ -100,7 +111,7 @@ impl RuleBot {
                 support -= delta * 0.5; // the strength an opponent showed is against us
             }
         }
-        hand_tricks(obs.hand, strain) + support + self.style.kitty_credit + self.style.aggression
+        hand_tricks(obs.hand, strain) - short_trumps(obs.hand, strain) + support + self.style.kitty_credit + self.style.aggression
     }
 
     fn call(&mut self, obs: &Observation, legal: &[Action]) -> Action {
@@ -461,6 +472,21 @@ mod tests {
     use super::*;
     use crate::{play_out, RandomBot};
     use fh_core::{Game, Rules, Seat, Team};
+
+    /// A user's deal: The Gambler, first to call with 5♠ 8♠ A♠ 6♣ A♣ 4♦ 8♦ 7♥ K♥ A♥, opened 7♦ on two
+    /// small diamonds. With short trumps counted as short, it doesn't bid diamonds (or clubs).
+    #[test]
+    fn short_trumps_dont_make_the_trump_suit() {
+        let hands = ["QS 5C QC 5D 9D JD KD AD 4H 9H", "7S 9S 10S JC KC 10D 5H 8H JH Joker", "5S 8S AS 6C AC 4D 8D 7H KH AH", "6S KS 7C 8C 10C 6D 7D 6H 10H QH"]
+            .map(|h| CardSet::parse(h).unwrap());
+        let game = Game::from_deal(Rules::default(), 1, Seat::WEST, hands, CardSet::parse("JS 9C QD").unwrap());
+        assert_eq!(game.to_act(), Some(Seat::NORTH));
+        let call = RuleBot::new("The Gambler", Style::BOLD, 1).choose(&game.observe(Seat::NORTH), &game.legal_actions());
+        assert!(!matches!(call, Action::Call(Call::Bid(c)) if matches!(c.strain, Strain::Diamonds | Strain::Clubs)), "{call:?}");
+        assert_eq!(short_trumps(hands[2], Strain::Diamonds), 1.8);
+        assert_eq!(short_trumps(hands[2], Strain::Hearts), 0.9);
+        assert_eq!(short_trumps(hands[2], Strain::NoTrumps), 0.0);
+    }
 
     /// Once both opponents have shown out of trumps, the declarer stops leading them: the trumps
     /// left are partner's, and drawing them only pulls partner's (a user saw The Gambler do it).

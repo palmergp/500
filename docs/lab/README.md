@@ -1240,6 +1240,40 @@ odd deals decided it; four other seeds called it best.
   was, so kitty cards that decide the bid were undercounted: putting back the right bower in the user's deal was
   graded good on two of five seeds before, a blunder on all five now.
 
+### 59. The rule bots' strain: short trumps counted as short
+
+The user saw The Gambler open 7♦ holding 5♠ 8♠ A♠, 6♣ A♣, 4♦ 8♦, 7♥ K♥ A♥: two small diamonds as trumps. The rule
+bots' hand estimate (`evaluate::hand_tricks`, which Steady, The Rock, The Gambler, Rookie, The Counter and The Shark
+all bid by; The Oracle bids by its network and would open 7NT) counts a side ace 0.9 and a king beside it 0.7
+whatever the trumps, but the same A♥ K♥ as trumps only 0.8 and 0.4 in a three-card suit. So it rated diamonds (4.10)
+above hearts (3.35), and nothing marked two trumps as too few: the opponents, holding nine or ten, trump the aces.
+
+`fh-lab strainpick` (20,000 deals) took the first player to call, solved every strain with every card seen (after
+the kitty, discarding as the bots do), and scored the strain and level each version of the estimate would bid
+(real play half a trick under the solver; pass below 7):
+
+| Style | Estimate | Bids | Strain the solver's best | Points a deal |
+|---|---|---|---|---|
+| Steady | today | 12% | 65% | +7.9 |
+| Steady | −0.9 a trump short of 4 | 12% | 65% | +7.9 |
+| Steady | −0.5 a trump short of 5 | 11% | 65% | +7.4 |
+| The Counter | today | 27% | 61% | +5.6 |
+| The Counter | −0.9 a trump short of 4 | 26% | 62% | +5.9 |
+| The Counter | −0.5 a trump short of 5 | 23% | 62% | +5.6 |
+| The Gambler | today | 45% | 58% | −13.2 |
+| The Gambler | −0.9 a trump short of 4 | 44% | 58% | −11.8 |
+| The Gambler | −0.5 a trump short of 5 | 37% | 60% | −8.9 |
+
+(Intervals about ±1 to ±2 points a deal, but the versions share their deals: they differ only where the strain or
+level changes.)
+
+- **Three trumps or fewer is rare in an opening bid**, so the gains are small; the penalty for each trump short of
+  four was never worse than today for any style. Penalising short of five helped The Gambler more, mostly by
+  bidding less, but cost Steady half a point, so it wasn't taken.
+- **The change:** `rule_bot::short_trumps`, 0.9 a trump short of four, in the rule bots' estimate only (the belief
+  model's guess at what an opponent bid from still uses the plain hand estimate). With the user's hand The Gambler
+  now mentions no trumps instead of bidding 7♦.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

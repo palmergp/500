@@ -122,6 +122,8 @@
   hand while holding other cards (`cardplay::early_joker_lead`, findings 54 and 56); the coach grades that lead as
   costing the bid's chance. From trick 4 the search decides (tricks 4–6 came out even, 7+ the Joker lead pays).
 - Rule bots stop drawing trumps once both opponents have shown out (`cardplay::opponents_may_hold_trumps`).
+- The rule bots' bidding estimate (Steady, Rock, Gambler, Rookie, and The Counter's and The Shark's bidding) counts a
+  suit with fewer than four trumps 0.9 a trump short (`rule_bot::short_trumps`, finding 59, `fh-lab strainpick`).
 - `fh-lab show --code C --at N` shows any seat's decision at action N (your own: the coach's grade and reasons; its
   bot, The Oracle's ranking, the solver's values; `--discards "6S 8S 4H"` grades a kitty on five seeds and 400
   deals); `fh-lab whatif --code C --at N --a X --b Y` plays two choices out over that seat's possible deals.

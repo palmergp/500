@@ -207,6 +207,16 @@ Action {at}: {seat} ({persona}) to act, holding {}", game.hand(seat));
             Err(e) => println!("  (no grade: {e})"),
         }
     }
+    if game.phase() == fh_core::Phase::Bidding {
+        // Each strain as the rule bots and the coach's count see it (the rule estimate before style).
+        if let Some(mut oracle) = fh_ai::personas::make_bot("oracle", save.seed) {
+            println!("  The Oracle would call: {}", oracle.choose(&obs, &legal));
+        }
+        println!("  By strain: rule bots' hand estimate (cards only) · the coach's count (with partner and kitty):");
+        for strain in fh_core::Strain::ALL {
+            println!("    {:<3} {:>5.2} · {:>5.2}", strain.to_string(), fh_ai::evaluate::hand_tricks(obs.hand, strain), fh_ai::thumb::count(&obs, strain).0);
+        }
+    }
     if game.phase() != fh_core::Phase::Playing {
         return;
     }
