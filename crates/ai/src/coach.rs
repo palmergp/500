@@ -6,7 +6,7 @@
 //! hindsight view (every card visible) is kept separate, in [`dd_trace`].
 
 use crate::belief::Belief;
-use crate::cardplay::{is_boss, trumps};
+use crate::cardplay::{is_boss, suit_order, trumps};
 use crate::evaluate::has_bower;
 use crate::thumb;
 use crate::rule_bot::{heuristic_discards, RuleBot, Style};
@@ -852,6 +852,12 @@ pub fn real_play_chance(raw: f64, curve: &[(f64, f64)]) -> f64 {
     curve.last().map_or(raw, |&(_, y)| y)
 }
 
+/// The text with its first letter in capitals.
+fn capitalize(text: &str) -> String {
+    let mut chars = text.chars();
+    chars.next().map_or_else(String::new, |first| first.to_uppercase().chain(chars).collect())
+}
+
 fn pct(x: f64) -> String {
     format!("{:.0}%", 100.0 * x)
 }
@@ -937,8 +943,50 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
                     reasons.push(format!("Save the {}: {} It's a winner later.", c.card, top_card_note(c.card, obs.hand, trump)));
                 }
             }
-        } else if beats(best_play.card) && !chosen_play.is_some_and(|c| beats(c.card)) {
-            reasons.push(format!("{} wins this trick.", best_play.card));
+        } else if beats(best_play.card) {
+            let last = trick.cards().len() == 3;
+            let best = best_play.card;
+            // Nothing left out can beat it: the Joker, the top trump, a top card in no trumps, or
+            // the last card of the trick.
+            let sure = last || best.is_joker() || (is_boss(best, seen, trump) && (is_trump(best, trump) || (trump.is_none() && seen.contains(Card::JOKER))));
+            let ruff = is_trump(best, trump) && Some(led) != trump;
+            let wins = match (ruff, sure) {
+                (true, true) => format!("trumping with {best} wins it for sure"),
+                (true, false) => format!("trumping with {best} wins it for now"),
+                (false, true) => format!("{best} wins it for sure"),
+                (false, false) => format!("{best} beats it"),
+            };
+            match chosen_play {
+                Some(c) if !beats(c.card) => reasons.push(if last {
+                    format!("You're last to play: {best} takes this trick, and {} hands it to their {winning}.", c.card)
+                } else if trick.cards().len() == 2 {
+                    format!("{} leaves this trick to their {winning}: your partner has played, so only an opponent is left. {}.", c.card, capitalize(&wins))
+                } else {
+                    format!("{} leaves their {winning} winning, with only your partner left to beat it; {wins}.", c.card)
+                }),
+                Some(c) if !last && trick_strength(best, led, trump) > trick_strength(c.card, led, trump) => {
+                    // Yours wins for now, but an opponent still to play may hold a higher card (of
+                    // the suit, or a higher trump to overtrump yours).
+                    let unseen: Vec<Card> = effective_suit(c.card, trump)
+                        .map(|suit| suit_order(suit, trump).into_iter().take_while(|&x| x != c.card).filter(|&x| !seen.contains(x)).collect())
+                        .unwrap_or_default();
+                    if !unseen.is_empty() {
+                        let names: Vec<String> = unseen.iter().take(3).map(|&x| if x.is_joker() { "the Joker".into() } else { x.to_string() }).collect();
+                        let list = match names.len() {
+                            1 => format!("{} is", names[0]),
+                            n => format!("{} and {} are", names[..n - 1].join(", "), names[n - 1]),
+                        };
+                        let more = if unseen.len() > 3 { " among others" } else { "" };
+                        let best_text = if sure { format!("{best} wins it for sure") } else { format!("{best} is harder to beat") };
+                        reasons.push(format!("{} may not hold: an opponent plays after you, and {list} still out{more}. {best_text}.", c.card));
+                    }
+                }
+                None => {
+                    let how = if sure { "for sure" } else { "for now" };
+                    reasons.push(if ruff { format!("Trumping with {best} wins this trick {how}.") } else { format!("{best} wins this trick {how}.") });
+                }
+                _ => {}
+            }
         }
     } else if declaring && trump.is_some() && is_trump(best_play.card, trump) {
         // Leading: drawing trumps.
@@ -1799,6 +1847,42 @@ mod tests {
         let grade = Coach::new(5).grade(&obs, &game.legal_actions(), play("AD"));
         assert_ne!(grade.best, play("AD"));
         assert!(grade.analysis.reasons.iter().any(|r| r.starts_with("Keep A♦ for now")), "{:?}", grade.analysis.reasons);
+    }
+
+    /// The reasons for following to a trick say what each card does to it: last to play, the
+    /// coach's card takes it and yours hands it over; with an opponent still to play, a card that
+    /// wins for now may not hold.
+    #[test]
+    fn following_reasons_say_what_happens_to_the_trick() {
+        let card = |c: &str| Card::parse(c).unwrap();
+        let play = |c: &str| Action::Play(Play::card(card(c)));
+        let hands = ["AS 7S 8C 9C 10C 5D 6D 7D 5H 6H", "KS QS JS AC KC AD KD AH KH Joker", "5S 9S 10S 5C 6C 7C 8D 9D 7H 8H", "6S 8S QC JC 10D JD QD 9H 10H JH"];
+        let back = [Action::Discard(card("4D")), Action::Discard(card("4H")), Action::Discard(card("QH"))];
+        let reasons = |game: &fh_core::Game| {
+            let obs = game.observe(Seat::SOUTH);
+            play_reasons(&obs, play("AS"), Some(play("7S")), None, None, 32)
+        };
+        // West's 7NT, West leads the K♠: South is last.
+        let mut actions = vec![Action::Call(Call::Pass), Action::Call(Call::Pass), Action::Call(Call::Bid(Contract::new(7, Strain::NoTrumps))), Action::Call(Call::Pass)];
+        actions.extend(back);
+        actions.extend([play("KS"), play("5S"), play("6S")]);
+        let last = reasons(&deal_from(Seat::NORTH, hands, "4D 4H QH", &actions));
+        assert!(last.iter().any(|r| r == "You're last to play: A♠ takes this trick, and 7♠ hands it to their K♠."), "{last:?}");
+        // Partner's 7NT, partner leads the 5♠ and East plays the 6♠: South's 7♠ wins for now.
+        let mut actions = vec![Action::Call(Call::Bid(Contract::new(7, Strain::NoTrumps))), Action::Call(Call::Pass), Action::Call(Call::Pass), Action::Call(Call::Pass)];
+        actions.extend(back);
+        actions.extend([play("5S"), play("6S")]);
+        let third = reasons(&deal_from(Seat::WEST, hands, "4D 4H QH", &actions));
+        assert!(
+            third.iter().any(|r| r == "7♠ may not hold: an opponent plays after you, and K♠, Q♠ and J♠ are still out among others. A♠ is harder to beat."),
+            "{third:?}"
+        );
+        // The same, but East plays the 8♠: the 7♠ leaves it to them.
+        let mut actions = vec![Action::Call(Call::Bid(Contract::new(7, Strain::NoTrumps))), Action::Call(Call::Pass), Action::Call(Call::Pass), Action::Call(Call::Pass)];
+        actions.extend(back);
+        actions.extend([play("5S"), play("8S")]);
+        let over = reasons(&deal_from(Seat::WEST, hands, "4D 4H QH", &actions));
+        assert!(over.iter().any(|r| r == "7♠ leaves this trick to their 8♠: your partner has played, so only an opponent is left. A♠ beats it."), "{over:?}");
     }
 
     /// A user's 8♣: the plan puts back 6♠ 8♠ 4♦; putting back the 4♥ instead is a tie over 400
