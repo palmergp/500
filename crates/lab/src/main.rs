@@ -43,6 +43,8 @@ mod coachaudit;
 mod gradestab;
 mod kittyplay;
 mod bidplay;
+mod gradeaudit;
+mod leadread;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -213,6 +215,16 @@ fn main() {
         "coachaudit" => coachaudit::run(
             flag(&flags, "deals", 3000),
             flag(&flags, "seed", 8_100_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "gradeaudit" => gradeaudit::run(
+            flag(&flags, "deals", 1500),
+            flag(&flags, "seed", 8_500_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "leadread" => leadread::run(
+            flag(&flags, "deals", 1500),
+            flag(&flags, "seed", 8_600_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "strainpick" => strainpick::run(
