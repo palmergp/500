@@ -1376,6 +1376,67 @@ out both calls (the rest of the auction and the play by The Oracle, the same see
   (`dd_bias`, finding 2, measured on 120 deals, every strain together); no trumps now has its own allowance
   (`dd_bias_nt`), set by `fh-lab ntbias`, which plays out the calls a larger one changes.
 
+### 64. Reading the auction for leads, played out
+
+Finding 60 hinted that leads chosen on deals fitting the auction did better (17 ± 14 points from 238 leads).
+`fh-lab leadread` (1,500 deals, expert bots in every seat): of 10,441 leads with a choice, the coach as it is and a
+coach reading the auction chose leads that play differently 780 times, and both were played out (The Oracle in every
+seat, the same seed). Gaps are the reading coach's lead less the plain coach's, for the leader's side:
+
+| | n | Real gap (95%) | Reading's lead did better / worse |
+|---|---|---|---|
+| **All** | 780 | **+7.0 ± 10.8** | 22% / 20% |
+| The declarer | 368 | +12.1 ± 17.3 | 25% / 22% |
+| A defender | 268 | −2.0 ± 18.9 | 17% / 21% |
+| The declarer's partner | 144 | +10.9 ± 14.2 | 26% / 14% |
+| Partner bid | 186 | +19.0 ± 17.5 | 25% / 16% |
+| Partner passed | 329 | +5.4 ± 15.0 | 19% / 21% |
+
+- **No clear gain:** +7 ± 11 overall, and the defenders, whose leads the auction should help most, gained nothing
+  (−2 ± 19). Leads after partner bid look better, but that's one slice of many. Each coach rated its own lead 8 to 11
+  points above the other's; played out, they came within a few points.
+- **No change:** the coach's card play keeps deals that don't read the auction (finding 21's reasons stand).
+
+### 65. Grades played out: what a slip costs at the table
+
+`fh-lab gradeaudit` (4,000 deals): Steady or Rookie as South against expert bots, so there are slips. Every South
+card play the coach didn't call best (3,955) was played out both ways, the player's card and the coach's, by The
+Oracle in every seat with the same seed. The coach's loss (its gap on the likely deals, every card seen) against the
+real one, for South's side:
+
+| Verdict | n | Stated loss | Real loss (95%) | Real tricks |
+|---|---|---|---|---|
+| Good | 2,162 | 10.9 | +2.9 ± 5.0 | +0.01 |
+| Inaccuracy | 681 | 35.2 | +0.3 ± 9.8 | +0.10 |
+| Mistake | 561 | 40.3 | +18.5 ± 11.6 | +0.14 |
+| Blunder | 551 | 121.9 | +74.0 ± 16.8 | +0.42 |
+
+| Gap on the likely deals | n | Mean gap | Real loss (95%) |
+|---|---|---|---|
+| Under 10 | 1,371 | 4.7 | −1.6 ± 5.8 |
+| 10–25 | 1,071 | 16.7 | +9.5 ± 7.5 |
+| 25–60 | 861 | 38.7 | +10.4 ± 9.5 |
+| 60–120 | 436 | 82.7 | +29.7 ± 14.1 |
+| 120 or more | 216 | 201.3 | +129.0 ± 33.1 |
+
+- **The order holds:** blunders cost the most, mistakes some, the rest little. But the gaps run about twice the real
+  cost: solved with every card seen, every slip is punished, and the best of a few dozen deals flatters the winner
+  (finding 60). **Real ≈ 0.6 × gap − 6** fits every band, and an earlier 3,000-deal run (before the caps below) too.
+- **By player** (discards and low leads left out) the ratio is about the same: defenders 31 stated, 16 real; the
+  declarer's partner 36 and 14; the declarer 45 and 21. A first run had suggested defenders' losses were overstated
+  far more; that was their discards.
+- **One discard against another:** stated 58 among the inaccuracies, real +1 ± 8; in the earlier run, even the coach's
+  "blunders" came to −11 ± 21. With finding 60 (+1 ± 4 from 1,230), the coach's choice of discard is worth a few points.
+- **Which low card to lead:** 354, stated 23, real +17 ± 12 (+3 ± 14 in the earlier run): around 10 points.
+- **Changes:** a card play's loss is now `coach::played_out(gap)`, 0.6 × gap − 6 and never below 0: the grade's points,
+  its verdict and the "worth about N points more" reasons all use it, so a mistake costs 25–60 points at the table as
+  the scale says (a gap of 40 on the likely deals is now an inaccuracy of 18 points; a mistake starts at a gap of 52, a
+  blunder at 110). The early Joker lead in no trumps keeps its cost, measured at the table already (findings 54 and
+  56). One discard against another is good at worst ("Discards are hard to judge…"), and so is one low lead against
+  another ("A close call…"). Bidding and kitty grades are unchanged: this audit measured card play.
+- **Lead reasons:** a lead that can lose the trick names the cards still out above it ("9♠ can lose the trick: A♠, J♠
+  and 10♠ are still out").
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

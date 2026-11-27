@@ -288,14 +288,19 @@ impl Coach {
             }
             if let Some(play) = analysis.play.as_ref() {
                 let stat = |a: Action| play.stats.iter().find(|s| s.action == a).map(|&s| PlayStat { makes: shown_play_chance(obs, s.makes), ..s });
-                analysis.reasons = play_reasons(obs, chosen, None, stat(chosen), None, play.worlds);
+                analysis.reasons = play_reasons(obs, chosen, None, stat(chosen), None);
             } else if obs.phase == Phase::Bidding {
                 analysis.reasons = call_reasons(obs, chosen, None, &analysis.options, obs.auction.high_bid());
             }
             analysis.best = chosen;
             return Grade { chosen, best: chosen, loss: 0.0, verdict: Verdict::Best, analysis };
         }
-        let mut verdict = if chosen == analysis.best { Verdict::Best } else { Verdict::from_loss(loss, obs.phase == Phase::Bidding) };
+        // A card play's gap on the likely deals, seen double dummy, comes to less at the table (finding 65).
+        let loss = match chosen {
+            Action::Play(c) => at_the_table(obs, c.card, loss),
+            _ => loss,
+        };
+        let mut verdict = if chosen == analysis.best { Verdict::Best } else { Verdict::from_loss(loss, obs.phase == Phase::Bidding).max(Verdict::Good) };
         if let (Action::Call(Call::Bid(c)), true) = (chosen, verdict > Verdict::Good) {
             if let Some(note) = count_disagreement(obs, c, &analysis) {
                 analysis.reasons.insert(0, note);
@@ -309,13 +314,13 @@ impl Coach {
         }
         if let (Action::Play(c), Action::Play(b)) = (chosen, analysis.best) {
             if throws_away(obs, c.card) && throws_away(obs, b.card) {
-                // One discard against another: played out, the coach's discard came out about 13
-                // points better whatever the deals said, and its "blunders" cost nothing (finding
-                // 65). With the cards hidden, the opponents rarely know which suit you let go.
-                if verdict > Verdict::Inaccuracy {
-                    verdict = Verdict::Inaccuracy;
+                // One discard against another: played out, the coach's discard came out a few points
+                // better whatever the deals said, its "blunders" no better than the rest (findings 60
+                // and 65). With the cards hidden, the opponents rarely know which suit you let go.
+                if verdict > Verdict::Good {
+                    verdict = Verdict::Good;
                     analysis.reasons.push(format!(
-                        "Discards are hard to judge: {} looks much better on these deals, but played out, a discard the coach prefers gains only about 13 points on average. The opponents can't see which suit you let go.",
+                        "Discards are hard to judge: {} looks better on these deals, but played out, the discard the coach prefers gains only a few points on average. The opponents can't see which suit you let go.",
                         b.card
                     ));
                 }
@@ -415,7 +420,7 @@ impl Coach {
             .map(|&(a, _)| a)
             .take(3)
             .collect();
-        let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat), result.worlds);
+        let reasons = play_reasons(obs, best, chosen, stat(best), chosen.and_then(stat));
         let mut close_note = (!close.is_empty()).then(|| close_call_reason(obs, &result, best, &close));
         if let Some(top) = top {
             let note = ace_or_top_trump_note(top, best);
@@ -732,6 +737,27 @@ fn ace_or_top_trump_note(yours: Action, other: Action) -> String {
     )
 }
 
+/// What a card play's gap on the likely deals comes to at the table. The deals are solved with
+/// every card seen, where every slip is punished and the best of a few dozen solved deals flatters
+/// the winner: played out (`fh-lab gradeaudit`, 7,000 deals, finding 65), a gap of 40 came to about
+/// 18 points, one of 200 to about 115, and under 10 to nothing. Grades and their reasons use this.
+pub fn played_out(gap: f64) -> f64 {
+    (PLAYED_OUT_SHARE * gap - PLAYED_OUT_LESS).max(0.0)
+}
+
+const PLAYED_OUT_SHARE: f64 = 0.6;
+const PLAYED_OUT_LESS: f64 = 6.0;
+
+/// `played_out` for playing `card`, except an early Joker lead in no trumps: its cost was measured
+/// at the table already (findings 54 and 56) and goes into the values as it is.
+fn at_the_table(obs: &Observation, card: Card, gap: f64) -> f64 {
+    if card.is_joker() && crate::cardplay::early_joker_lead(obs).is_some() {
+        gap
+    } else {
+        played_out(gap)
+    }
+}
+
 /// Whether `card` would be thrown away: it neither follows the suit led nor beats the trick.
 fn throws_away(obs: &Observation, card: Card) -> bool {
     let trump = obs.trump();
@@ -930,7 +956,7 @@ fn play_card(action: Action) -> Option<Play> {
 }
 
 /// Plain-language reasons for a card-play decision.
-fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_stat: Option<PlayStat>, chosen_stat: Option<PlayStat>, worlds: usize) -> Vec<String> {
+fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_stat: Option<PlayStat>, chosen_stat: Option<PlayStat>) -> Vec<String> {
     let mut reasons = Vec::new();
     let (Some(best_play), Some((declarer, contract))) = (play_card(best), obs.contract) else { return reasons };
     let trump = contract.trump();
@@ -975,9 +1001,9 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
                 c.card,
                 pct(side(cs.makes))
             )),
-            (Some(c), Some(cs)) if b.ev - cs.ev >= 2.0 => reasons.push(format!(
-                "{} across {worlds} likely deals.",
-                Units::of(obs).compare(&best_play.card.to_string(), &c.card.to_string(), b.ev - cs.ev)
+            (Some(c), Some(cs)) if at_the_table(obs, c.card, b.ev - cs.ev) >= 1.0 => reasons.push(format!(
+                "{}.",
+                Units::of(obs).compare(&best_play.card.to_string(), &c.card.to_string(), at_the_table(obs, c.card, b.ev - cs.ev))
             )),
             (None, _) => reasons.push(format!("The bid {goal} in {} of likely deals after this play.", pct(side(b.makes)))),
             _ => {}
@@ -1907,17 +1933,14 @@ mod tests {
         assert_ne!(grade.best, play("AD"));
         assert!(grade.analysis.reasons.iter().any(|r| r.starts_with("Keep A♦ for now")), "{:?}", grade.analysis.reasons);
         // Leading the 9♠ rather than the K♥ (now the top heart): the 9♠ can lose the trick.
-        let reasons = play_reasons(&obs, play("KH"), Some(play("9S")), None, None, 32);
+        let reasons = play_reasons(&obs, play("KH"), Some(play("9S")), None, None);
         assert!(reasons.iter().any(|r| r == "9♠ can lose the trick: A♠, J♠ and 10♠ are still out."), "{reasons:?}");
     }
 
-    /// The reasons for following to a trick say what each card does to it: last to play, the
-    /// coach's card takes it and yours hands it over; with an opponent still to play, a card that
-    /// wins for now may not hold.
-    /// One discard against another is never graded worse than an inaccuracy: played out, the
-    /// coach's "blunder" discards cost nothing (finding 65).
+    /// One discard against another is good at worst: played out, the coach's preferred discard
+    /// gains a few points, its "blunders" no more (findings 60 and 65).
     #[test]
-    fn a_discard_against_another_is_at_worst_an_inaccuracy() {
+    fn a_discard_against_another_is_good_at_worst() {
         let mut found = 0;
         for seed in 0..40 {
             let mut game = Game::new(Rules::default(), seed);
@@ -1927,12 +1950,12 @@ mod tests {
                 let legal = game.legal_actions();
                 let discards: Vec<Action> = legal.iter().copied().filter(|&a| matches!(a, Action::Play(p) if throws_away(&obs, p.card))).collect();
                 if game.phase() == Phase::Playing && discards.len() == legal.len() && legal.len() >= 2 {
-                    // Grade each discard but the coach's: none is worse than an inaccuracy.
+                    // Grade each discard but the coach's: none is worse than good.
                     let mut coach = Coach::new(seed);
                     let best = coach.analyze(&obs, &legal, None).best;
                     for &a in discards.iter().filter(|&&a| a != best) {
                         let grade = coach.grade(&obs, &legal, a);
-                        assert!(grade.verdict <= Verdict::Inaccuracy, "seed {seed}: {a} {:?} ({:.0})", grade.verdict, grade.loss);
+                        assert!(grade.verdict <= Verdict::Good, "seed {seed}: {a} {:?} ({:.0})", grade.verdict, grade.loss);
                     }
                     found += 1;
                     break;
@@ -1950,6 +1973,20 @@ mod tests {
         assert!(found >= 3, "positions with only discards to choose from: {found}");
     }
 
+    /// Card-play losses are what play-outs show (finding 65): nothing under a gap of 10 on the likely
+    /// deals, about 18 points from a gap of 40, and still a blunder from one of 200.
+    #[test]
+    fn card_play_losses_are_what_play_outs_show() {
+        assert_eq!(played_out(8.0), 0.0);
+        assert!((played_out(40.0) - 18.0).abs() < 1e-9);
+        assert_eq!(Verdict::from_loss(played_out(40.0), false), Verdict::Inaccuracy);
+        assert_eq!(Verdict::from_loss(played_out(80.0), false), Verdict::Mistake);
+        assert_eq!(Verdict::from_loss(played_out(200.0), false), Verdict::Blunder);
+    }
+
+    /// The reasons for following to a trick say what each card does to it: last to play, the
+    /// coach's card takes it and yours hands it over; with an opponent still to play, a card that
+    /// wins for now may not hold.
     #[test]
     fn following_reasons_say_what_happens_to_the_trick() {
         let card = |c: &str| Card::parse(c).unwrap();
@@ -1958,7 +1995,7 @@ mod tests {
         let back = [Action::Discard(card("4D")), Action::Discard(card("4H")), Action::Discard(card("QH"))];
         let reasons = |game: &fh_core::Game| {
             let obs = game.observe(Seat::SOUTH);
-            play_reasons(&obs, play("AS"), Some(play("7S")), None, None, 32)
+            play_reasons(&obs, play("AS"), Some(play("7S")), None, None)
         };
         // West's 7NT, West leads the K♠: South is last.
         let mut actions = vec![Action::Call(Call::Pass), Action::Call(Call::Pass), Action::Call(Call::Bid(Contract::new(7, Strain::NoTrumps))), Action::Call(Call::Pass)];

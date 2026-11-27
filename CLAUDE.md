@@ -38,7 +38,12 @@
   Kitty grades do the same (`discard_comparison`): 12 deals, then 60 fresh ones when the gap is unclear or small;
   a gap the deals can't confirm is a close call (good) within `CLOSE_POINTS`, at most an inaccuracy beyond.
   Their deals fit the auction (partner's bid read in, unlike the search's card play): closer to the truth (finding 58,
-  `fh-lab kittyworlds`).
+  `fh-lab kittyworlds`). Reading the auction didn't help leads either (finding 64, `fh-lab leadread`).
+- A card play's loss is what play-outs show, not the gap on the likely deals: `coach::played_out` (0.6 × gap − 6,
+  finding 65, `fh-lab gradeaudit`) sets the grade's points, its verdict and the "worth about N points more" reasons
+  (not the early Joker lead's measured cost). One discard against another, and one low lead against another, grade
+  good at worst. Following to a trick, the reasons say what the card does to it; a lead that can lose the trick names
+  the cards still out above it (`still_out_above`).
 - Winning (H23–H24, games to 500 only): declarers who make their bid and reach 500 win; defensive points never win
   (no cap, they just keep counting); −500 or worse loses. `game_winner(rules, scores, declarers, made)`.
 - Near the end of a game to 500 (either side within 160 of 500 or of −500) the coach plays for the game
