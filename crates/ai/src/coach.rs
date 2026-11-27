@@ -886,6 +886,20 @@ fn top_card_note(card: Card, hand: CardSet, trump: Option<Suit>) -> String {
     }
 }
 
+/// "K♠, Q♠ and J♠ are still out among others": the cards of `card`'s suit (trumps for a trump)
+/// above it that the player hasn't seen, the top three named; `None` if there are none.
+fn still_out_above(card: Card, seen: CardSet, trump: Option<Suit>) -> Option<String> {
+    let above: Vec<Card> = suit_order(effective_suit(card, trump)?, trump).into_iter().take_while(|&x| x != card).filter(|&x| !seen.contains(x)).collect();
+    let names: Vec<String> = above.iter().take(3).map(|&x| if x.is_joker() { "the Joker".into() } else { x.to_string() }).collect();
+    let list = match names.len() {
+        0 => return None,
+        1 => format!("{} is", names[0]),
+        n => format!("{} and {} are", names[..n - 1].join(", "), names[n - 1]),
+    };
+    let more = if above.len() > 3 { " among others" } else { "" };
+    Some(format!("{list} still out{more}"))
+}
+
 /// The real-play chance for a raw chance, on `curve`.
 pub fn real_play_chance(raw: f64, curve: &[(f64, f64)]) -> f64 {
     let raw = raw.clamp(0.0, 1.0);
@@ -1013,18 +1027,9 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
                 Some(c) if !last && trick_strength(best, led, trump) > trick_strength(c.card, led, trump) => {
                     // Yours wins for now, but an opponent still to play may hold a higher card (of
                     // the suit, or a higher trump to overtrump yours).
-                    let unseen: Vec<Card> = effective_suit(c.card, trump)
-                        .map(|suit| suit_order(suit, trump).into_iter().take_while(|&x| x != c.card).filter(|&x| !seen.contains(x)).collect())
-                        .unwrap_or_default();
-                    if !unseen.is_empty() {
-                        let names: Vec<String> = unseen.iter().take(3).map(|&x| if x.is_joker() { "the Joker".into() } else { x.to_string() }).collect();
-                        let list = match names.len() {
-                            1 => format!("{} is", names[0]),
-                            n => format!("{} and {} are", names[..n - 1].join(", "), names[n - 1]),
-                        };
-                        let more = if unseen.len() > 3 { " among others" } else { "" };
+                    if let Some(out) = still_out_above(c.card, seen, trump) {
                         let best_text = if sure { format!("{best} wins it for sure") } else { format!("{best} is harder to beat") };
-                        reasons.push(format!("{} may not hold: an opponent plays after you, and {list} still out{more}. {best_text}.", c.card));
+                        reasons.push(format!("{} may not hold: an opponent plays after you, and {out}. {best_text}.", c.card));
                     }
                 }
                 None => {
@@ -1042,6 +1047,14 @@ fn play_reasons(obs: &Observation, best: Action, chosen: Option<Action>, best_st
         }
     } else if is_boss(best_play.card, seen, trump) && !best_play.card.is_joker() {
         reasons.push(top_card_note(best_play.card, obs.hand, trump));
+    }
+    // Leading a card that can lose the trick when the coach's lead is the top card: played out,
+    // leading low instead of a side winner cost about 96 points, and a lower trump instead of the
+    // top one about 139 (finding 65).
+    if let Some(c) = chosen_play.filter(|c| trick.is_empty() && !c.card.is_joker() && is_boss(best_play.card, seen, trump) && !is_boss(c.card, seen, trump)) {
+        if let Some(out) = still_out_above(c.card, seen, trump) {
+            reasons.push(format!("{} can lose the trick: {out}.", c.card));
+        }
     }
     // In no trumps, cashing the only card you hold in a suit gives up its stopper: once it's gone,
     // whoever gets the lead can run that suit against you.
@@ -1893,6 +1906,9 @@ mod tests {
         let grade = Coach::new(5).grade(&obs, &game.legal_actions(), play("AD"));
         assert_ne!(grade.best, play("AD"));
         assert!(grade.analysis.reasons.iter().any(|r| r.starts_with("Keep A♦ for now")), "{:?}", grade.analysis.reasons);
+        // Leading the 9♠ rather than the K♥ (now the top heart): the 9♠ can lose the trick.
+        let reasons = play_reasons(&obs, play("KH"), Some(play("9S")), None, None, 32);
+        assert!(reasons.iter().any(|r| r == "9♠ can lose the trick: A♠, J♠ and 10♠ are still out."), "{reasons:?}");
     }
 
     /// The reasons for following to a trick say what each card does to it: last to play, the
