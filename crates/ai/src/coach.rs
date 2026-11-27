@@ -436,7 +436,7 @@ impl Coach {
                 Action::Call(Call::Bid(contract)) => {
                     let results = coach.search.simulate(&worlds, me, contract.strain);
                     let ev = coach.search.expected(obs, &results, contract, me);
-                    let bias = coach.search.config().dd_bias;
+                    let bias = coach.search.play_gap(contract.strain);
                     let weight: f64 = results.iter().map(|r| r.1).sum();
                     let makes = results.iter().filter(|r| r.0 as f64 - bias >= contract.level as f64).map(|r| r.1).sum::<f64>() / weight.max(1e-9);
                     OptionEval { action, ev, makes: Some(real_play_chance(makes, BID_CURVE)) }

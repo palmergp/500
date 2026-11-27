@@ -47,6 +47,7 @@ mod gradeaudit;
 mod leadread;
 mod kittystab;
 mod ntguard;
+mod ntbias;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -222,6 +223,11 @@ fn main() {
         "gradeaudit" => gradeaudit::run(
             flag(&flags, "deals", 1500),
             flag(&flags, "seed", 8_500_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
+        ),
+        "ntbias" => ntbias::run(
+            flag(&flags, "deals", 6000),
+            flag(&flags, "seed", 9_000_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "ntguard" => ntguard::run(

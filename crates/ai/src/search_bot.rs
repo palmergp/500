@@ -99,6 +99,8 @@ pub struct SearchConfig {
     /// Tricks subtracted from simulated declarer results when bidding: double-dummy analysis
     /// assumes the declarer sees every card, which real declarers don't.
     pub dd_bias: f64,
+    /// The same gap for no-trump bids, which lose more to the unseen cards (finding 63).
+    pub dd_bias_nt: f64,
     /// Use search for bidding and for the kitty (otherwise a rule bot decides).
     pub search_bidding: bool,
     /// Bid with the neural evaluator (takes precedence over `search_bidding`).
@@ -159,6 +161,7 @@ impl SearchConfig {
         // Measured with `fh-lab calibrate`: double-dummy results run about half a trick above
         // what search bots actually take as declarer.
         dd_bias: 0.5,
+        dd_bias_nt: 0.5,
         // Simulated bidding with a handful of worlds lost 27 points a hand to rule bidding in the
         // lab (finding 7), so the expert bids by calibrated rules until a learned evaluator exists.
         search_bidding: false,
@@ -242,6 +245,12 @@ impl SearchBot {
     }
 
     /// The value of a hand's outcome to `me`, given the declaring side's trick count.
+    /// Tricks real play loses to the solver's every-card-seen count in `strain` (`dd_bias`, or
+    /// `dd_bias_nt` in no trumps).
+    pub fn play_gap(&self, strain: Strain) -> f64 {
+        if strain == Strain::NoTrumps { self.config.dd_bias_nt } else { self.config.dd_bias }
+    }
+
     pub(crate) fn utility(&self, obs: &Observation, contract: Contract, declarer: Seat, declarer_tricks: u8) -> f64 {
         let rules = &obs.rules;
         let side = declarer.team();
@@ -576,7 +585,7 @@ impl SearchBot {
     }
 
     pub(crate) fn expected(&self, obs: &Observation, results: &[(u8, f64)], contract: Contract, declarer: Seat) -> f64 {
-        let bias = self.config.dd_bias.max(0.0);
+        let bias = self.play_gap(contract.strain).max(0.0);
         let (whole, frac) = (bias.floor() as u8, bias.fract());
         let mut total = 0.0;
         for &(tricks, w) in results {
@@ -624,7 +633,7 @@ impl SearchBot {
                     continue;
                 }
                 let value = self.expected(obs, &d, contract, me);
-                let makes: f64 = d.iter().filter(|(t, _)| *t as f64 - self.config.dd_bias >= level as f64).map(|(_, p)| p).sum();
+                let makes: f64 = d.iter().filter(|(t, _)| *t as f64 - self.play_gap(strain) >= level as f64).map(|(_, p)| p).sum();
                 bids.push((contract, value, makes));
             }
         }
@@ -655,7 +664,7 @@ impl SearchBot {
         let logits = model.forward(&bid_features(obs));
         let block = strain_block(contract.strain);
         let dist = softmax(&logits[block..block + 11]);
-        Some(dist.iter().enumerate().filter(|&(t, _)| t as f64 - self.config.dd_bias >= contract.level as f64).map(|(_, p)| p).sum())
+        Some(dist.iter().enumerate().filter(|&(t, _)| t as f64 - self.play_gap(contract.strain) >= contract.level as f64).map(|(_, p)| p).sum())
     }
 
     fn neural_call(&mut self, obs: &Observation, legal: &[Action], model: &Mlp) -> Action {
@@ -713,7 +722,7 @@ impl SearchBot {
                 let value = self.expected(obs, &results, contract, me);
                 if best.is_none_or(|(v, _, _)| value > v) {
                     let weight: f64 = results.iter().map(|r| r.1).sum();
-                    let bias = self.config.dd_bias;
+                    let bias = self.play_gap(strain);
                     let makes = results.iter().filter(|r| r.0 as f64 - bias >= level as f64).map(|r| r.1).sum::<f64>() / weight;
                     best = Some((value, contract, makes));
                 }
