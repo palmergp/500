@@ -35,7 +35,7 @@
 - The coach's card-play analysis takes a closer look (up to 64 more deals) when its best play isn't clearly ahead of
   the next different play, and reports plays it still can't separate as close calls (`Analysis::close`), so a near
   tie never reads as a firm answer. Its significance test weights deals as the averages do (effective sample size).
-  Kitty grades do the same (`discard_comparison`): 12 deals, then 60 fresh ones when the gap is unclear or small;
+  Kitty grades do the same (`discard_comparison`): 24 deals, then 120 fresh ones when the gap is unclear or small (finding 66);
   a gap the deals can't confirm is a close call (good) within `CLOSE_POINTS`, at most an inaccuracy beyond.
   Their deals fit the auction (partner's bid read in, unlike the search's card play): closer to the truth (finding 58,
   `fh-lab kittyworlds`). Reading the auction didn't help leads either (finding 64, `fh-lab leadread`).

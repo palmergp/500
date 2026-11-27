@@ -15,9 +15,9 @@ use fh_core::{Card, CardSet, Event, Game, Phase, Rng, Rules};
 
 /// (name, first look, closer look)
 const WAYS: [(&str, usize, usize); 4] = [
-    ("12, then 60 (today)", 12, 60),
+    ("12, then 60 (before finding 66)", 12, 60),
     ("12, then 120", 12, 120),
-    ("24, then 120", 24, 120),
+    ("24, then 120 (today)", 24, 120),
     ("12, then 180", 12, 180),
 ];
 const REFERENCE: usize = 400;

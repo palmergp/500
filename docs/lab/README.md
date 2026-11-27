@@ -1437,6 +1437,27 @@ real one, for South's side:
 - **Lead reasons:** a lead that can lose the trick names the cards still out above it ("9♠ can lose the trick: A♠, J♠
   and 10♠ are still out").
 
+### 66. Kitty grades: how many deals
+
+Finding 61 found kitty grades unsteady: three coaches agreed on the verdict for only 44% of kitties one card off the
+plan. `fh-lab kittystab` (140 deals, 110 such kitties) graded each three times by differently seeded coaches for
+each way of choosing the deals, and once on 400 deals as the reference:
+
+| First look, then closer look | Same verdict all three times | Good on one, a mistake on another | Spread of the loss | Matches the reference | Good where the reference says mistake | Time a grade |
+|---|---|---|---|---|---|---|
+| 12, then 60 (before) | 46% | 21.8% | 47.9 | 76% | 8.8% | 4.9 s |
+| 12, then 120 | 52% | 13.6% | 44.3 | 83% | 3.9% | 9.0 s |
+| **24, then 120** | 46% | **10.0%** | **37.3** | **83%** | **2.7%** | 7.4 s |
+| 12, then 180 | 58% | 14.5% | 40.9 | 84% | 3.0% | 12.2 s |
+
+- **More deals, fewer wrong calls:** with 24 deals first and 120 more when unclear, grades agree with the reference 83%
+  of the time (76% before), and call good what it calls a mistake 2.7% of the time (8.8%). A first look of 24 settles
+  more kitties by itself, so it's quicker than 12 then 120. (Times are native, with other runs on the machine.)
+- **Still not steady:** whether a kitty card decides the bid turns on a few deals in a hundred, so coaches still
+  differ by 37 points. Gaps the deals can't confirm stay close calls (finding 58).
+- **Change:** kitty grades look at 24 deals, then 120 fresh ones when the gap is unclear or small. A grade takes about
+  half as long again, on the coach's worker, so play doesn't wait.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

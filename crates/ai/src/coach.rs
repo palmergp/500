@@ -660,9 +660,10 @@ impl Coach {
 }
 
 /// The likely deals a kitty grade first compares discards on, and how many more it looks at when
-/// those can't separate them.
-const DISCARD_DEALS: usize = 12;
-const DISCARD_CLOSER_LOOK: usize = 60;
+/// those can't separate them. 24 then 120 agreed with grades on 400 deals 83% of the time, against
+/// 76% for 12 then 60, and rarely called good what those called a mistake (finding 66).
+const DISCARD_DEALS: usize = 24;
+const DISCARD_CLOSER_LOOK: usize = 120;
 
 /// Two sets of discards, compared: their average values (`a` the plan's), the deals compared on,
 /// and each deal's weight and difference.
