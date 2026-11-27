@@ -580,7 +580,7 @@ impl Coach {
     /// compared on `NT_PLAN_DEALS` deals that fit the auction, and the best taken: played out, that
     /// took 0.34 tricks more where it differed (finding 62). The deals are seeded by the position,
     /// so the plan is the same whichever coach asks, and stays the plan as its cards go back.
-    fn kitty_plan(&mut self, obs: &Observation, count: usize) -> Vec<Card> {
+    pub fn kitty_plan(&mut self, obs: &Observation, count: usize) -> Vec<Card> {
         let trump = obs.trump();
         let rule = heuristic_discards(obs.hand, trump, count);
         if trump.is_some() || count == 0 {
