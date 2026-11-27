@@ -193,7 +193,8 @@ export const LESSONS: Lesson[] = [
       "What each part is worth, solved over 4,000 deals: putting back a trump costs about ¾ of a trick, and putting back an ace about ½; neither was ever right. Making a void gains about ½ a trick, more the more trumps you hold. Keeping a king guarded makes no difference, so spend the discards on the void.",
       "No suit you can empty? If a king with small cards is the only suit you can cut down, put back the small cards and leave the king alone: about ¼ of a trick better than keeping it guarded. The small cards were losers; once the king has won or fallen to the ace, you trump the suit.",
       "## In no trumps",
-      "It's the other way round: you can't trump a void, so making one gains nothing. Keep your stoppers instead: a guarded king (a king with a small card beside it) was worth about ⅕ of a trick. Keep your aces and the length under them, and put back low cards from suits with no honours.",
+      "It's the other way round: you can't trump a void, so making one gains nothing for its own sake. Keep your aces and the length under them, and keep a guarded king (a king with a small card beside it): it stops their suit, worth about ⅕ of a trick.",
+      "But a queen with one or two small cards is a poor stopper. Put back a short suit with no ace or king first, queen and all, and keep the length in your other suits. Played out, that took about a third of a trick more, and the bid was made 70% of the time against 63%.",
     ],
     quiz: [
       {
@@ -219,6 +220,12 @@ export const LESSONS: Lesson[] = [
         options: ["Keep the king guarded", "Empty the suit", "No difference"],
         answer: 0,
         explain: "In no trumps a void can't be trumped, so it gains nothing, while the guarded king stops their clubs: about ⅕ of a trick.",
+      },
+      {
+        q: "No trumps again. You hold Q♦ 6♦, and four small hearts with no honour. Put back both diamonds, or two of the hearts?",
+        options: ["Both diamonds, queen and all", "Two small hearts, keeping Q♦ guarded", "No difference"],
+        answer: 0,
+        explain: "A queen with one small card rarely stops their suit. Putting it back keeps your heart length: about a third of a trick better when played out.",
       },
     ],
   },

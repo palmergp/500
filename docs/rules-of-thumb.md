@@ -61,7 +61,8 @@ Details and re-run commands are in `docs/lab/README.md`. The rules assume our ho
     - Make your own winners easy to read: from A-K, play the **ace** first, then the king.
 13. **On defense, lead a side ace if you have one.** Never a low trump, and partner's mention isn't a reason to lead that suit.
 14. **Holding the Joker but no bid? Call 6** (unless partner has already called). It's worth up to 1⅓ tricks to your partner.
-15. **Kitty discards come from your shortest side suits,** to make a void.
+15. **Kitty discards come from your shortest side suits,** to make a void. In no trumps too, for length rather than a
+    void: put back short suits with no ace or king first, a queen's included, but keep a king with a small card.
 
 **Signals and counting**
 
@@ -309,6 +310,11 @@ or more, leave the ace alone, a second void once you've cashed it; with a weak s
 even), while a guarded king is a stopper worth keeping: **+0.2 tricks** (better on 23% of deals, worse on 9%).
 Keep your aces, guarded kings and their guards, and the length under an ace; put back low cards from suits with
 no honours (finding 23).
+
+**But a short queen is no stopper.** A queen with one or two small cards and no ace or king beside it stops little:
+put that suit back first (and any other short suit with no ace or king), keeping the length in your long suits.
+Played out against keeping it, that took **+0.34 tricks**, and the bid was made 70% of the time against 63% (finding
+67). Keep a king with a small card, though: putting K-x back cost about 50 points when you had no five-card suit.
 
 *Source: lab, 600 duplicate deals* (finding 8) *and `fh-lab declarer`* (finding 16).
 

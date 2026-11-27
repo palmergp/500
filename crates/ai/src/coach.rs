@@ -1327,6 +1327,16 @@ fn discard_reasons(obs: &Observation, plan: &[Card], chosen: Option<Action>) -> 
             reasons.push(format!("That leaves you void in {suit}, so you can trump it."));
         }
     }
+    // In no trumps, a short queen the plan puts back (finding 67).
+    let short_queen = plan.iter().copied().find(|&q| {
+        let suit: Vec<Card> = obs.hand.iter().filter(|h| !h.is_joker() && h.suit() == q.suit()).collect();
+        trump.is_none() && q.rank() == fh_core::cards::QUEEN && suit.len() <= 3 && suit.iter().all(|h| h.rank() < fh_core::cards::KING)
+    });
+    if let Some(q) = short_queen {
+        if !matches!(chosen, Some(Action::Discard(d)) if d.suit() == q.suit()) {
+            reasons.push(format!("In no trumps a queen with one or two small cards stops little: put back {q} and its guards, and keep the length in your other suits."));
+        }
+    }
     if let Some(Action::Discard(card)) = chosen {
         let suit_cards = |c: Card| obs.hand.iter().filter(|h| h.suit() == c.suit() && !h.is_joker()).count();
         let king_guard = |c: Card| {
@@ -1783,6 +1793,23 @@ mod tests {
         };
         let legal = fh_core::legal_plays(obs.hand, &trick, None).into_iter().map(Action::Play).collect();
         (obs, legal)
+    }
+
+    /// In no trumps, when the plan puts back a short queen and the player keeps it, the reasons
+    /// say why (finding 67).
+    #[test]
+    fn a_short_queen_put_back_in_no_trumps_is_explained() {
+        let (mut obs, _) = opening_lead_with_the_joker();
+        obs.phase = Phase::Discarding;
+        obs.current_trick = None;
+        obs.discards = None;
+        obs.hand = CardSet::parse("Joker AS KS 9S 7S 9H 8H 6H 5H QC 6C AD 7D").unwrap();
+        let card = |c: &str| Card::parse(c).unwrap();
+        let plan = [card("6C"), card("QC"), card("5H")];
+        let reasons = discard_reasons(&obs, &plan, Some(Action::Discard(card("5H"))));
+        assert!(reasons.iter().any(|r| r.contains("put back Q♣ and its guards")), "{reasons:?}");
+        let reasons = discard_reasons(&obs, &plan, Some(Action::Discard(card("6C"))));
+        assert!(!reasons.iter().any(|r| r.contains("queen with one or two")), "{reasons:?}");
     }
 
     #[test]

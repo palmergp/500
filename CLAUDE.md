@@ -131,6 +131,14 @@
 - Rule bots stop drawing trumps once both opponents have shown out (`cardplay::opponents_may_hold_trumps`).
 - The rule bots' bidding estimate (Steady, Rock, Gambler, Rookie, and The Counter's and The Shark's bidding) counts a
   suit with fewer than four trumps 0.9 a trump short (`rule_bot::short_trumps`, finding 59, `fh-lab strainpick`).
+- Kitty plans: in a suit bid the rule's set (`set_discards`, finding 40) for everyone. In no trumps the search bots
+  and the coach choose by search among the rule's plan and the next sets it ranks (`SearchBot::nt_kitty_plan`, 20
+  deals seeded by the position, finding 62); the rule bots use the rule, which puts back short suits with no ace or
+  king first, a short queen's included, and keeps guarded kings (`nt_keep_value`, finding 67; lesson 6 says so).
+  Bids take half a trick off the solver's tricks for real play, no trumps too (`dd_bias`, `dd_bias_nt`, finding 63).
+- Lab audits of the coach, each played out by The Oracle: `coachaudit` (card play), `gradestab` (grade steadiness),
+  `gradeaudit` (stated against real losses), `kittyplay`, `kittystab`, `bidplay`, `leadread`, `ntguard`, `ntrule`,
+  `ntbias` (findings 60–67).
 - `fh-lab show --code C --at N` shows any seat's decision at action N (your own: the coach's grade and reasons; its
   bot, The Oracle's ranking, the solver's values; `--discards "6S 8S 4H"` grades a kitty on five seeds and 400
   deals); `fh-lab whatif --code C --at N --a X --b Y` plays two choices out over that seat's possible deals.

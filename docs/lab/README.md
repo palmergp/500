@@ -1476,6 +1476,41 @@ each way of choosing the deals, and once on 400 deals as the reference:
 - **Change:** kitty grades look at 24 deals, then 120 fresh ones when the gap is unclear or small. A grade takes about
   half as long again, on the coach's worker, so play doesn't wait.
 
+### 67. A short queen in no trumps: put it back
+
+Lesson 6 said a void gains nothing in no trumps and a guarded king is worth keeping (finding 23), and the rule kept a
+guarded queen too. But the coach's searched no-trump plan (finding 62) often emptied a short suit, honour and all.
+`fh-lab ntguard` (The Oracle's auctions): at each no-trump declarer's discard holding a short suit (two cards, or
+three with a queen and no king) with a king or queen but no ace, which the rule kept, the rule's plan was played out
+against putting the whole suit back. A first run (6,000 deals) pointed the way; this is the second, on 18,000 fresh
+deals:
+
+| Short suit | n | Putting it back, points (95%) | Tricks | Bid made: kept / put back |
+|---|---|---|---|---|
+| K-Q | 97 | −62.5 ± 41.0 | −0.31 | 77% / 65% |
+| K-x | 577 | −9.4 ± 22.3 | +0.02 | 69% / 68% |
+| K-x, no suit longer than four | 238 | −35.3 ± 36.9 | −0.18 | 66% / 59% |
+| **Q-x** | 242 | **+53.0 ± 31.3** | **+0.49** | 57% / 67% |
+| **Q-x-x** | 597 | **+41.9 ± 22.0** | **+0.31** | 58% / 66% |
+
+- **A queen with one or two small cards isn't worth a discard;** the length it lets you keep is. A king is: K-Q, and
+  K-x without a five-card suit, cost points to put back.
+- **The rule, changed and played out:** the no-trump plan (`nt_keep_value`) now puts back short suits with no ace or
+  king first, a queen's included (`NtShortSuits::PutBack`). `fh-lab ntrule` (12,000 fresh deals) played the rule before
+  and after wherever they differed (47% of no-trump bids):
+
+  | The new rule puts back | n | New less old, points (95%) | Tricks | Bid made: old / new |
+  |---|---|---|---|---|
+  | A short suit headed by a queen | 632 | +40.3 ± 19.3 | +0.34 | 63% / 70% |
+  | A short suit below the queen | 439 | +20.4 ± 23.4 | +0.32 | 58% / 61% |
+  | Something else | 299 | −4.9 ± 29.5 | −0.02 | 74% / 73% |
+  | **All** | 1,370 | **+24.1 ± 13.3** | **+0.25** | 64% / 68% |
+
+- **Changes:** it's the rule bots' plan and one of the candidates the search bots and the coach choose among (finding
+  62). Lesson 6 (with a new quiz question), rule 15 and the rules of thumb say so, and so do the coach's kitty reasons
+  ("a queen with one or two small cards stops little: put back Q♣ and its guards"). The hand puzzles were made again:
+  Steady, the careless declarer a puzzle must beat, puts its kitty back by the rule.
+
 ## Open questions for the lab
 
 - **Bid estimates:** they rest on few sampled worlds, so they are noisy. A fitted evaluator, trained on solver output, would be faster and steadier. This is planned for the Phase 5 neural work.

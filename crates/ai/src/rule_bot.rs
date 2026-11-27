@@ -298,7 +298,7 @@ pub fn keep_value(card: Card, hand: CardSet, trump: Option<Suit>) -> i32 {
         return 1000 + card.rank() as i32;
     }
     if trump.is_none() {
-        return nt_keep_value(card, hand);
+        return nt_keep_value(card, hand, NtShortSuits::PutBack);
     }
     let suit = effective_suit(card, trump);
     let in_suit = hand.iter().filter(|&h| effective_suit(h, trump) == suit).count();
@@ -314,30 +314,58 @@ pub fn keep_value(card: Card, hand: CardSet, trump: Option<Suit>) -> i32 {
     value
 }
 
+/// How the no-trump kitty plan treats a short suit (three cards or fewer) with no ace or king.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum NtShortSuits {
+    /// Keep a queen and its guards as a stopper (finding 23; the plan until finding 67).
+    KeepQueens,
+    /// Put the suit back first, a queen and all, keeping length in the others (finding 67).
+    PutBack,
+}
+
 /// In no trumps a void can't be trumped, so there's no reason to make one; what matters is
 /// stoppers and running suits (docs/lab/README.md, finding 23). Keep aces, guarded kings and their
-/// guards, guarded queens and length under an ace; throw low cards from suits with no honours.
-fn nt_keep_value(card: Card, hand: CardSet) -> i32 {
+/// guards, and length; put back short suits with no ace or king first, a queen's included: played
+/// out, putting back Q-x or Q-x-x made the bid more often than keeping it (finding 67).
+fn nt_keep_value(card: Card, hand: CardSet, short: NtShortSuits) -> i32 {
     let suit = card.suit();
     let in_suit: Vec<Card> = hand.iter().filter(|c| c.suit() == suit).collect();
     let has = |rank: u8| in_suit.iter().any(|c| c.rank() == rank);
+    let queens = short == NtShortSuits::KeepQueens;
     let mut value = card.rank() as i32;
     match card.rank() {
         ACE => value += 40,
         KING if in_suit.len() >= 2 => value += 15,
-        QUEEN if in_suit.len() >= 3 => value += 8,
+        QUEEN if in_suit.len() >= 3 && queens => value += 8,
         _ => {}
     }
     // The small card that guards a king (or one of the two guarding a queen).
     let guards = |honour: u8, needed: usize| has(honour) && !has(ACE) && card.rank() < honour && in_suit.len() <= needed;
-    if guards(KING, 2) || guards(QUEEN, 3) {
+    if guards(KING, 2) || (queens && guards(QUEEN, 3)) {
         value += 12;
     }
     // Length under an ace runs once the ace is cashed.
     if has(ACE) && card.rank() != ACE {
         value += 6;
     }
+    if !queens && in_suit.len() <= 3 && !has(ACE) && !has(KING) {
+        value -= 10;
+    }
     value
+}
+
+/// The no-trump kitty plan, one card at a time, treating short suits as `short` says (for the lab;
+/// play uses `heuristic_discards`).
+pub fn nt_greedy_discards(hand: CardSet, count: usize, short: NtShortSuits) -> Vec<Card> {
+    let value = |c: Card, hand: CardSet| if c.is_joker() { 1000 + c.rank() as i32 } else { nt_keep_value(c, hand, short) };
+    let mut hand = hand;
+    let mut out = Vec::with_capacity(count);
+    for _ in 0..count.min(hand.len()) {
+        let card = hand.iter().min_by_key(|&c| (value(c, hand), c.id())).expect("cards to discard");
+        hand.remove(card);
+        out.push(card);
+    }
+    out
 }
 
 /// The `count` cards to discard from `hand`, chosen greedily by [`keep_value`].
@@ -431,7 +459,7 @@ pub fn ranked_discards(hand: CardSet, trump: Option<Suit>, count: usize, w: Kitt
 }
 
 /// The kitty plan the bots and the coach use: judged as a set in a suit bid (`set_discards`,
-/// finding 40), card by card in no trumps (`nt_keep_value`, finding 23).
+/// finding 40), card by card in no trumps (`nt_keep_value`, findings 23 and 67).
 pub fn heuristic_discards(hand: CardSet, trump: Option<Suit>, count: usize) -> Vec<Card> {
     if trump.is_some() {
         set_discards(hand, trump, count)
@@ -620,6 +648,17 @@ mod tests {
         let discards: CardSet = heuristic_discards(hand, None, 3).into_iter().collect();
         assert!(!discards.contains(Card::parse("KC").unwrap()) && !discards.contains(Card::parse("5C").unwrap()), "{discards:?}");
         assert!(discards.iter().all(|c| c.rank() != ACE && !c.is_joker()));
+    }
+
+    /// A queen with one small card is no stopper worth a discard: in no trumps the plan puts the
+    /// suit back, keeping length elsewhere (finding 67).
+    #[test]
+    fn no_trump_discards_put_back_a_short_queen() {
+        let hand = CardSet::parse("Joker AS KS 9S 7S 9H 8H 6H 5H QC 6C AD 7D").unwrap();
+        let discards: CardSet = heuristic_discards(hand, None, 3).into_iter().collect();
+        assert!(discards.contains(Card::parse("QC").unwrap()) && discards.contains(Card::parse("6C").unwrap()), "{discards:?}");
+        let before: CardSet = nt_greedy_discards(hand, 3, NtShortSuits::KeepQueens).into_iter().collect();
+        assert!(!before.contains(Card::parse("6C").unwrap()), "{before:?}");
     }
 
     #[test]

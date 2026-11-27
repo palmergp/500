@@ -48,6 +48,7 @@ mod leadread;
 mod kittystab;
 mod ntguard;
 mod ntbias;
+mod ntrule;
 mod jokerlead;
 mod bidbar;
 mod lastdiscard;
@@ -230,6 +231,11 @@ fn main() {
             flag(&flags, "seed", 9_000_000),
             flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
             &flags.get("gaps").map_or(ntbias::GAPS.to_vec(), |s| s.split(',').map(|g| g.trim().parse().expect("--gaps 0.25,0.75")).collect()),
+        ),
+        "ntrule" => ntrule::run(
+            flag(&flags, "deals", 12000),
+            flag(&flags, "seed", 9_100_000),
+            flag(&flags, "threads", std::thread::available_parallelism().map_or(4, |n| n.get() as u64)),
         ),
         "ntguard" => ntguard::run(
             flag(&flags, "deals", 4000),
