@@ -80,7 +80,12 @@
   the background (`gradeGame`, coach op `decisions`), a grade at a time, pausing while you play a game it grades live.
   `Tournament.assisted` turns true on a hint, an undo, Finish hand, or a helper setting on (`assistHelpers`) in one of
   its games; a win without it is the Unaided achievement. The round-results dialog can't be closed: its only way on is
-  the next round.
+  the next round. Quit tournament is offered any time before the results (`quitTournament` clears the saved game only
+  if it's the tournament's), and the unaided note's Turn off all help switches every helper off (`turnOffHelp`; the
+  story's chapter list has it too).
+- Hand review with grading off: opening a finished hand's review grades your decisions in it after the fact
+  (`gradeHandAfter`, quietly: no grade panel, not counted as help), leaving out plays Finish hand made (`autoActed`).
+  Trick by trick (`dd_trace`) names the plays that would have kept par under any card that cost a trick (`better`).
 - Story mode (`web/src/career/`, called career in the code): the story "The Kitty" lives in `story.ts` (characters with the persona that plays
   them, ten chapters: opening scene, level, win and lose scenes, lines after each hand); progress in `career.ts`
   (local storage). A level is a game against story characters (solo save, `careerGame` in App.tsx, "Continue the

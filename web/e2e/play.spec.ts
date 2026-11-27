@@ -1,6 +1,6 @@
 import { writeFileSync } from "node:fs";
 import { expect, test } from "@playwright/test";
-import { startGame, takeTurn, topBarControl } from "./helpers";
+import { freshStart, startGame, takeTurn, topBarControl } from "./helpers";
 
 test("plays a hand through to the score", async ({ page }, info) => {
   const errors: string[] = [];
@@ -160,4 +160,29 @@ test("a hand code, and replaying a hand from its review", async ({ page }, info)
   await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Deal" }).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   await expect(page.locator(".replay-banner")).toHaveCount(0);
+});
+
+test("with grading off, a finished hand's review still grades your decisions, after the fact", async ({ page }, info) => {
+  test.setTimeout(180_000);
+  await freshStart(page, { grade: false });
+  await page.getByRole("button", { name: /^Play solo/ }).click();
+  await page.getByRole("dialog", { name: "New game" }).getByRole("button", { name: "Deal" }).click();
+  const result = page.getByRole("dialog", { name: /^Hand \d+$/ });
+  for (let step = 0; step < 2000 && !(await result.isVisible()); step++) {
+    if (!(await takeTurn(page))) await page.waitForTimeout(100);
+  }
+  // Nothing was graded during the hand.
+  await expect(page.getByRole("status", { name: "Coach's grade" })).toHaveCount(0);
+  await result.getByRole("button", { name: "Review hand" }).click();
+  const review = page.getByRole("dialog", { name: "Hand review" });
+  await review.getByRole("tab", { name: /Your decisions/ }).click();
+  await expect(review.getByText(/Graded after the hand, with grading off/)).toBeVisible();
+  await expect(review.locator(".decision-list > li").first()).toBeVisible({ timeout: 60_000 });
+  // Trick by trick: every trick a row of four cards, with the coach's better card under any misplay.
+  await review.getByRole("tab", { name: "Trick by trick" }).click();
+  await expect(review.locator(".trick-list > li")).toHaveCount(10, { timeout: 30_000 });
+  await expect(review.locator(".trick-list > li").first().locator(".trick-play")).toHaveCount(4);
+  const slips = await review.locator(".trick-play.costly").count();
+  if (slips > 0) await expect(review.locator(".trick-note").first()).toContainText(/would (each )?have kept par/);
+  await page.screenshot({ path: `test-results/${info.project.name}-review-tricks.png`, fullPage: true });
 });

@@ -1244,6 +1244,8 @@ pub struct TracedPlay {
     pub par_after: u8,
     /// Tricks this play cost the player's side compared with its best play (0 if it was best).
     pub cost: u8,
+    /// When it cost a trick: the plays that would have kept the best result (every card seen).
+    pub better: Vec<Play>,
 }
 
 /// The hand replayed card by card with every card visible: the best result possible at each
@@ -1271,7 +1273,9 @@ pub fn dd_trace(record: &HandRecord) -> Option<(u8, Vec<TracedPlay>)> {
             let actual = values.iter().find(|(p, _)| *p == play).map_or(0, |&(_, v)| v);
             let ours = |v: u8| if seat.team() == team { v } else { remaining - v };
             let best = values.iter().map(|&(_, v)| ours(v)).max().unwrap_or(0);
-            traced.push(TracedPlay { seat, card, par_after: won + actual, cost: best.saturating_sub(ours(actual)) });
+            let cost = best.saturating_sub(ours(actual));
+            let better = if cost > 0 { values.iter().filter(|&&(_, v)| ours(v) == best).map(|&(p, _)| p).collect() } else { vec![] };
+            traced.push(TracedPlay { seat, card, par_after: won + actual, cost, better });
             hands[seat.index()].remove(card);
             so_far.push(play);
         }

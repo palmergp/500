@@ -232,19 +232,30 @@ interface Props {
   helpers?: string[];
   /** After a round: to the main menu, the tournament kept for later. */
   onLeave?: () => void;
-  /** After a round: end the tournament for good. */
+  /** End the tournament for good (any time before its results). */
   onQuit?: () => void;
+  /** Turn every helper off (grading, the trump counter, the card tracker, out-of-suit marks), for
+   * an unaided tournament. */
+  onHelpOff?: () => void;
 }
 
 /** Whether this tournament can still be won unaided, and what would spoil it. */
-function UnaidedNote({ t, helpers }: { t: Tournament; helpers: string[] }) {
+function UnaidedNote({ t, helpers, onHelpOff }: { t: Tournament; helpers: string[]; onHelpOff?: () => void }) {
   if (t.assisted === undefined || t.current >= ROUNDS) return null;
   if (t.assisted) return <p className="note">You've had help in this tournament (a hint, an undo, Finish hand or a helper), so it can't count as unaided.</p>;
   return (
-    <p className="note unaided-note">
-      🙌 Unaided so far: no hints, undos or Finish hand.
-      {helpers.length > 0 && ` ${capitalize(listed(helpers))} ${helpers.length > 1 ? "are" : "is"} on in Settings: turn ${helpers.length > 1 ? "them off before you play, or they count" : "it off before you play, or it counts"} as help.`}
-    </p>
+    <div className="note unaided-note">
+      <p>
+        🙌 Unaided so far: no hints, undos or Finish hand.
+        {helpers.length > 0 && ` ${capitalize(listed(helpers))} ${helpers.length > 1 ? "are" : "is"} on in Settings: turn ${helpers.length > 1 ? "them off before you play, or they count" : "it off before you play, or it counts"} as help.`}
+        {helpers.length === 0 && " Every helper is off."}
+      </p>
+      {helpers.length > 0 && onHelpOff && (
+        <button type="button" onClick={onHelpOff} title="Turn off grading, the trump counter, the card tracker and out-of-suit marks, to play unaided">
+          Turn off all help
+        </button>
+      )}
+    </div>
   );
 }
 
@@ -302,7 +313,7 @@ export function RecapDialog({ t, progress, onClose }: { t: Tournament; progress:
 }
 
 /** The tournament's state: after a round, its results; always, the standings and the awards. */
-export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [], onLeave, onQuit }: Props) {
+export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestart, helpers = [], onLeave, onQuit, onHelpOff }: Props) {
   const waiting = after !== undefined && !roundComplete({ ...t, current: after });
   const { highGame, highHand } = awards(t);
   const done = t.current >= ROUNDS;
@@ -354,7 +365,7 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
       <AwardLine t={t} label="High game" award={highGame} personas={personas} />
       <AwardLine t={t} label="High hand" award={highHand} personas={personas} />
       {!done && !waiting && <YourTable t={t} r={t.current} personas={personas} />}
-      <UnaidedNote t={t} helpers={helpers} />
+      <UnaidedNote t={t} helpers={helpers} onHelpOff={onHelpOff} />
       <div className="actions">
         {onRestart && t.current > 0 && (
           <button
@@ -366,7 +377,7 @@ export function TournamentDialog({ t, personas, onPlay, onClose, after, onRestar
             New tournament
           </button>
         )}
-        {!closable && onQuit && (
+        {onQuit && !done && (
           <button
             type="button"
             onClick={() => {

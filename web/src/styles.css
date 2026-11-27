@@ -641,19 +641,79 @@ button:focus-visible {
   flex-wrap: wrap;
   gap: 2px;
 }
-.auction-line,
-.trick-list li {
+.auction-line {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 14px;
   font-size: 0.9rem;
 }
+/* Trick by trick (HandReview): each trick a block, its four cards in a fixed grid, so it reads the
+   same at any width. */
 .trick-list {
-  padding-left: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
 }
-.trick-list .winner {
+.trick-row {
+  padding: 6px 8px;
+  border: 1px solid var(--panel-line);
+  border-radius: 8px;
+}
+.trick-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.82rem;
+}
+.trick-no {
   font-weight: 700;
-  text-decoration: underline;
+}
+.trick-head .replay-trick {
+  margin-left: auto;
+}
+.trick-plays {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  margin-top: 5px;
+}
+.trick-play {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 3px 2px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: rgba(127, 127, 127, 0.1);
+  font-size: 0.95rem;
+}
+.trick-seat {
+  font-size: 0.66rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  opacity: 0.7;
+}
+.trick-played {
+  white-space: nowrap;
+}
+.trick-play.winner {
+  border-color: var(--accent);
+  font-weight: 700;
+}
+.trick-play.costly {
+  background: rgba(198, 40, 40, 0.12);
+}
+.trick-cost {
+  margin-left: 1px;
+  color: var(--blunder);
+  font-weight: 700;
+}
+.trick-note {
+  margin: 5px 0 0;
+  font-size: 0.84rem;
 }
 
 .loading,
@@ -899,12 +959,8 @@ button:focus-visible {
   padding-left: 18px;
   font-size: 0.88rem;
 }
-.trick-list .costly {
-  color: var(--blunder);
-}
 .trick-list .par {
-  opacity: 0.6;
-  font-size: 0.8rem;
+  opacity: 0.65;
 }
 .waiting-text {
   font-style: italic;
@@ -2195,9 +2251,7 @@ button.danger {
   padding: 1px 8px;
   font-size: 0.78rem;
 }
-.replay-trick {
-  margin-left: 8px;
-}
+
 .hand-code {
   width: 100%;
   font: 600 1.3rem/1.4 ui-monospace, monospace;
@@ -3639,4 +3693,11 @@ dialog.cutscene::backdrop {
 }
 .career-unaided-note {
   margin-top: 0.6rem;
+}
+.unaided-note p {
+  margin: 0;
+}
+.unaided-note button,
+.career-unaided-note button {
+  margin-top: 6px;
 }

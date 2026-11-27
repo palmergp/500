@@ -182,7 +182,8 @@ export function lossText(g: { loss: number; units?: "points" | "win" }): string 
 
 export interface TraceView {
   par: number;
-  plays: { seat: SeatIndex; card: CardView; parAfter: number; cost: number }[];
+  /** `better`: when the play cost a trick, the plays that would have kept par ("K♠", "Joker naming ♦"). */
+  plays: { seat: SeatIndex; card: CardView; parAfter: number; cost: number; better: string[] }[];
   /** The declarer's tricks with perfect play had they kept the ten cards they were dealt (no kitty). */
   parWithoutKitty: number;
   /** The declarer's rule-of-thumb count of their own ten dealt cards, without the constant. */

@@ -105,7 +105,8 @@ test("an unaided tournament: the dialog says what would count as help, and a hin
   await page.getByRole("dialog", { name: "Settings" }).getByRole("button", { name: "Done" }).click();
   await page.getByRole("navigation", { name: "Main menu" }).getByRole("button", { name: /^Tournament/ }).click();
   await expect(page.getByRole("dialog", { name: "New tournament" })).toHaveCount(0);
-  await expect(dialog.locator(".unaided-note")).toHaveText(/^🙌 Unaided so far: no hints, undos or Finish hand\.$/);
+  await expect(dialog.locator(".unaided-note")).toHaveText(/^🙌 Unaided so far: no hints, undos or Finish hand\. Every helper is off\.$/);
+  await expect(dialog.getByRole("button", { name: "Turn off all help" })).toHaveCount(0);
   await dialog.getByRole("button", { name: "Play round 1" }).click();
   await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
   const hint = page.getByRole("button", { name: "Hint" });
@@ -315,4 +316,28 @@ test("the reveal waits for the other tables' last games, and plays them out if t
   await expect(reveal).toBeEnabled({ timeout: 240_000 });
   await reveal.click();
   await expect(final.locator(".podium-step")).toHaveCount(1);
+});
+
+test("turn off all help before a tournament, and quit it during the first game", async ({ page }, info) => {
+  test.skip(info.project.name !== "desktop", "one pass is enough");
+  test.setTimeout(120_000);
+  await freshStart(page);
+  const menu = page.getByRole("navigation", { name: "Main menu" });
+  await menu.getByRole("button", { name: /^Tournament/ }).click();
+  await page.getByRole("dialog", { name: "New tournament" }).getByRole("button", { name: /Random/ }).click();
+  const dialog = page.getByRole("dialog", { name: "Tournament" });
+  // Grading and the other helpers are on by default: one button turns them all off.
+  await dialog.getByRole("button", { name: "Turn off all help" }).click();
+  await expect(dialog.getByText(/Every helper is off/)).toBeVisible();
+  expect(await page.evaluate(() => JSON.parse(localStorage.getItem("fh500.settings") ?? "{}"))).toMatchObject({ grade: false, trumpCounter: false, tracker: false, voids: false });
+  await dialog.getByRole("button", { name: "Play round 1" }).click();
+  await expect(page.getByLabel("Your hand").locator(".card")).toHaveCount(10);
+
+  // Mid-game: the standings offer a way out.
+  await page.getByRole("button", { name: "Standings" }).click();
+  page.once("dialog", (d) => void d.accept());
+  await page.getByRole("dialog", { name: "Tournament" }).getByRole("button", { name: "Quit tournament" }).click();
+  await expect(menu).toBeVisible();
+  await expect(menu.getByRole("button", { name: /^Tournament/ })).toContainText("12 players");
+  await expect(menu.getByRole("button", { name: /^Continue/ })).toHaveCount(0);
 });

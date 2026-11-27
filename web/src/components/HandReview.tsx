@@ -3,12 +3,17 @@ import type { Coach, ExpertView, GradeView, HandView, PlayerView, TraceView } fr
 import { lossText, SEAT_NAMES, SUIT_SYMBOL } from "../engine";
 import { Card } from "./Card";
 import { VerdictChip } from "./Coach";
+import { BidText } from "./BidText";
 
 interface Props {
   hand: HandView;
   players: PlayerView[];
   /** The coach's grades for your decisions on this deal. */
   grades: GradeView[];
+  /** Grades the coach is still working out. */
+  pending?: number;
+  /** Grading is off, so the coach grades this hand now that it's over. */
+  afterwards?: boolean;
   coach: Coach | null;
   /** The game's save, for the coach to rebuild positions. */
   save: string | null;
@@ -48,7 +53,7 @@ type Tab = "overview" | "decisions" | "tricks" | "luck";
 
 /** A played deal, in four views: what happened, your decisions, every trick with hindsight, and
  * how an expert would have done with your cards. */
-export function HandReview({ hand, players, grades, coach, save, onReplay, onCode, end }: Props) {
+export function HandReview({ hand, players, grades, pending = 0, afterwards, coach, save, onReplay, onCode, end }: Props) {
   const [tab, setTab] = useState<Tab>("overview");
   const tabs: [Tab, string][] = [
     ["overview", "Overview"],
@@ -84,8 +89,17 @@ export function HandReview({ hand, players, grades, coach, save, onReplay, onCod
           )}
         </>
       )}
-      {tab === "decisions" && <DecisionList grades={grades} onReplay={onReplay} onCode={onCode} />}
-      {tab === "tricks" && <Tricks hand={hand} coach={coach} save={save} onReplay={onReplay} />}
+      {tab === "decisions" && (
+        <>
+          {afterwards && (
+            <p className="note">
+              {pending > 0 ? "The coach is going over this hand now that it's over… " : ""}Graded after the hand, with grading off: it doesn't count as help.
+            </p>
+          )}
+          <DecisionList grades={grades} onReplay={onReplay} onCode={onCode} pending={pending > 0} />
+        </>
+      )}
+      {tab === "tricks" && <Tricks hand={hand} players={players} coach={coach} save={save} onReplay={onReplay} />}
       {tab === "luck" && <Luck hand={hand} coach={coach} save={save} />}
     </div>
   );
@@ -172,9 +186,20 @@ export function decisionLabel(g: GradeView): string {
 }
 
 /** Graded decisions, each with when it was made and (opened for slips) the coach's reasons. */
-export function DecisionList({ grades, onReplay, onCode }: { grades: GradeView[]; onReplay?: (at: number, label: string) => void; onCode?: (at: number) => void }) {
+export function DecisionList({
+  grades,
+  onReplay,
+  onCode,
+  pending,
+}: {
+  grades: GradeView[];
+  onReplay?: (at: number, label: string) => void;
+  onCode?: (at: number) => void;
+  /** The coach is still grading: say so rather than "none". */
+  pending?: boolean;
+}) {
   if (grades.length === 0) {
-    return <p>No graded decisions yet. Turn on “Grade my decisions” in Settings to see them.</p>;
+    return <p>{pending ? "Grading…" : "No graded decisions yet. Turn on “Grade my decisions” in Settings to see them."}</p>;
   }
   const lost = grades.reduce((s, g) => s + g.loss, 0);
   const slips = grades.filter((g) => g.verdict === "inaccuracy" || g.verdict === "mistake" || g.verdict === "blunder");
@@ -237,36 +262,80 @@ function useCoach<T>(load: (() => Promise<T>) | null): { value: T | null; error:
   return { value, error };
 }
 
-function Tricks({ hand, coach, save, onReplay }: { hand: HandView; coach: Coach | null; save: string | null; onReplay?: (at: number, label: string) => void }) {
+function Tricks({
+  hand,
+  players,
+  coach,
+  save,
+  onReplay,
+}: {
+  hand: HandView;
+  players: PlayerView[];
+  coach: Coach | null;
+  save: string | null;
+  onReplay?: (at: number, label: string) => void;
+}) {
   const { value: trace, error } = useCoach<TraceView | null>(coach && save ? () => coach.trace(save, hand.number) : null);
   const c = hand.contract!;
   if (error) return <p>Could not analyze this hand: {error}</p>;
   if (!trace) return <p className="waiting-text">Analyzing every card with all hands visible…</p>;
   const tricks = hand.tricks.map((t, i) => ({ trick: t, plays: trace.plays.slice(i * 4, i * 4 + 4) }));
+  const whose = (seat: number) => (seat === 0 ? "Your" : `${players[seat].name}'s`);
   return (
     <>
       <p>
         With every card visible and perfect play by everyone, {SEAT_NAMES[c.declarer]} takes <strong>{trace.par}</strong> tricks in {c.label}; they
-        took {hand.tricksWon[c.declarer % 2]}. Marked cards cost their side a trick <em>in hindsight</em>, which no player can know at the table:
+        took {hand.tricksWon[c.declarer % 2]}. A card marked −1 cost its side a trick <em>in hindsight</em>, which no player can know at the table:
         use it to spot patterns, not as a grade.
       </p>
       <Contributions hand={hand} trace={trace} />
       <ol className="trick-list">
         {tricks.map(({ trick, plays }, i) => (
-          <li key={i}>
-            {plays.map((p) => (
-              <span key={p.seat} className={`${p.seat === trick.winner ? "winner" : ""} ${p.cost > 0 ? "costly" : ""}`}>
-                {SEAT_NAMES[p.seat][0]} {p.card.label}
-                {p.card.suit === null && trick.namedSuit ? ` (naming ${SUIT_SYMBOL[trick.namedSuit]})` : ""}
-                {p.cost > 0 && <sup> −{p.cost}</sup>}
+          <li key={i} className="trick-row">
+            <div className="trick-head">
+              <span className="trick-no">Trick {i + 1}</span>
+              <span className="par" title="The declarer's tricks with perfect play from here">
+                par {plays[3]?.parAfter ?? ""}
               </span>
-            ))}
-            <span className="par">par {plays[3]?.parAfter ?? ""}</span>
-            {onReplay && (
-              <button type="button" className="replay-trick" onClick={() => onReplay(trickStart(hand, i + 1), `trick ${i + 1}`)} title={`Play the hand again from trick ${i + 1}`}>
-                Replay
-              </button>
-            )}
+              {onReplay && (
+                <button type="button" className="replay-trick" onClick={() => onReplay(trickStart(hand, i + 1), `trick ${i + 1}`)} title={`Play the hand again from trick ${i + 1}`}>
+                  Replay
+                </button>
+              )}
+            </div>
+            <div className="trick-plays">
+              {plays.map((p, k) => {
+                const named = p.card.suit === null && k === 0 && trick.namedSuit ? SUIT_SYMBOL[trick.namedSuit] : null;
+                return (
+                  <span
+                    key={p.seat}
+                    className={`trick-play${p.seat === trick.winner ? " winner" : ""}${p.cost > 0 ? " costly" : ""}`}
+                    title={`${players[p.seat].name}${k === 0 ? " led" : ""}${p.seat === trick.winner ? ", won the trick" : ""}${named ? `, naming ${named}` : ""}`}
+                  >
+                    <span className="trick-seat">{p.seat === 0 ? "You" : SEAT_NAMES[p.seat]}</span>
+                    <span className="trick-played">
+                      <BidText label={p.card.label} />
+                      {named && <small> {named}</small>}
+                      {p.cost > 0 && <sup className="trick-cost">−{p.cost}</sup>}
+                    </span>
+                  </span>
+                );
+              })}
+            </div>
+            {plays
+              .filter((p) => p.cost > 0 && p.better.length > 0)
+              .map((p) => (
+                <p key={p.seat} className="trick-note">
+                  {whose(p.seat)} <BidText label={p.card.label} /> cost {p.cost === 1 ? "a trick" : `${p.cost} tricks`}:{" "}
+                  {p.better.map((b, j) => (
+                    <span key={b}>
+                      {j > 0 && (j === p.better.length - 1 ? " or " : ", ")}
+                      <BidText label={b} />
+                    </span>
+                  ))}{" "}
+                  {p.better.length > 1 ? "would each have" : "would have"} kept par.
+                </p>
+              ))}
           </li>
         ))}
       </ol>

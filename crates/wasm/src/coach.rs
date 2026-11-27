@@ -266,6 +266,9 @@ pub struct TracedPlayView {
     pub card: crate::view::CardView,
     pub par_after: u8,
     pub cost: u8,
+    /// When it cost a trick: the plays that would have kept par ("K♠", "Joker naming ♦"), at
+    /// most three, the highest first.
+    pub better: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -310,7 +313,19 @@ pub fn trace_for(save: &SaveData, number: usize, viewer: Seat) -> Result<Option<
         constant: fh_ai::thumb::constant(contract.strain),
         plays: plays
             .into_iter()
-            .map(|p| TracedPlayView { seat: rotate(p.seat), card: card_view(p.card, trump), par_after: p.par_after, cost: p.cost })
+            .map(|p| {
+                let mut better: Vec<fh_core::Play> = p.better.clone();
+                better.sort_by_key(|b| std::cmp::Reverse(fh_core::trick::trick_strength(b.card, fh_core::effective_suit(b.card, trump).unwrap_or(fh_core::Suit::Spades), trump)));
+                let mut labels: Vec<String> = Vec::new();
+                for b in better {
+                    let label = fh_core::Action::Play(b).to_string();
+                    if !labels.contains(&label) {
+                        labels.push(label);
+                    }
+                }
+                labels.truncate(3);
+                TracedPlayView { seat: rotate(p.seat), card: card_view(p.card, trump), par_after: p.par_after, cost: p.cost, better: labels }
+            })
             .collect(),
     }))
 }

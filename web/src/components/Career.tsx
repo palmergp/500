@@ -12,8 +12,9 @@ interface Props {
   onPlay: (chapter: number, skipIntro: boolean) => void;
   /** A finished chapter's opening or ending scene again. */
   onWatch: (chapter: number, which: "opening" | "ending") => void;
-  /** Helper settings now on (they keep a chapter from counting as unaided). */
+  /** Helper settings now on (they keep a chapter from counting as unaided), and turning them off. */
   helpers: string[];
+  onHelpOff: () => void;
   onResume: () => void;
   onReset: () => void;
   onClose: () => void;
@@ -25,7 +26,7 @@ const NUMBERS = ["One", "Two", "Three", "Four", "Five", "Six", "Seven", "Eight",
 /** What "unaided" means, for the 🙌 marks. */
 const UNAIDED = "Beaten with no help: no hints, undos or Finish hand, and grading, the trump counter, the card tracker and out-of-suit marks all off.";
 
-export function CareerDialog({ career, resumable, onName, onPlay, onWatch, helpers, onResume, onReset, onClose }: Props) {
+export function CareerDialog({ career, resumable, onName, onPlay, onWatch, helpers, onHelpOff, onResume, onReset, onClose }: Props) {
   const [naming, setNaming] = useState(!career.name);
   const [draft, setDraft] = useState(career.name);
   const next = nextChapter(career);
@@ -131,10 +132,17 @@ export function CareerDialog({ career, resumable, onName, onPlay, onWatch, helpe
                 );
               })}
             </ol>
-            <p className="note career-unaided-note">
+            <div className="note career-unaided-note">
               <span aria-hidden="true">🙌</span> marks a chapter you've beaten with no help: no hints, undos or Finish hand, and the helpers off.
               {helpers.length > 0 && ` Right now ${helpers.join(", ")} ${helpers.length > 1 ? "are" : "is"} on (Settings), so a chapter won't count.`}
-            </p>
+              {helpers.length > 0 && (
+                <div>
+                  <button type="button" onClick={onHelpOff} title="Turn off grading, the trump counter, the card tracker and out-of-suit marks, to play unaided">
+                    Turn off all help
+                  </button>
+                </div>
+              )}
+            </div>
           </>
         )}
         <div className="actions">

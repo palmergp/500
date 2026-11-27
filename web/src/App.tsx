@@ -518,6 +518,26 @@ export function App() {
     setTourDialog({});
   };
 
+  /** Ends the tournament for good, any time before its results. Its game goes too (if it's the one
+   * saved or on the table); a solo game saved meanwhile stays. */
+  const quitTournament = () => {
+    const t = tourRef.current;
+    const tourGame = t && t.current < ROUNDS ? t.rounds[t.current].tables[yourTable(t, t.current)].seed : null;
+    const saved = savedGame.load();
+    const ownSave = saved !== null && tourGame !== null && (JSON.parse(saved) as { seed: number }).seed === tourGame;
+    tourRef.current = null;
+    setTour(null);
+    saveTournament(null);
+    setTourDialog(null);
+    if (inTour || ownSave) {
+      leaveTourRound();
+    }
+    setInTour(false);
+  };
+
+  /** Turns every helper off (for an unaided tournament or story chapter). */
+  const turnOffHelp = () => changeSettings({ ...settings, grade: false, trumpCounter: false, tracker: false, voids: false });
+
   /** You've had help in a tournament game: it can't count as unaided any more. */
   const markAssisted = useCallback(() => {
     if (tourRef.current?.assisted === false && !replayRef.current) {
@@ -903,13 +923,18 @@ export function App() {
   useEffect(() => {
     if (mode !== "solo" || !view || paused || (view.humanToAct && !finishing) || view.phase === "gameOver") return;
     const pause = new Promise((r) => setTimeout(r, DELAY[view.phase] * factor));
+    if (view.humanToAct) autoActed.current.add(`${gameRef.current}:${view.actionCount}`);
     void request(async (engine) => {
       const [snapshot] = await Promise.all([view.humanToAct ? engine.autoAct() : engine.stepBot(), pause]);
       return snapshot;
     });
   }, [mode, view, paused, factor, request, finishing]);
+  /** Your actions that Finish hand made (The Natural played them), by game: never graded as yours. */
+  const autoActed = useRef(new Set<string>());
 
-  const keepGrade = (save: string, found: GradeView | null, numbers: number[]) => {
+  /** Keeps a grade: shown at the table as it comes (`quiet`: kept without showing, for a hand
+   * graded after the fact in its review). */
+  const keepGrade = (save: string, found: GradeView | null, numbers: number[], quiet = false) => {
     if (!found) return;
     const g: GradeView = { ...found, hinted: numbers.some((n) => hintedRef.current.has(n)) };
     // A puzzle's grades wait for the end (Review hand), and don't count anywhere else. A grade
@@ -930,18 +955,47 @@ export function App() {
       recordGrades(gameRef.current ?? gameId(save), next);
       return next;
     });
-    setLastGrade(g);
+    if (!quiet) setLastGrade(g);
   };
 
   /** Asks the coach to grade your actions `numbers` (positions in the game's action log). */
   /** Runs one grading request, counting it while it's out. */
-  const grade = (run: () => Promise<GradeView | null>, save: string, numbers: number[]) => {
+  const grade = (run: () => Promise<GradeView | null>, save: string, numbers: number[], quiet = false) => {
     setGrading((n) => n + 1);
     run()
-      .then((g) => keepGrade(save, g, numbers))
+      .then((g) => keepGrade(save, g, numbers, quiet))
       .catch(() => {})
       .finally(() => setGrading((n) => n - 1));
   };
+
+  /** A finished hand's review with grading off: the coach grades your decisions in it now, after
+   * the fact (so they don't count as help in an unaided tournament or story chapter). Each hand
+   * once; Finish hand's plays are left out (they weren't yours). */
+  const gradedAfter = useRef(new Set<string>());
+  const gradeHandAfter = (hand: HandView, end: number) => {
+    const save = saveRef.current;
+    const client = coachRef.current;
+    if (!client || !save || modeRef.current !== "solo" || replayRef.current || puzzleRef.current) return;
+    const key = `${gameRef.current}:${hand.number}`;
+    if (gradedAfter.current.has(key)) return;
+    gradedAfter.current.add(key);
+    void client
+      .decisions(save)
+      .then((list) => {
+        const have = new Set(gradesRef.current.map((g) => g.actionNumber));
+        for (const d of list) {
+          if (d.number < hand.firstAction || d.number >= end || have.has(d.number) || autoActed.current.has(`${gameRef.current}:${d.number}`)) continue;
+          grade(() => (d.discards ? client.gradeDiscards(save, d.number) : client.grade(save, d.number)), save, [d.number], true);
+        }
+      })
+      .catch(() => gradedAfter.current.delete(key));
+  };
+  const reviewEnd = review && view ? (view.history.find((h) => h.number === review.number + 1)?.firstAction ?? view.actionCount) : 0;
+  useEffect(() => {
+    if (review && !settings.grade) gradeHandAfter(review, reviewEnd);
+    // Once per review opened; the rest is read when it runs.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [review]);
 
   const gradeLater = (save: string, numbers: number[]) => {
     if (!coach || replayRef.current || (!settings.grade && !puzzleRef.current)) return;
@@ -1641,11 +1695,13 @@ export function App() {
             hand={review}
             players={view.players}
             grades={grades.filter((g) => g.deal === review.number)}
+            pending={grading}
+            afterwards={mode === "solo" && !settings.grade}
             coach={coach}
             save={coachSave()}
             onReplay={mode === "solo" && !puzzle ? startReplay : undefined}
             onCode={mode === "solo" ? showCode : undefined}
-            end={view.history.find((h) => h.number === review.number + 1)?.firstAction ?? view.actionCount}
+            end={reviewEnd}
           />
         </Dialog>
       )}
@@ -1678,13 +1734,9 @@ export function App() {
               : undefined
           }
           helpers={helpers}
+          onHelpOff={turnOffHelp}
           onLeave={leaveTourRound}
-          onQuit={() => {
-            tourRef.current = null;
-            setTour(null);
-            saveTournament(null);
-            leaveTourRound();
-          }}
+          onQuit={quitTournament}
         />
       )}
       {showRecap && tour && <RecapDialog t={tour} progress={recapProgress} onClose={() => setShowRecap(false)} />}
@@ -1744,6 +1796,7 @@ export function App() {
           onPlay={startChapter}
           onWatch={watchScene}
           helpers={helpers}
+          onHelpOff={turnOffHelp}
           onResume={resumeCareer}
           onReset={() => {
             updateCareer((c) => {
