@@ -67,7 +67,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
     println!("{deals} deals, Steady or Rookie as South, expert bots elsewhere. Every South card play the coach didn't call");
     println!("best, played out both ways (the player's card and the coach's) by The Oracle in every seat, same seed both ways.");
     println!("Losses are the coach's card's points less the player's, for the player's side: as the coach stated, and real.\n");
-    let sections: [(&str, &str); 8] = [
+    let sections: [(&str, &str); 9] = [
         ("verdict", "By verdict"),
         ("slip role", "Mistakes and blunders, by player"),
         ("slip trick", "Mistakes and blunders, by trick"),
@@ -76,6 +76,7 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
         ("good", "Graded good (not the coach's card), by decision"),
         ("discard", "Discards against discards, by verdict"),
         ("stated", "By the loss stated"),
+        ("calib", "Other than discards and low leads: by player and the loss stated"),
     ];
     for (prefix, title) in sections {
         println!("### {title}\n");
@@ -84,9 +85,10 @@ pub fn run(deals: u64, seed: u64, threads: u64) {
         let mut rows: Vec<(&String, &Tally)> = tallies.iter().filter(|(k, _)| k.starts_with(&format!("{prefix}:"))).collect();
         match prefix {
             "verdict" | "discard" | "stated" => rows.sort_by(|a, b| a.1.stated.mean().total_cmp(&b.1.stated.mean())),
+            "calib" => {}
             _ => rows.sort_by(|a, b| b.1.real.n.total_cmp(&a.1.real.n)),
         }
-        for (key, t) in rows.into_iter().take(18) {
+        for (key, t) in rows.into_iter().take(24) {
             let m = t.real.n.max(1.0);
             println!(
                 "| {} | {} | {:.1} | {} | {} | {:.0}% / {:.0}% |",
@@ -215,7 +217,14 @@ fn deal(seed: u64, rows: &mut Vec<Row>) {
             Verdict::Inaccuracy => keys.push(format!("inaccuracy: {what}")),
             _ => keys.push(format!("good: {what}")),
         }
-        if what.starts_with("follow a discard") && what.contains("instead of a discard") {
+        let discards = what.starts_with("follow a discard") && what.contains("instead of a discard");
+        let low_leads = what == "lead a low side card instead of a low side card";
+        if !discards && !low_leads {
+            // The rest, for calibrating the stated loss by who plays.
+            keys.push(format!("calib: {role}, stated {bucket}"));
+            keys.push(format!("calib: {role}, all"));
+        }
+        if discards {
             keys.push(format!("discard: {label}"));
             keys.push(format!("discard: {label}, {role}"));
         }

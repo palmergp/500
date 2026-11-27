@@ -307,6 +307,24 @@ impl Coach {
             analysis.reasons = vec![ace_or_top_trump_note(chosen, analysis.best)];
             return Grade { chosen, best: analysis.best, loss: 0.0, verdict: Verdict::Good, analysis };
         }
+        if let (Action::Play(c), Action::Play(b)) = (chosen, analysis.best) {
+            if throws_away(obs, c.card) && throws_away(obs, b.card) {
+                // One discard against another: played out, the coach's discard came out about 13
+                // points better whatever the deals said, and its "blunders" cost nothing (finding
+                // 65). With the cards hidden, the opponents rarely know which suit you let go.
+                if verdict > Verdict::Inaccuracy {
+                    verdict = Verdict::Inaccuracy;
+                    analysis.reasons.push(format!(
+                        "Discards are hard to judge: {} looks much better on these deals, but played out, a discard the coach prefers gains only about 13 points on average. The opponents can't see which suit you let go.",
+                        b.card
+                    ));
+                }
+            } else if low_side_lead(obs, c.card) && low_side_lead(obs, b.card) && verdict > Verdict::Good {
+                // Which low card to lead: played out, the coach's choice came out no better (finding 65).
+                verdict = Verdict::Good;
+                analysis.reasons.push(format!("A close call: which low card you lead made little difference when hands like this were played out, even where the likely deals favour {}.", b.card));
+            }
+        }
         if analysis.close.contains(&chosen) {
             // One of the plays the coach couldn't separate from its choice: not a mistake.
             verdict = verdict.min(Verdict::Good);
@@ -712,6 +730,23 @@ fn ace_or_top_trump_note(yours: Action, other: Action) -> String {
     format!(
         "{yours} does as well as {other} here. Early in the hand, leading your top trump ({top}) to draw theirs and cashing a side ace ({ace}) came out even when both were played out from 1,747 hands like this: a side ace is seldom trumped this early (6% of the time)."
     )
+}
+
+/// Whether `card` would be thrown away: it neither follows the suit led nor beats the trick.
+fn throws_away(obs: &Observation, card: Card) -> bool {
+    let trump = obs.trump();
+    let Some(trick) = obs.current_trick.as_ref() else { return false };
+    let (Some(led), Some(winning)) = (trick.led_suit(), trick.winning_card(trump)) else { return false };
+    effective_suit(card, trump) != Some(led) && trick_strength(card, led, trump) <= trick_strength(winning, led, trump)
+}
+
+/// Whether `card` is a low side card to lead: no trump, not the Joker, below the king, and not the
+/// highest card left in its suit.
+fn low_side_lead(obs: &Observation, card: Card) -> bool {
+    let trump = obs.trump();
+    let leading = obs.current_trick.as_ref().is_none_or(|t| t.cards().is_empty());
+    let seen = obs.played().union(obs.hand).union(obs.discards.unwrap_or_default());
+    leading && !card.is_joker() && !is_trump(card, trump) && card.rank() < fh_core::cards::KING && !is_boss(card, seen, trump)
 }
 
 /// "Close call: …" for the hint and the grade.
@@ -1863,6 +1898,42 @@ mod tests {
     /// The reasons for following to a trick say what each card does to it: last to play, the
     /// coach's card takes it and yours hands it over; with an opponent still to play, a card that
     /// wins for now may not hold.
+    /// One discard against another is never graded worse than an inaccuracy: played out, the
+    /// coach's "blunder" discards cost nothing (finding 65).
+    #[test]
+    fn a_discard_against_another_is_at_worst_an_inaccuracy() {
+        let mut found = 0;
+        for seed in 0..40 {
+            let mut game = Game::new(Rules::default(), seed);
+            let mut bots: [crate::search_bot::SearchBot; 4] = std::array::from_fn(|i| crate::search_bot::SearchBot::new("bot", SearchConfig::FAST, seed * 4 + i as u64));
+            while let Some(seat) = game.to_act() {
+                let obs = game.observe(seat);
+                let legal = game.legal_actions();
+                let discards: Vec<Action> = legal.iter().copied().filter(|&a| matches!(a, Action::Play(p) if throws_away(&obs, p.card))).collect();
+                if game.phase() == Phase::Playing && discards.len() == legal.len() && legal.len() >= 2 {
+                    // Grade each discard but the coach's: none is worse than an inaccuracy.
+                    let mut coach = Coach::new(seed);
+                    let best = coach.analyze(&obs, &legal, None).best;
+                    for &a in discards.iter().filter(|&&a| a != best) {
+                        let grade = coach.grade(&obs, &legal, a);
+                        assert!(grade.verdict <= Verdict::Inaccuracy, "seed {seed}: {a} {:?} ({:.0})", grade.verdict, grade.loss);
+                    }
+                    found += 1;
+                    break;
+                }
+                let action = bots[seat.index()].choose(&obs, &legal);
+                let Ok(events) = game.apply(action) else { break };
+                if events.iter().any(|e| matches!(e, fh_core::Event::HandScored { .. } | fh_core::Event::PassedOut { .. })) {
+                    break;
+                }
+            }
+            if found >= 3 {
+                break;
+            }
+        }
+        assert!(found >= 3, "positions with only discards to choose from: {found}");
+    }
+
     #[test]
     fn following_reasons_say_what_happens_to_the_trick() {
         let card = |c: &str| Card::parse(c).unwrap();
