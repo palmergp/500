@@ -12,7 +12,7 @@
   {
     "contract": "8NT",
     "id": 3,
-    "save": "{\"version\":1,\"seed\":7000141,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[20,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+    "save": "{\"version\":1,\"seed\":7000184,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,20,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♥",
@@ -30,173 +30,173 @@
     "save": "{\"version\":1,\"seed\":7000423,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,17,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
-    "contract": "8NT",
-    "id": 7,
-    "save": "{\"version\":1,\"seed\":7000456,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,20,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
-  },
-  {
     "contract": "8♥",
-    "id": 8,
+    "id": 7,
     "save": "{\"version\":1,\"seed\":7000536,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,19,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♣",
-    "id": 9,
+    "id": 8,
     "save": "{\"version\":1,\"seed\":7000605,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[17,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♠",
-    "id": 10,
+    "id": 9,
     "save": "{\"version\":1,\"seed\":7000689,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[16,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♥",
-    "id": 11,
+    "id": 10,
     "save": "{\"version\":1,\"seed\":7000712,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,19],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♦",
-    "id": 12,
+    "id": 11,
     "save": "{\"version\":1,\"seed\":7000800,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,18,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♠",
-    "id": 13,
+    "id": 12,
     "save": "{\"version\":1,\"seed\":7000905,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,16,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "8♠",
-    "id": 14,
+    "id": 13,
     "save": "{\"version\":1,\"seed\":7000941,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,16],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
-    "contract": "8NT",
-    "id": 15,
-    "save": "{\"version\":1,\"seed\":7001059,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[20,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
-  },
-  {
     "contract": "8♥",
-    "id": 16,
+    "id": 14,
     "save": "{\"version\":1,\"seed\":7001252,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,19,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
+    "contract": "9NT",
+    "id": 15,
+    "save": "{\"version\":1,\"seed\":7000001,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,25],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+  },
+  {
     "contract": "9♣",
-    "id": 17,
+    "id": 16,
     "save": "{\"version\":1,\"seed\":7000171,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,22,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♥",
-    "id": 18,
+    "id": 17,
     "save": "{\"version\":1,\"seed\":7000180,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,24],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9NT",
-    "id": 19,
+    "id": 18,
     "save": "{\"version\":1,\"seed\":7000202,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,25],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♦",
-    "id": 20,
+    "id": 19,
     "save": "{\"version\":1,\"seed\":7000214,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,23,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♥",
-    "id": 21,
+    "id": 20,
     "save": "{\"version\":1,\"seed\":7000553,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,24,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9NT",
-    "id": 22,
+    "id": 21,
     "save": "{\"version\":1,\"seed\":7000715,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,25],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♣",
-    "id": 23,
+    "id": 22,
     "save": "{\"version\":1,\"seed\":7000878,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[22,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♥",
-    "id": 24,
+    "id": 23,
     "save": "{\"version\":1,\"seed\":7000882,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[24,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♦",
-    "id": 25,
+    "id": 24,
     "save": "{\"version\":1,\"seed\":7000909,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,23],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
-    "contract": "9NT",
-    "id": 26,
-    "save": "{\"version\":1,\"seed\":7000919,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,25,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
-  },
-  {
     "contract": "9♣",
-    "id": 27,
+    "id": 25,
     "save": "{\"version\":1,\"seed\":7000983,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,22,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
-    "contract": "9NT",
-    "id": 28,
-    "save": "{\"version\":1,\"seed\":7001080,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[25,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
-  },
-  {
     "contract": "9♠",
-    "id": 29,
+    "id": 26,
     "save": "{\"version\":1,\"seed\":7001158,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,21,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♥",
-    "id": 30,
+    "id": 27,
     "save": "{\"version\":1,\"seed\":7001258,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[24,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♠",
-    "id": 31,
+    "id": 28,
     "save": "{\"version\":1,\"seed\":7001266,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[21,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "9♠",
-    "id": 32,
+    "id": 29,
     "save": "{\"version\":1,\"seed\":7001278,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[21,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
+    "contract": "9NT",
+    "id": 30,
+    "save": "{\"version\":1,\"seed\":7001302,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,25],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+  },
+  {
     "contract": "10NT",
-    "id": 33,
+    "id": 31,
     "save": "{\"version\":1,\"seed\":7000002,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10NT",
-    "id": 34,
-    "save": "{\"version\":1,\"seed\":7000128,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,0,30],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
-  },
-  {
-    "contract": "10NT",
-    "id": 35,
+    "id": 32,
     "save": "{\"version\":1,\"seed\":7000208,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10♠",
-    "id": 36,
+    "id": 33,
     "save": "{\"version\":1,\"seed\":7000298,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[26,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10NT",
-    "id": 37,
-    "save": "{\"version\":1,\"seed\":7000355,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+    "id": 34,
+    "save": "{\"version\":1,\"seed\":7000348,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,30,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10NT",
-    "id": 38,
+    "id": 35,
     "save": "{\"version\":1,\"seed\":7000379,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
+    "contract": "10NT",
+    "id": 36,
+    "save": "{\"version\":1,\"seed\":7000404,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+  },
+  {
+    "contract": "10NT",
+    "id": 37,
+    "save": "{\"version\":1,\"seed\":7000417,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+  },
+  {
     "contract": "10♥",
-    "id": 39,
+    "id": 38,
     "save": "{\"version\":1,\"seed\":7000571,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,29,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   },
   {
     "contract": "10♣",
-    "id": 40,
+    "id": 39,
     "save": "{\"version\":1,\"seed\":7000719,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[0,0,27,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
+  },
+  {
+    "contract": "10NT",
+    "id": 40,
+    "save": "{\"version\":1,\"seed\":7000984,\"players\":[\"human\",\"oracle\",\"oracle\",\"oracle\"],\"log\":[30,0,0,0],\"hands\":1,\"names\":[\"You\",\"West\",\"North\",\"East\"]}"
   }
 ]
