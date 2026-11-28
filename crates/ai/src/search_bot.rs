@@ -186,6 +186,7 @@ impl SearchConfig {
         alt_bid_model: false,
         nt_kitty_search: true,
     };
+    /// Plays for the game in a game to 500; a short game (so every tournament game) for points.
     pub const SHARK: SearchConfig =
         SearchConfig { bid_margin: -5.0, rule_aggression: 1.0, goal: Goal::WinChance, ..SearchConfig::COUNTER };
     /// Neural bidding (Phase 5) with The Counter's card play.
@@ -263,13 +264,16 @@ impl SearchBot {
         let change = score_hand(rules, contract, side, tricks, obs.scores);
         let us = obs.seat.team().index();
         match self.config.goal {
-            Goal::Points => (change[us] - change[1 - us]) as f64,
-            Goal::WinChance => {
+            // A short game is played for points, as the coach plays it (the house rule; in a
+            // tournament every point goes to the totals). Played for the win, a side sure of it
+            // on the last hand found every card alike and threw its cheapest, letting a 7♠ that
+            // could take nine tricks go down.
+            Goal::WinChance if rules.hand_limit.is_none() => {
                 let after = [obs.scores[0] + change[0], obs.scores[1] + change[1]];
-                let hands_left = rules.hand_limit.map(|n| n.saturating_sub(obs.hands_played + 1));
                 let made = declarer_tricks >= contract.level;
-                1000.0 * win_chance(rules, after, side, made, obs.seat.team(), hands_left)
+                1000.0 * win_chance(rules, after, side, made, obs.seat.team(), None)
             }
+            _ => (change[us] - change[1 - us]) as f64,
         }
     }
 
@@ -901,6 +905,30 @@ mod tests {
         let even = win_chance(&rules, [200, 200], ns, true, ns, None);
         assert!((even - 0.5).abs() < 1e-9);
         assert!(win_chance(&rules, [400, 100], ns, true, ns, None) > 0.8);
+    }
+
+    /// In a short game The Shark plays for points like everyone else: on the last hand of a
+    /// tournament game, East–West 240 to −50, it threw low diamonds instead of trumping, the game
+    /// being won whatever happened, and let 7♠ go down.
+    #[test]
+    fn the_shark_plays_a_short_game_for_points() {
+        let rules = Rules { hand_limit: Some(4), ..Rules::default() };
+        let mut game = Game::new(rules, 3);
+        let mut bots: [SearchBot; 4] = std::array::from_fn(|i| SearchBot::new("bot", SearchConfig::FAST, i as u64));
+        while game.phase() != Phase::Playing {
+            let seat = game.to_act().expect("someone to act");
+            let action = bots[seat.index()].choose(&game.observe(seat), &game.legal_actions());
+            if game.apply(action).is_err() {
+                return;
+            }
+        }
+        let (declarer, contract) = game.contract().expect("a bid");
+        let obs = game.observe(declarer.next());
+        let shark = SearchBot::new("The Shark", SearchConfig::SHARK, 1);
+        let counter = SearchBot::new("The Counter", SearchConfig::COUNTER, 1);
+        for tricks in 0..=10 {
+            assert_eq!(shark.utility(&obs, contract, declarer, tricks), counter.utility(&obs, contract, declarer, tricks));
+        }
     }
 
     #[test]

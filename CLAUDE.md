@@ -49,7 +49,7 @@
 - Near the end of a game to 500 (either side within 160 of 500 or of −500) the coach plays for the game
   (`plays_for_the_game`, `Units::WinChance`): values are tenths of a percent of the chance to win, and grades
   carry `units: "win"`. Four-hand games are always played for points (the user's rule: no race to 500, so no
-  sacrifices). Displayed make chances go through the measured real-play curves (`real_play_chance`).
+  sacrifices), by the bots too: The Shark plays for the game only in a game to 500 (`SearchBot::utility`). Displayed make chances go through the measured real-play curves (`real_play_chance`).
 - Neural bidding: `fh-lab dataset` writes training data (inputs defined in `crates/ai/src/features.rs`), then
   `train/.venv/Scripts/python train/train_bid.py` writes `crates/ai/models/bid.fhnn`, embedded at build time.
   `train/rules_of_thumb.py` measures the counting rules in `docs/rules-of-thumb.md`.
